@@ -1,7 +1,719 @@
 (function(){
-const _s=document.createElement("style");
-_s.textContent='        /* ── Code Canvas (Gemini-style) ── */\n        .code-canvas {\n            margin: 8px 0 4px;\n            border-radius: 12px;\n            overflow: hidden;\n            border: 1px solid var(--glass-border);\n            background: #0d0d10;\n            font-family: \'Courier New\', Courier, monospace;\n            max-width: 100%;\n            min-width: 0;\n            width: 100%;\n            box-sizing: border-box;\n        }\n        body.light-theme .code-canvas { background: #1e1e2e; }\n        .code-canvas-header {\n            display: flex; align-items: center; gap: 7px;\n            padding: 6px 10px;\n            background: rgba(255,255,255,0.04);\n            border-bottom: 1px solid rgba(255,255,255,0.07);\n        }\n        .code-canvas-lang {\n            font-size: 9px; font-weight: 700; font-family: \'Poppins\', sans-serif;\n            color: var(--accent); text-transform: uppercase; letter-spacing: 0.7px; flex: 1;\n            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;\n        }\n        .code-canvas-btn {\n            background: rgba(255,255,255,0.07); border: none; border-radius: 6px;\n            padding: 3px 7px; font-size: 9px; font-weight: 700;\n            font-family: \'Poppins\', sans-serif; color: rgba(255,255,255,0.7);\n            cursor: pointer; display: flex; align-items: center; gap: 3px;\n            transition: background 0.15s, color 0.15s; flex-shrink: 0;\n            -webkit-tap-highlight-color: transparent;\n        }\n        .code-canvas-btn:active { background: var(--accent-dim); color: var(--accent); }\n        .code-canvas-btn .material-icons-round { font-size: 11px; pointer-events: none; }\n        .code-canvas-btn.copied { color: var(--accent); }\n        .code-canvas-body {\n            padding: 10px 12px;\n            overflow-x: auto;\n            overflow-y: auto;\n            font-size: 11px;\n            line-height: 1.55;\n            color: #e0e0e0;\n            white-space: pre;\n            max-height: 260px;\n            -webkit-overflow-scrolling: touch;\n        }\n        /* inline code */\n        .chat-inline-code {\n            font-family: \'Courier New\', Courier, monospace;\n            font-size: 11px;\n            background: rgba(16,185,129,0.12);\n            color: var(--accent);\n            padding: 1px 5px;\n            border-radius: 4px;\n        }\n        /* chat markdown */\n        .chat-md-bold { font-weight: 700; }\n        .chat-md-li { padding-left: 14px; position: relative; }\n        .chat-md-li::before { content: \'•\'; position: absolute; left: 3px; color: var(--accent); }\n        .agent-step-card {\n            margin-top: 8px;\n            border-radius: 12px;\n            overflow: hidden;\n            border: 1px solid var(--glass-border);\n        }\n        .agent-step-header {\n            display: flex; align-items: center; gap: 8px;\n            padding: 9px 12px;\n            background: rgba(16,185,129,0.08);\n            border-bottom: 1px solid var(--glass-border);\n        }\n        .agent-step-num {\n            width: 20px; height: 20px; border-radius: 50%;\n            background: var(--accent); color: white;\n            font-size: 10px; font-weight: 700;\n            display: flex; align-items: center; justify-content: center;\n            flex-shrink: 0;\n        }\n        .agent-step-label {\n            font-size: 10px; font-weight: 700; color: var(--accent);\n            text-transform: uppercase; letter-spacing: 0.5px; flex: 1;\n        }\n        .agent-step-body {\n            padding: 10px 12px;\n            font-size: 12px; line-height: 1.6;\n            color: var(--text-color); opacity: 0.9;\n            background: rgba(0,0,0,0.12);\n        }\n        .agent-step-actions {\n            display: flex; gap: 8px;\n            padding: 9px 12px;\n            background: rgba(0,0,0,0.10);\n            border-top: 1px solid var(--glass-border);\n        }\n        .agent-step-accept {\n            flex: 1; padding: 8px; border: none; border-radius: 8px;\n            background: var(--accent); color: white;\n            font-family: \'Poppins\', sans-serif; font-size: 12px; font-weight: 700;\n            cursor: pointer; display: flex; align-items: center;\n            justify-content: center; gap: 5px;\n            transition: opacity 0.15s, transform 0.15s;\n        }\n        .agent-step-accept:active { opacity: 0.85; transform: scale(0.97); }\n        .agent-step-accept .material-icons-round { font-size: 14px; pointer-events: none; }\n        .agent-step-reject {\n            padding: 8px 14px; border: 1px solid var(--glass-border); border-radius: 8px;\n            background: none; color: var(--text-color); opacity: 0.6;\n            font-family: \'Poppins\', sans-serif; font-size: 12px; font-weight: 700;\n            cursor: pointer; transition: opacity 0.15s, background 0.15s;\n        }\n        .agent-step-reject:active { background: rgba(239,68,68,0.1); color: #ef4444; opacity: 1; }\n        .agent-step-refine-btn {\n            padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px;\n            background: none; color: var(--accent);\n            font-family: \'Poppins\', sans-serif; font-size: 12px; font-weight: 700;\n            cursor: pointer; transition: background 0.15s, opacity 0.15s;\n            white-space: nowrap;\n        }\n        .agent-step-refine-btn:active { background: var(--accent-dim); }\n        .agent-step-refine-area {\n            padding: 8px 12px;\n            border-top: 1px solid var(--glass-border);\n            background: rgba(0,0,0,0.1);\n            display: flex; gap: 8px; align-items: flex-end;\n        }\n        .agent-step-refine-input {\n            flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);\n            border-radius: 8px; color: var(--text-color); font-family: \'Poppins\', sans-serif;\n            font-size: 12px; padding: 7px 10px; resize: none; outline: none;\n            line-height: 1.4; min-height: 34px; max-height: 80px;\n        }\n        .agent-step-refine-input:focus { border-color: var(--accent); }\n        .agent-step-refine-send {\n            width: 32px; height: 32px; border-radius: 8px; border: none; flex-shrink: 0;\n            background: var(--accent); color: white; cursor: pointer;\n            display: flex; align-items: center; justify-content: center;\n            transition: opacity 0.15s, transform 0.15s;\n        }\n        .agent-step-refine-send:active { opacity: 0.8; transform: scale(0.9); }\n        .agent-step-refine-send .material-icons-round { font-size: 16px; pointer-events: none; }\n        .agent-step-done {\n            font-size: 10px; font-weight: 700; color: var(--text-color);\n            opacity: 0.4; padding: 9px 12px;\n            background: rgba(0,0,0,0.10);\n            border-top: 1px solid var(--glass-border);\n            text-align: center;\n        }\n        .agent-plan-item {\n            display: flex; gap: 8px; align-items: flex-start;\n            padding: 6px 0; border-bottom: 1px solid var(--glass-border);\n            font-size: 11px; line-height: 1.5;\n        }\n        .agent-plan-item:last-child { border-bottom: none; }\n        .agent-plan-num {\n            font-size: 10px; font-weight: 700; color: var(--accent);\n            min-width: 18px; margin-top: 1px;\n        }\n\n        /* Typing indicator bubble */\n        .chat-typing-bubble {\n            display: flex; align-items: center; gap: 4px;\n            padding: 10px 14px; border-radius: 16px; border-bottom-left-radius: 4px;\n            background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);\n            width: fit-content;\n        }\n        .chat-typing-bubble span {\n            width: 5px; height: 5px; border-radius: 50%;\n            background: var(--accent); display: inline-block;\n            animation: agentBounce 0.8s infinite;\n        }\n        .chat-typing-bubble span:nth-child(2) { animation-delay: 0.2s; }\n        .chat-typing-bubble span:nth-child(3) { animation-delay: 0.4s; }\n\n        /* Fix / Apply card inside chat bubble */\n        .chat-fix-card {\n            margin-top: 8px;\n            background: rgba(16,185,129,0.07);\n            border: 1px solid rgba(16,185,129,0.25);\n            border-radius: 10px; padding: 9px 11px;\n        }\n        .chat-fix-title {\n            font-size: 10px; font-weight: 700; color: var(--accent);\n            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;\n        }\n        .chat-fix-reason {\n            font-size: 11px; color: var(--text-color); opacity: 0.8;\n            margin-bottom: 8px; line-height: 1.5;\n        }\n        .chat-fix-preview {\n            display: flex; gap: 5px; margin-bottom: 8px;\n        }\n        .chat-fix-side {\n            flex: 1; border-radius: 6px; padding: 5px 7px; min-width: 0;\n        }\n        .chat-fix-side.remove {\n            background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);\n        }\n        .chat-fix-side.insert {\n            background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);\n        }\n        .chat-fix-side-label {\n            font-size: 8px; font-weight: 700; letter-spacing: 0.4px; margin-bottom: 3px;\n        }\n        .chat-fix-side.remove .chat-fix-side-label { color: #ef4444; }\n        .chat-fix-side.insert .chat-fix-side-label { color: #10b981; }\n        .chat-fix-code {\n            font-family: monospace; font-size: 10px;\n            word-break: break-all; opacity: 0.9;\n        }\n        .chat-fix-side.remove .chat-fix-code { color: #ef4444; }\n        .chat-fix-side.insert .chat-fix-code { color: #10b981; }\n        .chat-apply-btn {\n            width: 100%; padding: 8px; border: none; border-radius: 8px;\n            background: var(--accent); color: white;\n            font-family: \'Poppins\', sans-serif; font-size: 12px; font-weight: 700;\n            cursor: pointer; display: flex; align-items: center;\n            justify-content: center; gap: 6px;\n            transition: opacity 0.15s, transform 0.15s;\n        }\n        .chat-apply-btn:active { opacity: 0.85; transform: scale(0.97); }\n        .chat-apply-btn.applied {\n            background: rgba(128,128,128,0.2); color: var(--text-color); cursor: default;\n        }\n        .chat-apply-btn .material-icons-round { font-size: 15px; pointer-events: none; }\n\n        /* Split file card */\n        .chat-split-card {\n            margin-top: 8px;\n            background: rgba(16,185,129,0.06);\n            border: 1px solid rgba(16,185,129,0.2);\n            border-radius: 10px; padding: 9px 11px;\n        }\n        .chat-split-file-row {\n            display: flex; align-items: center; gap: 8px;\n            padding: 6px 0; border-bottom: 1px solid var(--glass-border);\n        }\n        .chat-split-file-row:last-of-type { border-bottom: none; }\n        .chat-split-file-name {\n            flex: 1; font-size: 12px; font-weight: 600;\n            color: var(--text-color); overflow: hidden;\n            text-overflow: ellipsis; white-space: nowrap;\n        }\n        .chat-split-mini-btn {\n            background: var(--accent-dim); border: none; border-radius: 6px;\n            padding: 4px 7px; cursor: pointer; font-size: 10px;\n            font-family: \'Poppins\', sans-serif; font-weight: 700;\n            color: var(--accent); transition: transform 0.15s;\n        }\n        .chat-split-mini-btn:active { transform: scale(0.92); }\n\n        /* Chat input row */\n        #agent-chat-input-row {\n            display: flex; align-items: flex-end; gap: 8px;\n            padding: 10px 14px;\n            padding-bottom: max(env(safe-area-inset-bottom), 14px);\n            border-top: 1px solid var(--glass-border);\n            flex-shrink: 0;\n        }\n        #agent-chat-file-selector {\n            padding: 0 14px 6px; display: none;\n            flex-shrink: 0;\n        }\n        #agent-chat-file-select {\n            width: 100%; padding: 5px 8px; border-radius: 7px;\n            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);\n            color: var(--text-color); font-family: Poppins,sans-serif;\n            font-size: 10px; font-weight: 600;\n            appearance: none; -webkit-appearance: none; cursor: pointer;\n        }\n        #agent-chat-textarea {\n            flex: 1; padding: 9px 12px; border-radius: 20px;\n            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);\n            color: var(--text-color); font-family: \'Poppins\', sans-serif;\n            font-size: 13px; resize: none; min-height: 38px;\n            max-height: 100px; overflow-y: auto; line-height: 1.4;\n            user-select: text; -webkit-user-select: text;\n            transition: border-color 0.2s;\n        }\n        #agent-chat-textarea:focus {\n            border-color: var(--accent); outline: none;\n            box-shadow: 0 0 0 2px var(--accent-dim);\n        }\n        #agent-chat-attach-btn, #agent-chat-send-btn {\n            width: 38px; height: 38px; border-radius: 50%; border: none;\n            display: flex; align-items: center; justify-content: center;\n            cursor: pointer; flex-shrink: 0;\n            transition: transform 0.15s, opacity 0.15s;\n        }\n        #agent-chat-attach-btn:active, #agent-chat-send-btn:active { transform: scale(0.88); }\n        #agent-chat-attach-btn { background: rgba(128,128,128,0.12); color: var(--text-color); }\n        #agent-chat-send-btn { background: var(--accent); color: white; }\n        #agent-chat-attach-btn .material-icons-round,\n        #agent-chat-send-btn .material-icons-round { font-size: 17px; pointer-events: none; }\n\n        /* Empty chat state */\n        #chat-empty-state {\n            flex: 1; display: flex; flex-direction: column;\n            align-items: center; justify-content: center;\n            gap: 10px; opacity: 0.45; pointer-events: none;\n            padding: 20px;\n        }\n        #chat-empty-state .material-icons-round { font-size: 38px; color: var(--accent); }\n        #chat-empty-state p {\n            font-size: 12px; text-align: center; line-height: 1.6;\n            color: var(--text-color);\n        }\n\n\n\n        /* When chat is open, main-container splits into two halves */\n        .main-container.chat-split {\n            display: flex;\n            flex-direction: column;\n        }\n\n        /* Editor half — top 50% */\n        .main-container.chat-split #editor {\n            position: relative;\n            top: auto; right: auto; bottom: auto; left: auto;\n            flex: 1;\n            min-height: 0;\n            border-bottom: 2px solid var(--accent);\n        }\n\n        /* Chat half — bottom 50% */\n        #inline-chat-panel {\n            position: fixed;\n            left: 0; right: 0;\n            bottom: 0;\n            z-index: 41;\n            height: 45vh;\n            display: flex;\n            flex-direction: column;\n            background: var(--glass-bg);\n            border-top: 2px solid var(--accent);\n            border-radius: var(--panel-round) var(--panel-round) 0 0;\n            box-shadow: 0 -3px 16px rgba(0,0,0,0.10);\n            overflow: hidden;\n            transform: translateY(100%);\n            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);\n            pointer-events: none;\n            will-change: transform;\n        }\n        #inline-chat-panel.chat-open {\n            transform: translateY(0);\n            pointer-events: auto;\n        }\n\n        /* Chat header — compact strip */\n        #inline-chat-header {\n            display: flex;\n            align-items: center;\n            gap: 8px;\n            padding: 7px 12px;\n            border-bottom: 1px solid var(--glass-border);\n            flex-shrink: 0;\n        }\n        .inline-chat-avatar {\n            width: 26px; height: 26px; border-radius: 50%;\n            background: linear-gradient(135deg, #10b981, #059669);\n            display: flex; align-items: center; justify-content: center;\n            flex-shrink: 0;\n        }\n        .inline-chat-avatar .material-icons-round { font-size: 14px; color: white; }\n        #inline-chat-name {\n            font-size: 12px; font-weight: 700;\n            color: var(--text-color); flex: 1;\n        }\n        #inline-chat-status {\n            font-size: 10px; color: var(--accent); font-weight: 600;\n        }\n        #inline-chat-close {\n            background: none; border: none; cursor: pointer;\n            color: var(--text-color); opacity: 0.4;\n            display: flex; align-items: center; padding: 2px;\n        }\n        #inline-chat-close .material-icons-round { font-size: 18px; pointer-events: none; }\n        /* Fullscreen toggle */\n        #inline-chat-fullscreen {\n            background: rgba(128,128,128,0.1); border: none; border-radius: 8px;\n            width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;\n            cursor: pointer; color: var(--text-color); opacity: 0.55; flex-shrink: 0;\n            transition: opacity 0.15s;\n        }\n        #inline-chat-fullscreen:active { opacity: 1; background: var(--accent-dim); }\n        #inline-chat-panel.chat-fullscreen {\n            top: var(--header-full-h, 80px) !important;\n            height: calc(100svh - var(--header-full-h, 80px)) !important;\n            border-radius: 0 !important;\n            padding-top: 0;\n            max-height: calc(100svh - var(--header-full-h, 80px)) !important;\n        }\n\n        /* Chat mode button — animated glow ring when ON */\n        #inline-chat-mode-btn { position: relative; transition: background 0.25s, color 0.25s, box-shadow 0.25s; }\n        #inline-chat-mode-btn.mode-on { background: var(--accent) !important; color: white !important; animation: chatModePulse 2s ease-out infinite; }\n        @keyframes chatModePulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); } 60% { box-shadow: 0 0 0 6px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }\n        #inline-chat-mode-btn.mode-on svg { filter: drop-shadow(0 0 3px rgba(255,255,255,0.4)); }\n        #chat-code-access-btn { display: none; position: relative; transition: background 0.25s, color 0.25s, box-shadow 0.25s; }\n        #chat-code-access-btn.access-on { background: rgba(245,158,11,0.18) !important; color: #f59e0b !important; border: 1.5px solid rgba(245,158,11,0.4) !important; }\n        #chat-code-access-btn.access-on svg { stroke: #f59e0b; }\n\n        /* Toast anchored above chat panel */\n        #chat-panel-toast { position:fixed; left:50%; transform:translateX(-50%) translateY(8px); bottom:46vh; background:var(--glass-bg); border:1px solid var(--glass-border); color:var(--text-color); padding:7px 14px; border-radius:20px; font-size:11px; font-weight:700; font-family:\'Poppins\',sans-serif; display:flex; align-items:center; gap:7px; z-index:9999; opacity:0; pointer-events:none; white-space:nowrap; box-shadow:0 -3px 12px rgba(0,0,0,0.25); transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1); }\n        #chat-panel-toast.show { opacity:1; }\n        #chat-panel-toast:not([style*="top"]).show { transform:translateX(-50%) translateY(0); }\n        #chat-panel-toast .cpt-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }\n\n        /* Messages area */\n        #inline-chat-messages {\n            flex: 1; overflow-y: auto;\n            padding: 10px 12px;\n            display: flex; flex-direction: column;\n            gap: 8px;\n            overscroll-behavior: contain;\n        }\n        #inline-chat-messages::-webkit-scrollbar { display: none; }\n\n        /* Reuse existing chat bubble styles */\n        #inline-chat-messages .chat-msg { max-width: 88%; min-width: 0; }\n        #inline-chat-messages .chat-msg.agent { max-width: 100%; width: 100%; }\n\n        /* Input row */\n        #inline-chat-input-row {\n            display: flex; align-items: flex-end; gap: 6px;\n            padding: 8px 10px;\n            padding-bottom: max(env(safe-area-inset-bottom), 10px);\n            border-top: 1px solid var(--glass-border);\n            flex-shrink: 0;\n        }\n        #inline-chat-textarea {\n            flex: 1; padding: 8px 11px; border-radius: 18px;\n            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);\n            color: var(--text-color); font-family: \'Poppins\', sans-serif;\n            font-size: 12px; resize: none; min-height: 34px;\n            max-height: 80px; overflow-y: auto; line-height: 1.4;\n            user-select: text; -webkit-user-select: text;\n            transition: border-color 0.2s;\n        }\n        #inline-chat-textarea:focus {\n            border-color: var(--accent); outline: none;\n            box-shadow: 0 0 0 2px var(--accent-dim);\n        }\n        #inline-chat-send-btn {\n            width: 34px; height: 34px; border-radius: 50%; border: none;\n            background: var(--accent); color: white;\n            display: flex; align-items: center; justify-content: center;\n            cursor: pointer; flex-shrink: 0;\n            transition: transform 0.15s, background 0.2s;\n        }\n        #inline-chat-send-btn:active { transform: scale(0.88); }\n        #inline-chat-send-btn .material-icons-round { font-size: 16px; pointer-events: none; }\n        .prompt-preview-card { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 10px; margin: 4px 0; overflow: hidden; font-family: \'Poppins\', sans-serif; }\n        .prompt-preview-header { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; user-select: none; }\n        .prompt-preview-header:active { background: rgba(16,185,129,0.08); }\n        .prompt-preview-title { font-size: 10px; font-weight: 700; color: var(--accent); flex: 1; }\n        .prompt-preview-size { font-size: 9px; color: var(--accent); opacity: 0.6; }\n        .prompt-preview-chevron { font-size: 14px; color: var(--accent); opacity: 0.7; transition: transform 0.2s; pointer-events: none; }\n        .prompt-preview-body { display: none; padding: 0 10px 8px; }\n        .prompt-preview-body.open { display: block; }\n        .prompt-preview-row { display: flex; gap: 6px; align-items: flex-start; padding: 3px 0; border-bottom: 1px solid rgba(16,185,129,0.08); font-size: 10px; }\n        .prompt-preview-row:last-child { border-bottom: none; }\n        .prompt-preview-label { color: var(--accent); font-weight: 700; opacity: 0.7; min-width: 70px; flex-shrink: 0; }\n        .prompt-preview-val { color: var(--text-color); opacity: 0.8; word-break: break-word; line-height: 1.4; }\n\n        /* Empty state inside inline chat */\n        #inline-chat-empty {\n            display: flex; flex-direction: column;\n            align-items: center; justify-content: center;\n            flex: 1; opacity: 0.4; padding: 16px; text-align: center;\n            pointer-events: none;\n        }\n        #inline-chat-empty .material-icons-round { font-size: 28px; color: var(--accent); margin-bottom: 6px; }\n        #inline-chat-empty p { font-size: 11px; color: var(--text-color); line-height: 1.6; }\n\n        /* ── Ace Editor Diff Markers (agent preview) ── */\n        .ace-diff-remove-line {\n            position: absolute;\n            background: rgba(239, 68, 68, 0.18);\n            border-left: 3px solid #ef4444;\n            z-index: 4;\n        }\n        .ace-diff-add-line {\n            position: absolute;\n            background: rgba(16, 185, 129, 0.15);\n            border-left: 3px solid #10b981;\n            z-index: 4;\n        }\n        .ace_gutter-cell.ace-diff-remove {\n            background: rgba(239, 68, 68, 0.25);\n            color: #ef4444 !important;\n        }\n        .ace_gutter-cell.ace-diff-add {\n            background: rgba(16, 185, 129, 0.2);\n            color: #10b981 !important;\n        }\n\n        /* AI Agent button — glowing when chat open */\n        .toolbar-btn.chat-active {\n            background: var(--accent-dim) !important;\n            color: var(--accent) !important;\n            opacity: 1 !important;\n        }\n\n        /* ══════════════════════════════════════════\n           DESKTOP LAYOUT  ≥ 768px\n           bottom-panel becomes a left sidebar\n        ══════════════════════════════════════════ */\n        @media (min-width: 768px) {\n\n            /* Sidebar fixed on left */\n            #bottom-panel {\n                position: fixed !important;\n                left: 0; top: 0; bottom: 0;\n                width: 220px;\n                height: 100% !important;\n                transform: none !important;\n                transition: transform 0.3s cubic-bezier(0.4,0,0.2,1) !important;\n                z-index: 40;\n                display: flex !important;\n                flex-direction: column;\n                overflow-y: auto;\n                overflow-x: hidden;\n            }\n            #bottom-panel::-webkit-scrollbar { display: none; }\n\n            /* When hidden — slide left */\n            #bottom-panel.nav-hidden-desktop {\n                transform: translateX(-100%) !important;\n            }\n\n            /* bottom-area fills full height in sidebar */\n            #bottom-panel .bottom-area {\n                flex: 1;\n                border-top: none !important;\n                border-right: 1px solid var(--glass-border);\n                border-radius: 0 !important;\n                padding-top: 12px;\n                padding-bottom: 12px;\n                box-shadow: 2px 0 12px rgba(0,0,0,0.08);\n                display: flex;\n                flex-direction: column;\n                overflow-y: auto;\n                overflow-x: hidden;\n            }\n            #bottom-panel .bottom-area::-webkit-scrollbar { display: none; }\n\n            /* Nav toggle pill — hide on desktop */\n            #nav-toggle-btn { display: none !important; }\n\n            /* Cursor nav row — useless on desktop (keyboard exists) */\n            .cursor-nav { display: none !important; }\n\n            /* Toolbar rows — vertical flow, full width */\n            .toolbar-rows-wrap {\n                max-height: none !important;\n                overflow: visible !important;\n                flex: 1;\n            }\n            .toolbar-rows {\n                flex-direction: column;\n                gap: 2px;\n                padding: 0 10px 10px 10px;\n                opacity: 1 !important;\n                transform: none !important;\n                pointer-events: auto !important;\n            }\n            .bottom-wrapper.nav-mini .toolbar-rows {\n                opacity: 1 !important;\n                transform: none !important;\n                pointer-events: auto !important;\n            }\n            .bottom-wrapper.nav-mini .toolbar-rows-wrap {\n                max-height: none !important;\n            }\n\n            /* Toolbar rows — single column full width */\n            .toolbar-row {\n                grid-template-columns: 1fr;\n                gap: 1px;\n            }\n\n            /* Desktop toolbar buttons — horizontal icon+label, comfortable */\n            .toolbar-btn {\n                flex-direction: row !important;\n                justify-content: flex-start !important;\n                gap: 10px;\n                padding: 9px 12px !important;\n                border-radius: 9px !important;\n                font-size: 13px !important;\n                opacity: 0.75;\n                width: 100%;\n            }\n            .toolbar-btn:hover { background: rgba(128,128,128,0.1); opacity: 1; }\n            .toolbar-btn .material-icons-round { font-size: 18px !important; flex-shrink: 0; }\n\n            /* Section label dividers between groups */\n            .toolbar-row::before {\n                display: none;\n            }\n\n            /* Last misc row — also single column */\n            #bottom-panel .bottom-area > div[style*="justify-content: center"] {\n                display: flex !important;\n                flex-direction: column !important;\n                gap: 1px;\n                padding: 0 10px;\n                margin-top: 4px;\n            }\n            #bottom-panel .bottom-area > div[style*="justify-content: center"] .toolbar-btn {\n                width: 100% !important;\n            }\n\n            /* Show section labels only on desktop */\n            .dt-section-label { display: block !important; }\n\n            /* Tools row — override inline styles for desktop */\n            #bottom-panel .toolbar-rows > div[style*="justify-content: center"] {\n                flex-direction: column !important;\n                width: 100% !important;\n                margin-top: 0 !important;\n                padding: 0 10px !important;\n            }\n            #bottom-panel .toolbar-rows > div[style*="justify-content: center"] .toolbar-btn {\n                width: 100% !important;\n            }\n\n            /* Sidebar section header labels */\n            .dt-section-label {\n                font-size: 9px;\n                font-weight: 700;\n                color: var(--text-color);\n                opacity: 0.35;\n                text-transform: uppercase;\n                letter-spacing: 0.7px;\n                padding: 12px 12px 4px;\n            }\n\n            /* Push editor + header right to make room for sidebar */\n            .app-layout {\n                padding-left: 220px;\n            }\n\n            /* Inline chat panel — account for sidebar */\n            #inline-chat-panel {\n                left: 220px !important;\n            }\n\n            /* Find modal — account for sidebar */\n            #find-modal {\n                left: calc(220px + 2%) !important;\n                width: calc(96% - 220px) !important;\n            }\n\n            /* Editor default font size — larger on desktop */\n            #editor { font-size: 16px !important; }\n\n            /* Desktop zoom buttons — header */\n            #header-zoom-in-btn, #header-zoom-out-btn { display: flex !important; }\n\n            /* Desktop zoom buttons — sidebar (hide, moved to header) */\n            #desktop-zoom-btns { display: none !important; }\n\n            /* Nav hide button in header — on desktop toggles sidebar */\n            /* (JS already calls toggleNavVisibility which uses translateY,\n                we override that with CSS transform for desktop) */\n        }\n\n        /* ── Editor placeholder overlay — centered, shown when editor is empty ── */\n        #editor-placeholder {\n            position: absolute;\n            inset: 0;\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            justify-content: center;\n            pointer-events: none;\n            z-index: 15;\n            opacity: 0;\n            transition: opacity 0.2s ease;\n            text-align: center;\n            padding: 20px;\n            background: transparent;\n        }\n        #editor-placeholder.visible { opacity: 1; }\n        #editor-placeholder .ep-icon {\n            width: 44px; height: 44px;\n            border-radius: 14px;\n            background: var(--accent-dim);\n            border: 1px solid rgba(16,185,129,0.25);\n            display: flex; align-items: center; justify-content: center;\n            margin-bottom: 12px;\n        }\n        #editor-placeholder .ep-title {\n            font-size: 13px;\n            font-weight: 700;\n            color: var(--text-color);\n            opacity: 0.45;\n            font-family: \'Poppins\', sans-serif;\n            margin-bottom: 5px;\n        }\n        #editor-placeholder .ep-sub {\n            font-size: 10px;\n            color: var(--text-color);\n            opacity: 0.25;\n            font-family: \'Poppins\', sans-serif;\n            line-height: 1.7;\n        }\n\n\n        \n    ';
-document.head.appendChild(_s);
+var s=document.createElement("style");
+s.textContent=`        /* ── Code Canvas (Gemini-style) ── */
+        .code-canvas {
+            margin: 8px 0 4px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            background: #0d0d10;
+            font-family: 'Courier New', Courier, monospace;
+            max-width: 100%;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        body.light-theme .code-canvas { background: #1e1e2e; }
+        .code-canvas-header {
+            display: flex; align-items: center; gap: 7px;
+            padding: 6px 10px;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .code-canvas-lang {
+            font-size: 9px; font-weight: 700; font-family: 'Poppins', sans-serif;
+            color: var(--accent); text-transform: uppercase; letter-spacing: 0.7px; flex: 1;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .code-canvas-btn {
+            background: rgba(255,255,255,0.07); border: none; border-radius: 6px;
+            padding: 3px 7px; font-size: 9px; font-weight: 700;
+            font-family: 'Poppins', sans-serif; color: rgba(255,255,255,0.7);
+            cursor: pointer; display: flex; align-items: center; gap: 3px;
+            transition: background 0.15s, color 0.15s; flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .code-canvas-btn:active { background: var(--accent-dim); color: var(--accent); }
+        .code-canvas-btn .material-icons-round { font-size: 11px; pointer-events: none; }
+        .code-canvas-btn.copied { color: var(--accent); }
+        .code-canvas-body {
+            padding: 10px 12px;
+            overflow-x: auto;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.55;
+            color: #e0e0e0;
+            white-space: pre;
+            max-height: 260px;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* inline code */
+        .chat-inline-code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            background: rgba(16,185,129,0.12);
+            color: var(--accent);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+        /* chat markdown */
+        .chat-md-bold { font-weight: 700; }
+        .chat-md-li { padding-left: 14px; position: relative; }
+        .chat-md-li::before { content: '•'; position: absolute; left: 3px; color: var(--accent); }
+        .agent-step-card {
+            margin-top: 8px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+        .agent-step-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 12px;
+            background: rgba(16,185,129,0.08);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .agent-step-num {
+            width: 20px; height: 20px; border-radius: 50%;
+            background: var(--accent); color: white;
+            font-size: 10px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .agent-step-label {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 0.5px; flex: 1;
+        }
+        .agent-step-body {
+            padding: 10px 12px;
+            font-size: 12px; line-height: 1.6;
+            color: var(--text-color); opacity: 0.9;
+            background: rgba(0,0,0,0.12);
+        }
+        .agent-step-actions {
+            display: flex; gap: 8px;
+            padding: 9px 12px;
+            background: rgba(0,0,0,0.10);
+            border-top: 1px solid var(--glass-border);
+        }
+        .agent-step-accept {
+            flex: 1; padding: 8px; border: none; border-radius: 8px;
+            background: var(--accent); color: white;
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 5px;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .agent-step-accept:active { opacity: 0.85; transform: scale(0.97); }
+        .agent-step-accept .material-icons-round { font-size: 14px; pointer-events: none; }
+        .agent-step-reject {
+            padding: 8px 14px; border: 1px solid var(--glass-border); border-radius: 8px;
+            background: none; color: var(--text-color); opacity: 0.6;
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: opacity 0.15s, background 0.15s;
+        }
+        .agent-step-reject:active { background: rgba(239,68,68,0.1); color: #ef4444; opacity: 1; }
+        .agent-step-refine-btn {
+            padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px;
+            background: none; color: var(--accent);
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: background 0.15s, opacity 0.15s;
+            white-space: nowrap;
+        }
+        .agent-step-refine-btn:active { background: var(--accent-dim); }
+        .agent-step-refine-area {
+            padding: 8px 12px;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.1);
+            display: flex; gap: 8px; align-items: flex-end;
+        }
+        .agent-step-refine-input {
+            flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            border-radius: 8px; color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 12px; padding: 7px 10px; resize: none; outline: none;
+            line-height: 1.4; min-height: 34px; max-height: 80px;
+        }
+        .agent-step-refine-input:focus { border-color: var(--accent); }
+        .agent-step-refine-send {
+            width: 32px; height: 32px; border-radius: 8px; border: none; flex-shrink: 0;
+            background: var(--accent); color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .agent-step-refine-send:active { opacity: 0.8; transform: scale(0.9); }
+        .agent-step-refine-send .material-icons-round { font-size: 16px; pointer-events: none; }
+        .agent-step-done {
+            font-size: 10px; font-weight: 700; color: var(--text-color);
+            opacity: 0.4; padding: 9px 12px;
+            background: rgba(0,0,0,0.10);
+            border-top: 1px solid var(--glass-border);
+            text-align: center;
+        }
+        .agent-plan-item {
+            display: flex; gap: 8px; align-items: flex-start;
+            padding: 6px 0; border-bottom: 1px solid var(--glass-border);
+            font-size: 11px; line-height: 1.5;
+        }
+        .agent-plan-item:last-child { border-bottom: none; }
+        .agent-plan-num {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            min-width: 18px; margin-top: 1px;
+        }
+
+        /* Typing indicator bubble */
+        .chat-typing-bubble {
+            display: flex; align-items: center; gap: 4px;
+            padding: 10px 14px; border-radius: 16px; border-bottom-left-radius: 4px;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);
+            width: fit-content;
+        }
+        .chat-typing-bubble span {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: var(--accent); display: inline-block;
+            animation: agentBounce 0.8s infinite;
+        }
+        .chat-typing-bubble span:nth-child(2) { animation-delay: 0.2s; }
+        .chat-typing-bubble span:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Fix / Apply card inside chat bubble */
+        .chat-fix-card {
+            margin-top: 8px;
+            background: rgba(16,185,129,0.07);
+            border: 1px solid rgba(16,185,129,0.25);
+            border-radius: 10px; padding: 9px 11px;
+        }
+        .chat-fix-title {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+        }
+        .chat-fix-reason {
+            font-size: 11px; color: var(--text-color); opacity: 0.8;
+            margin-bottom: 8px; line-height: 1.5;
+        }
+        .chat-fix-preview {
+            display: flex; gap: 5px; margin-bottom: 8px;
+        }
+        .chat-fix-side {
+            flex: 1; border-radius: 6px; padding: 5px 7px; min-width: 0;
+        }
+        .chat-fix-side.remove {
+            background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+        }
+        .chat-fix-side.insert {
+            background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);
+        }
+        .chat-fix-side-label {
+            font-size: 8px; font-weight: 700; letter-spacing: 0.4px; margin-bottom: 3px;
+        }
+        .chat-fix-side.remove .chat-fix-side-label { color: #ef4444; }
+        .chat-fix-side.insert .chat-fix-side-label { color: #10b981; }
+        .chat-fix-code {
+            font-family: monospace; font-size: 10px;
+            word-break: break-all; opacity: 0.9;
+        }
+        .chat-fix-side.remove .chat-fix-code { color: #ef4444; }
+        .chat-fix-side.insert .chat-fix-code { color: #10b981; }
+        .chat-apply-btn {
+            width: 100%; padding: 8px; border: none; border-radius: 8px;
+            background: var(--accent); color: white;
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 6px;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .chat-apply-btn:active { opacity: 0.85; transform: scale(0.97); }
+        .chat-apply-btn.applied {
+            background: rgba(128,128,128,0.2); color: var(--text-color); cursor: default;
+        }
+        .chat-apply-btn .material-icons-round { font-size: 15px; pointer-events: none; }
+
+        /* Split file card */
+        .chat-split-card {
+            margin-top: 8px;
+            background: rgba(16,185,129,0.06);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 10px; padding: 9px 11px;
+        }
+        .chat-split-file-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 0; border-bottom: 1px solid var(--glass-border);
+        }
+        .chat-split-file-row:last-of-type { border-bottom: none; }
+        .chat-split-file-name {
+            flex: 1; font-size: 12px; font-weight: 600;
+            color: var(--text-color); overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap;
+        }
+        .chat-split-mini-btn {
+            background: var(--accent-dim); border: none; border-radius: 6px;
+            padding: 4px 7px; cursor: pointer; font-size: 10px;
+            font-family: 'Poppins', sans-serif; font-weight: 700;
+            color: var(--accent); transition: transform 0.15s;
+        }
+        .chat-split-mini-btn:active { transform: scale(0.92); }
+
+        /* Chat input row */
+        #agent-chat-input-row {
+            display: flex; align-items: flex-end; gap: 8px;
+            padding: 10px 14px;
+            padding-bottom: max(env(safe-area-inset-bottom), 14px);
+            border-top: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        #agent-chat-file-selector {
+            padding: 0 14px 6px; display: none;
+            flex-shrink: 0;
+        }
+        #agent-chat-file-select {
+            width: 100%; padding: 5px 8px; border-radius: 7px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: Poppins,sans-serif;
+            font-size: 10px; font-weight: 600;
+            appearance: none; -webkit-appearance: none; cursor: pointer;
+        }
+        #agent-chat-textarea {
+            flex: 1; padding: 9px 12px; border-radius: 20px;
+            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 13px; resize: none; min-height: 38px;
+            max-height: 100px; overflow-y: auto; line-height: 1.4;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.2s;
+        }
+        #agent-chat-textarea:focus {
+            border-color: var(--accent); outline: none;
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        #agent-chat-attach-btn, #agent-chat-send-btn {
+            width: 38px; height: 38px; border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+        #agent-chat-attach-btn:active, #agent-chat-send-btn:active { transform: scale(0.88); }
+        #agent-chat-attach-btn { background: rgba(128,128,128,0.12); color: var(--text-color); }
+        #agent-chat-send-btn { background: var(--accent); color: white; }
+        #agent-chat-attach-btn .material-icons-round,
+        #agent-chat-send-btn .material-icons-round { font-size: 17px; pointer-events: none; }
+
+        /* Empty chat state */
+        #chat-empty-state {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 10px; opacity: 0.45; pointer-events: none;
+            padding: 20px;
+        }
+        #chat-empty-state .material-icons-round { font-size: 38px; color: var(--accent); }
+        #chat-empty-state p {
+            font-size: 12px; text-align: center; line-height: 1.6;
+            color: var(--text-color);
+        }
+
+
+
+        /* When chat is open, main-container splits into two halves */
+        .main-container.chat-split {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Editor half — top 50% */
+        .main-container.chat-split #editor {
+            position: relative;
+            top: auto; right: auto; bottom: auto; left: auto;
+            flex: 1;
+            min-height: 0;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        /* Chat half — bottom 50% */
+        #inline-chat-panel {
+            position: fixed;
+            left: 0; right: 0;
+            bottom: 0;
+            z-index: 41;
+            height: 45vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--glass-bg);
+            border-top: 2px solid var(--accent);
+            border-radius: var(--panel-round) var(--panel-round) 0 0;
+            box-shadow: 0 -3px 16px rgba(0,0,0,0.10);
+            overflow: hidden;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            pointer-events: none;
+            will-change: transform;
+        }
+        #inline-chat-panel.chat-open {
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Chat header — compact strip */
+        #inline-chat-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        .inline-chat-avatar {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .inline-chat-avatar .material-icons-round { font-size: 14px; color: white; }
+        #inline-chat-name {
+            font-size: 12px; font-weight: 700;
+            color: var(--text-color); flex: 1;
+        }
+        #inline-chat-status {
+            font-size: 10px; color: var(--accent); font-weight: 600;
+        }
+        #inline-chat-close {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-color); opacity: 0.4;
+            display: flex; align-items: center; padding: 2px;
+        }
+        #inline-chat-close .material-icons-round { font-size: 18px; pointer-events: none; }
+        /* Fullscreen toggle */
+        #inline-chat-fullscreen {
+            background: rgba(128,128,128,0.1); border: none; border-radius: 8px;
+            width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-color); opacity: 0.55; flex-shrink: 0;
+            transition: opacity 0.15s;
+        }
+        #inline-chat-fullscreen:active { opacity: 1; background: var(--accent-dim); }
+        #inline-chat-panel.chat-fullscreen {
+            top: var(--header-full-h, 80px) !important;
+            height: calc(100svh - var(--header-full-h, 80px)) !important;
+            border-radius: 0 !important;
+            padding-top: 0;
+            max-height: calc(100svh - var(--header-full-h, 80px)) !important;
+        }
+
+        /* Chat mode button — animated glow ring when ON */
+        #inline-chat-mode-btn { position: relative; transition: background 0.25s, color 0.25s, box-shadow 0.25s; }
+        #inline-chat-mode-btn.mode-on { background: var(--accent) !important; color: white !important; animation: chatModePulse 2s ease-out infinite; }
+        @keyframes chatModePulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); } 60% { box-shadow: 0 0 0 6px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+        #inline-chat-mode-btn.mode-on svg { filter: drop-shadow(0 0 3px rgba(255,255,255,0.4)); }
+        #chat-code-access-btn { display: none; position: relative; transition: background 0.25s, color 0.25s, box-shadow 0.25s; }
+        #chat-code-access-btn.access-on { background: rgba(245,158,11,0.18) !important; color: #f59e0b !important; border: 1.5px solid rgba(245,158,11,0.4) !important; }
+        #chat-code-access-btn.access-on svg { stroke: #f59e0b; }
+
+        /* Toast anchored above chat panel */
+        #chat-panel-toast { position:fixed; left:50%; transform:translateX(-50%) translateY(8px); bottom:46vh; background:var(--glass-bg); border:1px solid var(--glass-border); color:var(--text-color); padding:7px 14px; border-radius:20px; font-size:11px; font-weight:700; font-family:'Poppins',sans-serif; display:flex; align-items:center; gap:7px; z-index:9999; opacity:0; pointer-events:none; white-space:nowrap; box-shadow:0 -3px 12px rgba(0,0,0,0.25); transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+        #chat-panel-toast.show { opacity:1; }
+        #chat-panel-toast:not([style*="top"]).show { transform:translateX(-50%) translateY(0); }
+        #chat-panel-toast .cpt-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+        /* Messages area */
+        #inline-chat-messages {
+            flex: 1; overflow-y: auto;
+            padding: 10px 12px;
+            display: flex; flex-direction: column;
+            gap: 8px;
+            overscroll-behavior: contain;
+        }
+        #inline-chat-messages::-webkit-scrollbar { display: none; }
+
+        /* Reuse existing chat bubble styles */
+        #inline-chat-messages .chat-msg { max-width: 88%; min-width: 0; }
+        #inline-chat-messages .chat-msg.agent { max-width: 100%; width: 100%; }
+
+        /* Input row */
+        #inline-chat-input-row {
+            display: flex; align-items: flex-end; gap: 6px;
+            padding: 8px 10px;
+            padding-bottom: max(env(safe-area-inset-bottom), 10px);
+            border-top: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        #inline-chat-textarea {
+            flex: 1; padding: 8px 11px; border-radius: 18px;
+            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 12px; resize: none; min-height: 34px;
+            max-height: 80px; overflow-y: auto; line-height: 1.4;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.2s;
+        }
+        #inline-chat-textarea:focus {
+            border-color: var(--accent); outline: none;
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        #inline-chat-send-btn {
+            width: 34px; height: 34px; border-radius: 50%; border: none;
+            background: var(--accent); color: white;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: transform 0.15s, background 0.2s;
+        }
+        #inline-chat-send-btn:active { transform: scale(0.88); }
+        #inline-chat-send-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+        .prompt-preview-card { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 10px; margin: 4px 0; overflow: hidden; font-family: 'Poppins', sans-serif; }
+        .prompt-preview-header { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; user-select: none; }
+        .prompt-preview-header:active { background: rgba(16,185,129,0.08); }
+        .prompt-preview-title { font-size: 10px; font-weight: 700; color: var(--accent); flex: 1; }
+        .prompt-preview-size { font-size: 9px; color: var(--accent); opacity: 0.6; }
+        .prompt-preview-chevron { font-size: 14px; color: var(--accent); opacity: 0.7; transition: transform 0.2s; pointer-events: none; }
+        .prompt-preview-body { display: none; padding: 0 10px 8px; }
+        .prompt-preview-body.open { display: block; }
+        .prompt-preview-row { display: flex; gap: 6px; align-items: flex-start; padding: 3px 0; border-bottom: 1px solid rgba(16,185,129,0.08); font-size: 10px; }
+        .prompt-preview-row:last-child { border-bottom: none; }
+        .prompt-preview-label { color: var(--accent); font-weight: 700; opacity: 0.7; min-width: 70px; flex-shrink: 0; }
+        .prompt-preview-val { color: var(--text-color); opacity: 0.8; word-break: break-word; line-height: 1.4; }
+
+        /* Empty state inside inline chat */
+        #inline-chat-empty {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            flex: 1; opacity: 0.4; padding: 16px; text-align: center;
+            pointer-events: none;
+        }
+        #inline-chat-empty .material-icons-round { font-size: 28px; color: var(--accent); margin-bottom: 6px; }
+        #inline-chat-empty p { font-size: 11px; color: var(--text-color); line-height: 1.6; }
+
+        /* ── Ace Editor Diff Markers (agent preview) ── */
+        .ace-diff-remove-line {
+            position: absolute;
+            background: rgba(239, 68, 68, 0.18);
+            border-left: 3px solid #ef4444;
+            z-index: 4;
+        }
+        .ace-diff-add-line {
+            position: absolute;
+            background: rgba(16, 185, 129, 0.15);
+            border-left: 3px solid #10b981;
+            z-index: 4;
+        }
+        .ace_gutter-cell.ace-diff-remove {
+            background: rgba(239, 68, 68, 0.25);
+            color: #ef4444 !important;
+        }
+        .ace_gutter-cell.ace-diff-add {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981 !important;
+        }
+
+        /* AI Agent button — glowing when chat open */
+        .toolbar-btn.chat-active {
+            background: var(--accent-dim) !important;
+            color: var(--accent) !important;
+            opacity: 1 !important;
+        }
+
+        /* ══════════════════════════════════════════
+           DESKTOP LAYOUT  ≥ 768px
+           bottom-panel becomes a left sidebar
+        ══════════════════════════════════════════ */
+        @media (min-width: 768px) {
+
+            /* Sidebar fixed on left */
+            #bottom-panel {
+                position: fixed !important;
+                left: 0; top: 0; bottom: 0;
+                width: 220px;
+                height: 100% !important;
+                transform: none !important;
+                transition: transform 0.3s cubic-bezier(0.4,0,0.2,1) !important;
+                z-index: 40;
+                display: flex !important;
+                flex-direction: column;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            #bottom-panel::-webkit-scrollbar { display: none; }
+
+            /* When hidden — slide left */
+            #bottom-panel.nav-hidden-desktop {
+                transform: translateX(-100%) !important;
+            }
+
+            /* bottom-area fills full height in sidebar */
+            #bottom-panel .bottom-area {
+                flex: 1;
+                border-top: none !important;
+                border-right: 1px solid var(--glass-border);
+                border-radius: 0 !important;
+                padding-top: 12px;
+                padding-bottom: 12px;
+                box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            #bottom-panel .bottom-area::-webkit-scrollbar { display: none; }
+
+            /* Nav toggle pill — hide on desktop */
+            #nav-toggle-btn { display: none !important; }
+
+            /* Cursor nav row — useless on desktop (keyboard exists) */
+            .cursor-nav { display: none !important; }
+
+            /* Toolbar rows — vertical flow, full width */
+            .toolbar-rows-wrap {
+                max-height: none !important;
+                overflow: visible !important;
+                flex: 1;
+            }
+            .toolbar-rows {
+                flex-direction: column;
+                gap: 2px;
+                padding: 0 10px 10px 10px;
+                opacity: 1 !important;
+                transform: none !important;
+                pointer-events: auto !important;
+            }
+            .bottom-wrapper.nav-mini .toolbar-rows {
+                opacity: 1 !important;
+                transform: none !important;
+                pointer-events: auto !important;
+            }
+            .bottom-wrapper.nav-mini .toolbar-rows-wrap {
+                max-height: none !important;
+            }
+
+            /* Toolbar rows — single column full width */
+            .toolbar-row {
+                grid-template-columns: 1fr;
+                gap: 1px;
+            }
+
+            /* Desktop toolbar buttons — horizontal icon+label, comfortable */
+            .toolbar-btn {
+                flex-direction: row !important;
+                justify-content: flex-start !important;
+                gap: 10px;
+                padding: 9px 12px !important;
+                border-radius: 9px !important;
+                font-size: 13px !important;
+                opacity: 0.75;
+                width: 100%;
+            }
+            .toolbar-btn:hover { background: rgba(128,128,128,0.1); opacity: 1; }
+            .toolbar-btn .material-icons-round { font-size: 18px !important; flex-shrink: 0; }
+
+            /* Section label dividers between groups */
+            .toolbar-row::before {
+                display: none;
+            }
+
+            /* Last misc row — also single column */
+            #bottom-panel .bottom-area > div[style*="justify-content: center"] {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 1px;
+                padding: 0 10px;
+                margin-top: 4px;
+            }
+            #bottom-panel .bottom-area > div[style*="justify-content: center"] .toolbar-btn {
+                width: 100% !important;
+            }
+
+            /* Show section labels only on desktop */
+            .dt-section-label { display: block !important; }
+
+            /* Tools row — override inline styles for desktop */
+            #bottom-panel .toolbar-rows > div[style*="justify-content: center"] {
+                flex-direction: column !important;
+                width: 100% !important;
+                margin-top: 0 !important;
+                padding: 0 10px !important;
+            }
+            #bottom-panel .toolbar-rows > div[style*="justify-content: center"] .toolbar-btn {
+                width: 100% !important;
+            }
+
+            /* Sidebar section header labels */
+            .dt-section-label {
+                font-size: 9px;
+                font-weight: 700;
+                color: var(--text-color);
+                opacity: 0.35;
+                text-transform: uppercase;
+                letter-spacing: 0.7px;
+                padding: 12px 12px 4px;
+            }
+
+            /* Push editor + header right to make room for sidebar */
+            .app-layout {
+                padding-left: 220px;
+            }
+
+            /* Inline chat panel — account for sidebar */
+            #inline-chat-panel {
+                left: 220px !important;
+            }
+
+            /* Find modal — account for sidebar */
+            #find-modal {
+                left: calc(220px + 2%) !important;
+                width: calc(96% - 220px) !important;
+            }
+
+            /* Editor default font size — larger on desktop */
+            #editor { font-size: 16px !important; }
+
+            /* Desktop zoom buttons — header */
+            #header-zoom-in-btn, #header-zoom-out-btn { display: flex !important; }
+
+            /* Desktop zoom buttons — sidebar (hide, moved to header) */
+            #desktop-zoom-btns { display: none !important; }
+
+            /* Nav hide button in header — on desktop toggles sidebar */
+            /* (JS already calls toggleNavVisibility which uses translateY,
+                we override that with CSS transform for desktop) */
+        }
+
+        /* ── Editor placeholder overlay — centered, shown when editor is empty ── */
+        #editor-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            text-align: center;
+            padding: 20px;
+            background: transparent;
+        }
+        #editor-placeholder.visible { opacity: 1; }
+        #editor-placeholder .ep-icon {
+            width: 44px; height: 44px;
+            border-radius: 14px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(16,185,129,0.25);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 12px;
+        }
+        #editor-placeholder .ep-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-color);
+            opacity: 0.45;
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 5px;
+        }
+        #editor-placeholder .ep-sub {
+            font-size: 10px;
+            color: var(--text-color);
+            opacity: 0.25;
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.7;
+        }
+
+
+        
+    `;
+document.head.appendChild(s);
 })();
 
     // ── Chat state ──
