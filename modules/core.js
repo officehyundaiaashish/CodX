@@ -1,13 +1,760 @@
 (function(){
-const _s=document.createElement("style");
-_s.textContent='\n\n        /* ──────────────────────── Variables & Themes ──────────────────────── */\n\n        :root {\n            --bg-color: #0a0a0c;\n            --editor-bg: #141417;\n            --text-color: #e0e0e0;\n            --glass-bg: #141419;\n            --glass-border: rgba(255, 255, 255, 0.08);\n            --accent: #10b981; \n            --accent-dim: rgba(16, 185, 129, 0.15);\n            --panel-round: 24px;\n            --transition: opacity 0.15s;\n        }\n\n        body.light-theme {\n            --bg-color: #f0f2f5;\n            --editor-bg: #ffffff;\n            --text-color: #1c1e21;\n            --glass-bg: #f8f9fb;\n            --glass-border: rgba(0, 0, 0, 0.05);\n            --accent: #059669;\n            --accent-dim: rgba(5, 150, 105, 0.1);\n        }\n\n        /* Anti-Google Search & Global UI Font */\n\n        \n/* ── PERF: GPU compositing hints for scroll containers ── */\n        #editor, #preview {\n            -webkit-overflow-scrolling: touch;\n            overscroll-behavior: none;\n        }\n        .cursor-nav, .toolbar-rows, .file-tabs-bar, .gh-custom-list, .agent-provider-grid {\n            -webkit-overflow-scrolling: touch;\n            overscroll-behavior-x: contain;\n        }\n        /* Touch-action: tells browser which touches to handle natively — zero delay */\n        .bottom-area, .toolbar-rows, .cursor-nav { touch-action: pan-x pan-y; }\n        #editor { touch-action: pan-x pan-y pinch-zoom; }\n        /* Promote scrollable layers to own GPU composite layer */\n        .file-tabs-bar { transform: translateZ(0); }\n        /* Prevent text selection flicker during touch */\n        .toolbar-btn, .icon-btn, .tab, .file-tab { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }\n        /* Remove 300ms tap delay on all interactive elements */\n        button, a, [onclick] { touch-action: manipulation; }\n        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }\n        .no-select { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }\n\n        body, html { width: 100vw; position: fixed; overflow: hidden; font-family: \'Poppins\', sans-serif; background-color: var(--bg-color); color: var(--text-color); height: 100%; overscroll-behavior: none; -webkit-text-size-adjust: none; }\n        .app-layout { display: flex; flex-direction: column; height: 100%; width: 100%; }\n\n        /* ── GPU PERF: Reduce backdrop-filter cost on mobile ── */\n        \n        /* ──────────────────────── Header & Tabs ──────────────────────── */\n\n        .app-header { flex-shrink: 0; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 4px 10px; display: flex; align-items: center; justify-content: space-between; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,0.10); }\n        /* Tabs pill with snake border animation */\n        .tabs {\n            display: flex;\n            padding: 2px;\n            border-radius: 20px;\n            background: rgba(0,0,0,0.2);\n            position: relative;\n        }\n        body.light-theme .tabs { background: rgba(0,0,0,0.05); }\n\n        /* Snake = thin conic border + inner mask to hollow it out */\n        .tabs::before {\n            content: \'\';\n            position: absolute;\n            inset: -1px;\n            border-radius: 21px;\n            padding: 1px;\n            background: conic-gradient(\n                from var(--pill-snake, 0deg),\n                transparent 0deg,\n                transparent 300deg,\n                rgba(16,185,129,0.2) 320deg,\n                rgba(16,185,129,0.7) 340deg,\n                #10b981 352deg,\n                rgba(52,211,153,0.3) 357deg,\n                transparent 360deg\n            );\n            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);\n            -webkit-mask-composite: xor;\n            mask-composite: exclude;\n            animation: pillSnake 3.5s linear infinite;\n            pointer-events: none;\n        }\n\n        @keyframes shimmer {\n            0%   { background-position: 200% 0; }\n            100% { background-position: -200% 0; }\n        }\n        @keyframes pillSnake {\n            from { --pill-snake: 0deg; }\n            to   { --pill-snake: 360deg; }\n        }\n        @property --pill-snake {\n            syntax: \'<angle>\';\n            initial-value: 0deg;\n            inherits: false;\n        }\n        .tab { padding: 4px 14px; border-radius: 18px; font-weight: 600; font-size: 12px; color: var(--text-color); opacity: 0.7; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }\n        .tab.active { background: var(--accent); color: white; opacity: 1; }\n        \n        .main-container { flex-grow: 1; position: relative; background-color: var(--editor-bg); overflow: hidden; }\n\n        /* FASTEST MONOSPACE FOR EDITOR ONLY */\n        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; font-size: 14px; font-family: \'Courier New\', Courier, monospace !important; z-index: 10; contain: size layout; }\n        #preview { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: none; background: white; visibility: hidden; opacity: 0; z-index: 20; transform: translateZ(0); }\n        #preview.active-pane { visibility: visible; opacity: 1; }\n\n        .ace_mobile-menu, .ace_tooltip, .ace_callout { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }\n        .ace_selection { background: rgba(16, 185, 129, 0.35) !important; }\n        .ace_selected-word { background: rgba(16, 185, 129, 0.3) !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; border-radius: 2px; }\n\n        .scroll-jumpers { position: absolute; right: 10px; top: 38%; transform: translateY(-50%); display: none; flex-direction: column; gap: 15px; z-index: 35; opacity: 0; transition: opacity 0.3s; }\n        .scroll-jumpers.visible { opacity: 1; }\n        .jumper-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: none; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }\n        .jumper-btn:active { transform: scale(0.9); opacity: 1; }\n\n        /* will-change: transform → own GPU layer, no repaint on slide */\n        \n\n        /* ──────────────────────── Toolbar & Cursor Nav ──────────────────────── */\n.cursor-nav { touch-action: pan-x pan-y; }\n        #editor { touch-action: pan-x pan-y pinch-zoom; }\n        /* Promote scrollable layers to own GPU composite layer */\n        .file-tabs-bar { transform: translateZ(0); }\n        .main-container { flex-grow: 1; position: relative; background-color: var(--editor-bg); overflow: hidden; }\n\n        /* FASTEST MONOSPACE FOR EDITOR ONLY */\n        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; font-size: 14px; font-family: \'Courier New\', Courier, monospace !important; z-index: 10; contain: size layout; }\n        #preview { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: none; background: white; visibility: hidden; opacity: 0; z-index: 20; transform: translateZ(0); }\n        #preview.active-pane { visibility: visible; opacity: 1; }\n\n        .ace_mobile-menu, .ace_tooltip, .ace_callout { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }\n        .ace_selection { background: rgba(16, 185, 129, 0.35) !important; }\n        .ace_selected-word { background: rgba(16, 185, 129, 0.3) !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; border-radius: 2px; }\n\n        .scroll-jumpers { position: absolute; right: 10px; top: 38%; transform: translateY(-50%); display: none; flex-direction: column; gap: 15px; z-index: 35; opacity: 0; transition: opacity 0.3s; }\n        .scroll-jumpers.visible { opacity: 1; }\n        .jumper-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: none; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }\n        .jumper-btn:active { transform: scale(0.9); opacity: 1; }\n\n        /* Nav panel */\n        .bottom-wrapper { position: absolute; bottom: 0; left: 0; right: 0; z-index: 40; }\n        .bottom-wrapper.nav-mini #agent-bar { display: none; }\n\n        /* bottom-area — green border stays always */\n        .bottom-area {\n            background: var(--glass-bg);\n            border-top: 2px solid var(--accent);\n            border-radius: var(--panel-round) var(--panel-round) 0 0;\n            padding-top: 10px;\n            padding-bottom: max(env(safe-area-inset-bottom), 12px);\n            box-shadow: 0 -2px 12px rgba(0,0,0,0.10);\n        }\n\n        .drag-handle-area { width: 100%; height: 0; display: flex; justify-content: center; align-items: center; }\n        .drag-pill { width: 30px; height: 4px; background: var(--text-color); opacity: 0.25; border-radius: 10px; }\n\n        /* Nav toggle pill */\n        #nav-toggle-btn {\n            will-change: transform;\n            transition: transform 0.18s ease;\n        }\n        #nav-toggle-btn:active { transform: scale(0.88); }\n\n        /* Cursor nav row */\n        .cursor-nav { display: flex; overflow-x: auto; padding: 4px 8px 6px 8px; gap: 5px; }\n        .cursor-nav::-webkit-scrollbar { display: none; }\n        .icon-btn { background: rgba(128,128,128,0.08); border: none; border-radius: 10px; min-width: 40px; height: 38px; display: flex; align-items: center; justify-content: center; color: var(--text-color); flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }\n        .icon-btn:active { background: var(--accent-dim); color: var(--accent); transform: scale(0.9); }\n        .icon-btn .material-icons-round { font-size: 18px; pointer-events: none; }\n\n        /* ── Toolbar animation ── */\n        /* Wrap clips height — separate from animated content to avoid layout recalc */\n        .toolbar-rows-wrap {\n            overflow: hidden;\n            max-height: 220px;\n            transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);\n        }\n        .bottom-wrapper.nav-mini .toolbar-rows-wrap {\n            max-height: 0;\n        }\n\n        /* Content: GPU-only opacity+transform — zero repaint */\n        .toolbar-rows {\n            display: flex;\n            flex-direction: column;\n            gap: 4px;\n            padding: 4px 6px 8px 6px;\n            opacity: 1;\n            transform: translateY(0);\n            transition: opacity 0.25s ease, transform 0.25s ease;\n            will-change: opacity, transform;\n        }\n        .bottom-wrapper.nav-mini .toolbar-rows {\n            opacity: 0;\n            transform: translateY(6px);\n            pointer-events: none;\n        }\n\n        .toolbar-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 100%; }\n\n        /* Toolbar buttons */\n        .toolbar-btn {\n            display: flex; flex-direction: column; align-items: center; justify-content: center;\n            background: none; border: none; color: var(--text-color); opacity: 0.8;\n            font-size: 8px; font-weight: 600; gap: 1px; width: 100%;\n            padding: 6px 0; cursor: pointer; border-radius: 8px;\n            -webkit-tap-highlight-color: transparent;\n        }\n        .toolbar-btn .material-icons-round { font-size: 19px; pointer-events: none; }\n        .toolbar-btn:active { background: var(--accent-dim); color: var(--accent); opacity: 1; transform: scale(0.9); }\n\n        \n        /* restore-btn removed */\n\n        \n/* Shared Modal CSS */\n        .modal { \n            position: fixed; left: 5%; width: 90%; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--panel-round); padding: 15px; z-index: 100; \n            box-shadow: 0 4px 20px rgba(0,0,0,0.10); transition: opacity 0.15s, transform 0.15s;\n            bottom: -150%; opacity: 0; pointer-events: none; transform: scale(0.96);\n        }\n        .modal.active { bottom: 20px; opacity: 1; pointer-events: auto; transform: scale(1); }\n        /* Find modal — redesigned card */\n        #find-modal {\n            left: 50% !important;\n            width: 92%;\n            max-width: 420px;\n            bottom: auto !important;\n            transform: translateX(-50%) translateY(12px) scale(0.96);\n            border-radius: 20px;\n            padding: 0;\n            overflow: hidden;\n            border: 1px solid var(--glass-border);\n            box-shadow: 0 8px 32px rgba(0,0,0,0.22);\n            transition: opacity 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.34,1.2,0.64,1);\n        }\n        #find-modal.active {\n            opacity: 1; pointer-events: auto;\n            transform: translateX(-50%) translateY(0) scale(1);\n        }\n        /* Animated search icon */\n        @keyframes fm-scan {\n            0%   { stroke-dashoffset: 62; opacity: 0.4; }\n            50%  { stroke-dashoffset: 0;  opacity: 1; }\n            100% { stroke-dashoffset: 62; opacity: 0.4; }\n        }\n        @keyframes fm-pulse {\n            0%,100% { transform: scale(1);   opacity: 0.7; }\n            50%      { transform: scale(1.18); opacity: 1;   }\n        }\n        #fm-scan-circle { stroke-dasharray: 62; stroke-dashoffset: 62; }\n        #find-modal.active #fm-scan-circle { animation: fm-scan 2s ease-in-out infinite; }\n        #find-modal.active #fm-lens-dot    { animation: fm-pulse 2s ease-in-out infinite; }\n\n        /* Find/Replace field — monospace, editor-style */\n        #find-modal .fm-field {\n            width: 100%;\n            padding: 8px 10px;\n            border-radius: 8px;\n            background: rgba(0,0,0,0.25);\n            border: 1.5px solid var(--glass-border);\n            color: var(--text-color);\n            font-family: \'Poppins\', sans-serif;\n            font-size: 13px;\n            resize: none;\n            outline: none;\n            user-select: text;\n            -webkit-user-select: text;\n            transition: border-color 0.15s, box-shadow 0.15s;\n            line-height: 1.55;\n        }\n        #find-modal .fm-field:focus {\n            border-color: var(--accent);\n            box-shadow: 0 0 0 2px var(--accent-dim);\n        }\n        body.light-theme #find-modal .fm-field { background: rgba(0,0,0,0.06); }\n\n        /* Toggle chips */\n        .fm-chip {\n            display: flex; align-items: center; gap: 4px;\n            padding: 4px 9px; border-radius: 8px;\n            border: 1.5px solid var(--glass-border);\n            background: transparent;\n            color: var(--text-color); opacity: 0.6;\n            font-family: \'Poppins\', sans-serif; font-size: 10px; font-weight: 700;\n            cursor: pointer; transition: all 0.15s; user-select: none;\n        }\n        .fm-chip.on { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); opacity: 1; }\n        \n        .modal textarea, .modal input, .modal select { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: var(--text-color); font-family: \'Courier New\', Courier, monospace; font-size: 13px; }\n        .modal-actions { display: flex; gap: 8px; }\n        .modal-btn { padding: 10px; border: none; border-radius: 8px; background: var(--accent); color: white; font-weight: 600; font-family: \'Poppins\', sans-serif; font-size: 13px; cursor: pointer; transition: opacity 0.2s, transform 0.15s; }\n        .modal-btn:active { opacity: 0.8; transform: scale(0.97); }\n        .modal-btn.secondary { background: rgba(128,128,128,0.2); color: var(--text-color); }\n\n        \n/* Find modal checkbox styles */\n        .find-options { display: flex; gap: 12px; margin-bottom: 8px; }\n        .find-check-label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.8; cursor: pointer; user-select: none; }\n        .find-check-label input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }\n\n        ';
-document.head.appendChild(_s);
+var s=document.createElement("style");
+s.textContent=`
+
+        /* ──────────────────────── Variables & Themes ──────────────────────── */
+
+        :root {
+            --bg-color: #0a0a0c;
+            --editor-bg: #141417;
+            --text-color: #e0e0e0;
+            --glass-bg: #141419;
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent: #10b981; 
+            --accent-dim: rgba(16, 185, 129, 0.15);
+            --panel-round: 24px;
+            --transition: opacity 0.15s;
+        }
+
+        body.light-theme {
+            --bg-color: #f0f2f5;
+            --editor-bg: #ffffff;
+            --text-color: #1c1e21;
+            --glass-bg: #f8f9fb;
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --accent: #059669;
+            --accent-dim: rgba(5, 150, 105, 0.1);
+        }
+
+        /* Anti-Google Search & Global UI Font */
+
+        
+/* ── PERF: GPU compositing hints for scroll containers ── */
+        #editor, #preview {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: none;
+        }
+        .cursor-nav, .toolbar-rows, .file-tabs-bar, .gh-custom-list, .agent-provider-grid {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+        }
+        /* Touch-action: tells browser which touches to handle natively — zero delay */
+        .bottom-area, .toolbar-rows, .cursor-nav { touch-action: pan-x pan-y; }
+        #editor { touch-action: pan-x pan-y pinch-zoom; }
+        /* Promote scrollable layers to own GPU composite layer */
+        .file-tabs-bar { transform: translateZ(0); }
+        /* Prevent text selection flicker during touch */
+        .toolbar-btn, .icon-btn, .tab, .file-tab { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        /* Remove 300ms tap delay on all interactive elements */
+        button, a, [onclick] { touch-action: manipulation; }
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        .no-select { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+
+        body, html { width: 100vw; position: fixed; overflow: hidden; font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color); height: 100%; overscroll-behavior: none; -webkit-text-size-adjust: none; }
+        .app-layout { display: flex; flex-direction: column; height: 100%; width: 100%; }
+
+        /* ── GPU PERF: Reduce backdrop-filter cost on mobile ── */
+        
+        /* ──────────────────────── Header & Tabs ──────────────────────── */
+
+        .app-header { flex-shrink: 0; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 4px 10px; display: flex; align-items: center; justify-content: space-between; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
+        /* Tabs pill with snake border animation */
+        .tabs {
+            display: flex;
+            padding: 2px;
+            border-radius: 20px;
+            background: rgba(0,0,0,0.2);
+            position: relative;
+        }
+        body.light-theme .tabs { background: rgba(0,0,0,0.05); }
+
+        /* Snake = thin conic border + inner mask to hollow it out */
+        .tabs::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 21px;
+            padding: 1px;
+            background: conic-gradient(
+                from var(--pill-snake, 0deg),
+                transparent 0deg,
+                transparent 300deg,
+                rgba(16,185,129,0.2) 320deg,
+                rgba(16,185,129,0.7) 340deg,
+                #10b981 352deg,
+                rgba(52,211,153,0.3) 357deg,
+                transparent 360deg
+            );
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: pillSnake 3.5s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        @keyframes pillSnake {
+            from { --pill-snake: 0deg; }
+            to   { --pill-snake: 360deg; }
+        }
+        @property --pill-snake {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
+        }
+        .tab { padding: 4px 14px; border-radius: 18px; font-weight: 600; font-size: 12px; color: var(--text-color); opacity: 0.7; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+        .tab.active { background: var(--accent); color: white; opacity: 1; }
+        
+        .main-container { flex-grow: 1; position: relative; background-color: var(--editor-bg); overflow: hidden; }
+
+        /* FASTEST MONOSPACE FOR EDITOR ONLY */
+        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; font-size: 14px; font-family: 'Courier New', Courier, monospace !important; z-index: 10; contain: size layout; }
+        #preview { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: none; background: white; visibility: hidden; opacity: 0; z-index: 20; transform: translateZ(0); }
+        #preview.active-pane { visibility: visible; opacity: 1; }
+
+        .ace_mobile-menu, .ace_tooltip, .ace_callout { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+        .ace_selection { background: rgba(16, 185, 129, 0.35) !important; }
+        .ace_selected-word { background: rgba(16, 185, 129, 0.3) !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; border-radius: 2px; }
+
+        .scroll-jumpers { position: absolute; right: 10px; top: 38%; transform: translateY(-50%); display: none; flex-direction: column; gap: 15px; z-index: 35; opacity: 0; transition: opacity 0.3s; }
+        .scroll-jumpers.visible { opacity: 1; }
+        .jumper-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: none; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+        .jumper-btn:active { transform: scale(0.9); opacity: 1; }
+
+        /* will-change: transform → own GPU layer, no repaint on slide */
+        
+
+        /* ──────────────────────── Toolbar & Cursor Nav ──────────────────────── */
+.cursor-nav { touch-action: pan-x pan-y; }
+        #editor { touch-action: pan-x pan-y pinch-zoom; }
+        /* Promote scrollable layers to own GPU composite layer */
+        .file-tabs-bar { transform: translateZ(0); }
+        .main-container { flex-grow: 1; position: relative; background-color: var(--editor-bg); overflow: hidden; }
+
+        /* FASTEST MONOSPACE FOR EDITOR ONLY */
+        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; font-size: 14px; font-family: 'Courier New', Courier, monospace !important; z-index: 10; contain: size layout; }
+        #preview { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: none; background: white; visibility: hidden; opacity: 0; z-index: 20; transform: translateZ(0); }
+        #preview.active-pane { visibility: visible; opacity: 1; }
+
+        .ace_mobile-menu, .ace_tooltip, .ace_callout { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+        .ace_selection { background: rgba(16, 185, 129, 0.35) !important; }
+        .ace_selected-word { background: rgba(16, 185, 129, 0.3) !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; border-radius: 2px; }
+
+        .scroll-jumpers { position: absolute; right: 10px; top: 38%; transform: translateY(-50%); display: none; flex-direction: column; gap: 15px; z-index: 35; opacity: 0; transition: opacity 0.3s; }
+        .scroll-jumpers.visible { opacity: 1; }
+        .jumper-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: none; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+        .jumper-btn:active { transform: scale(0.9); opacity: 1; }
+
+        /* Nav panel */
+        .bottom-wrapper { position: absolute; bottom: 0; left: 0; right: 0; z-index: 40; }
+        .bottom-wrapper.nav-mini #agent-bar { display: none; }
+
+        /* bottom-area — green border stays always */
+        .bottom-area {
+            background: var(--glass-bg);
+            border-top: 2px solid var(--accent);
+            border-radius: var(--panel-round) var(--panel-round) 0 0;
+            padding-top: 10px;
+            padding-bottom: max(env(safe-area-inset-bottom), 12px);
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
+        }
+
+        .drag-handle-area { width: 100%; height: 0; display: flex; justify-content: center; align-items: center; }
+        .drag-pill { width: 30px; height: 4px; background: var(--text-color); opacity: 0.25; border-radius: 10px; }
+
+        /* Nav toggle pill */
+        #nav-toggle-btn {
+            will-change: transform;
+            transition: transform 0.18s ease;
+        }
+        #nav-toggle-btn:active { transform: scale(0.88); }
+
+        /* Cursor nav row */
+        .cursor-nav { display: flex; overflow-x: auto; padding: 4px 8px 6px 8px; gap: 5px; }
+        .cursor-nav::-webkit-scrollbar { display: none; }
+        .icon-btn { background: rgba(128,128,128,0.08); border: none; border-radius: 10px; min-width: 40px; height: 38px; display: flex; align-items: center; justify-content: center; color: var(--text-color); flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .icon-btn:active { background: var(--accent-dim); color: var(--accent); transform: scale(0.9); }
+        .icon-btn .material-icons-round { font-size: 18px; pointer-events: none; }
+
+        /* ── Toolbar animation ── */
+        /* Wrap clips height — separate from animated content to avoid layout recalc */
+        .toolbar-rows-wrap {
+            overflow: hidden;
+            max-height: 220px;
+            transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .bottom-wrapper.nav-mini .toolbar-rows-wrap {
+            max-height: 0;
+        }
+
+        /* Content: GPU-only opacity+transform — zero repaint */
+        .toolbar-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 4px 6px 8px 6px;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            will-change: opacity, transform;
+        }
+        .bottom-wrapper.nav-mini .toolbar-rows {
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+        }
+
+        .toolbar-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 100%; }
+
+        /* Toolbar buttons */
+        .toolbar-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: none; border: none; color: var(--text-color); opacity: 0.8;
+            font-size: 8px; font-weight: 600; gap: 1px; width: 100%;
+            padding: 6px 0; cursor: pointer; border-radius: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .toolbar-btn .material-icons-round { font-size: 19px; pointer-events: none; }
+        .toolbar-btn:active { background: var(--accent-dim); color: var(--accent); opacity: 1; transform: scale(0.9); }
+
+        
+        /* restore-btn removed */
+
+        
+/* Shared Modal CSS */
+        .modal { 
+            position: fixed; left: 5%; width: 90%; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--panel-round); padding: 15px; z-index: 100; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10); transition: opacity 0.15s, transform 0.15s;
+            bottom: -150%; opacity: 0; pointer-events: none; transform: scale(0.96);
+        }
+        .modal.active { bottom: 20px; opacity: 1; pointer-events: auto; transform: scale(1); }
+        /* Find modal — redesigned card */
+        #find-modal {
+            left: 50% !important;
+            width: 92%;
+            max-width: 420px;
+            bottom: auto !important;
+            transform: translateX(-50%) translateY(12px) scale(0.96);
+            border-radius: 20px;
+            padding: 0;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+            transition: opacity 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+        }
+        #find-modal.active {
+            opacity: 1; pointer-events: auto;
+            transform: translateX(-50%) translateY(0) scale(1);
+        }
+        /* Animated search icon */
+        @keyframes fm-scan {
+            0%   { stroke-dashoffset: 62; opacity: 0.4; }
+            50%  { stroke-dashoffset: 0;  opacity: 1; }
+            100% { stroke-dashoffset: 62; opacity: 0.4; }
+        }
+        @keyframes fm-pulse {
+            0%,100% { transform: scale(1);   opacity: 0.7; }
+            50%      { transform: scale(1.18); opacity: 1;   }
+        }
+        #fm-scan-circle { stroke-dasharray: 62; stroke-dashoffset: 62; }
+        #find-modal.active #fm-scan-circle { animation: fm-scan 2s ease-in-out infinite; }
+        #find-modal.active #fm-lens-dot    { animation: fm-pulse 2s ease-in-out infinite; }
+
+        /* Find/Replace field — monospace, editor-style */
+        #find-modal .fm-field {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.25);
+            border: 1.5px solid var(--glass-border);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            font-size: 13px;
+            resize: none;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            line-height: 1.55;
+        }
+        #find-modal .fm-field:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        body.light-theme #find-modal .fm-field { background: rgba(0,0,0,0.06); }
+
+        /* Toggle chips */
+        .fm-chip {
+            display: flex; align-items: center; gap: 4px;
+            padding: 4px 9px; border-radius: 8px;
+            border: 1.5px solid var(--glass-border);
+            background: transparent;
+            color: var(--text-color); opacity: 0.6;
+            font-family: 'Poppins', sans-serif; font-size: 10px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; user-select: none;
+        }
+        .fm-chip.on { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); opacity: 1; }
+        
+        .modal textarea, .modal input, .modal select { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: var(--text-color); font-family: 'Courier New', Courier, monospace; font-size: 13px; }
+        .modal-actions { display: flex; gap: 8px; }
+        .modal-btn { padding: 10px; border: none; border-radius: 8px; background: var(--accent); color: white; font-weight: 600; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; transition: opacity 0.2s, transform 0.15s; }
+        .modal-btn:active { opacity: 0.8; transform: scale(0.97); }
+        .modal-btn.secondary { background: rgba(128,128,128,0.2); color: var(--text-color); }
+
+        
+/* Find modal checkbox styles */
+        .find-options { display: flex; gap: 12px; margin-bottom: 8px; }
+        .find-check-label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.8; cursor: pointer; user-select: none; }
+        .find-check-label input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+
+        `;
+document.head.appendChild(s);
 })();
 
 (function(){
-const _d=document.createElement("div");
-_d.innerHTML='<body class="dark-theme no-select">\n\n<!-- Welcome Screen (first launch only) -->\n<div id="welcome-screen" class="hidden">\n    <div class="welcome-card">\n        <div class="welcome-logo">&lt;/&gt;</div>\n        <div class="welcome-title">CodX Editor</div>\n        <div class="welcome-sub">Your pocket-sized code editor.<br>Write, edit & sync with GitHub — anywhere.</div>\n        <div class="welcome-features">\n            <div class="welcome-feature">\n                <span class="material-icons-round">code</span>\n                <span>Full code editor with syntax highlighting</span>\n            </div>\n            <div class="welcome-feature">\n                <span class="material-icons-round">cloud_sync</span>\n                <span>GitHub sync — load, edit & commit</span>\n            </div>\n            <div class="welcome-feature">\n                <span class="material-icons-round">smart_toy</span>\n                <span>AI Agent with multiple model support</span>\n            </div>\n            <div class="welcome-feature">\n                <span class="material-icons-round">preview</span>\n                <span>Live preview with instant refresh</span>\n            </div>\n        </div>\n        <button class="welcome-start-btn" onclick="dismissWelcome()">\n            <span class="material-icons-round">rocket_launch</span>\n            Start Coding\n        </button>\n    </div>\n</div>\n\n<!-- Repo Load Progress Bar -->\n<div id="repo-progress-overlay">\n    <div class="repo-progress-card">\n        <div class="repo-progress-title">Loading Repository</div>\n        <div class="repo-progress-sub" id="repo-progress-sub">Fetching files...</div>\n        <div class="repo-progress-bar-track">\n            <div class="repo-progress-bar-fill" id="repo-progress-fill"></div>\n        </div>\n        <div class="repo-progress-count" id="repo-progress-count">0 / 0</div>\n    </div>\n</div>\n\n<div class="app-layout">\n    <div class="app-header" id="header">\n        <div style="display:flex;align-items:center;gap:8px;">\n            <div class="tabs">\n                <div class="tab active" id="tab-code" onclick="switchTab(\'editor\')">Code</div>\n                <div class="tab" id="tab-preview" onclick="switchTab(\'preview\')">Preview</div>\n            </div>\n        </div>\n\n        <!-- Language chip — centered absolutely -->\n        <button id="lang-chip" onclick="_toggleLangMode()" title="Switch language" style="\n            position:absolute;left:50%;transform:translateX(-50%);\n            display:flex;align-items:center;gap:5px;\n            padding:4px 10px 4px 8px;\n            border-radius:8px;\n            border:1px solid rgba(250,204,21,0.45);\n            background:rgba(250,204,21,0.08);\n            color:#facc15;\n            font-family:\'Poppins\',sans-serif;\n            font-size:10px;font-weight:700;\n            cursor:pointer;\n            transition:border-color 0.2s,background 0.2s,color 0.2s;\n            flex-shrink:0;\n            z-index:10;\n        ">\n            <span id="lang-chip-icon" style="display:flex;align-items:center;flex-shrink:0;">\n                <!-- HTML icon: </> -->\n                <svg id="lang-icon-html" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>\n                <!-- Python icon: snake -->\n                <svg id="lang-icon-py" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M6 4h5a3 3 0 0 1 3 3v3H9a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3h1"/><path d="M18 20h-5a3 3 0 0 1-3-3v-3h5a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3h-1"/><circle cx="8.5" cy="6.5" r="1" fill="#facc15" stroke="none"/><circle cx="15.5" cy="17.5" r="1" fill="#facc15" stroke="none"/></svg>\n            </span>\n            <span id="lang-chip-label">HTML</span>\n        </button>\n        \n        <div style="display:flex; align-items:center; gap:4px;">\n            <button class="icon-btn no-select" id="install-btn" style="display:none; width:30px; height:30px; background:var(--accent-dim); min-width:30px; border: 1px solid var(--accent); margin-right: 5px;">\n                <span class="material-icons-round" style="color:var(--accent); font-size:16px;">download</span>\n            </button>\n            <!-- Zoom Out — desktop only -->\n            <button class="icon-btn no-select" id="header-zoom-out-btn" onclick="desktopZoomOut()" title="Zoom Out" style="display:none;width:30px;height:30px;background:none;min-width:30px;">\n                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>\n            </button>\n            <!-- Zoom In — desktop only -->\n            <button class="icon-btn no-select" id="header-zoom-in-btn" onclick="desktopZoomIn()" title="Zoom In" style="display:none;width:30px;height:30px;background:none;min-width:30px;">\n                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>\n            </button>\n            <!-- Find & Replace shortcut -->\n            <button class="icon-btn no-select" id="header-find-btn" style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleFindReplace()" title="Find &amp; Replace">\n                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>\n            </button>\n            <!-- Nav hide/show toggle -->\n            <button class="icon-btn no-select" id="nav-hide-btn" style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleNavVisibility()" title="Hide/Show toolbar">\n                <svg id="nav-hide-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.35s cubic-bezier(0.4,0,0.2,1),opacity 0.25s ease;">\n                    <rect x="3" y="3" width="18" height="18" rx="3"/>\n                    <line x1="3" y1="15" x2="21" y2="15"/>\n                    <line x1="9" y1="15" x2="9" y2="21"/>\n                    <line x1="15" y1="15" x2="15" y2="21"/>\n                </svg>\n            </button>\n            <button class="icon-btn no-select" style="width:30px; height:30px; background:none; min-width:30px;" onclick="toggleTheme()">\n                <span class="material-icons-round" id="theme-icon" style="color:var(--accent); font-size:18px;">light_mode</span>\n            </button>\n        </div>\n    </div>\n\n        <div class="file-tabs-bar no-select" id="file-tabs-bar"></div>\n\n    <div class="main-container" id="editor-wrapper">\n        <div id="editor"></div>\n\n        <!-- Editor empty state placeholder -->\n        <div id="editor-placeholder">\n            <div class="ep-icon" id="ep-icon">\n                <!-- icon set by JS -->\n            </div>\n            <div class="ep-title" id="ep-title">Start coding</div>\n            <div class="ep-sub" id="ep-sub">Your code will appear here</div>\n        </div>\n        <iframe id="preview" allow="geolocation; microphone; camera; fullscreen; payment; clipboard-read; clipboard-write"></iframe>\n\n        <!-- Python output terminal -->\n        <div id="python-output" style="\n            position:absolute;top:0;right:0;bottom:0;left:0;\n            background:#0d0d10;\n            visibility:hidden;opacity:0;z-index:21;\n            display:flex;flex-direction:column;\n            font-family:\'Courier New\',Courier,monospace;\n            transition:opacity 0.15s;\n        ">\n            <!-- Python output header bar -->\n            <div id="py-out-header" style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(16,185,129,0.08);border-bottom:1px solid rgba(16,185,129,0.2);flex-shrink:0;">\n                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="var(--accent-dim)"/><path d="M8 12l2 2 4-4" stroke="var(--accent)" stroke-width="2.2"/></svg>\n                <span style="font-size:10px;font-weight:700;color:var(--accent);font-family:\'Poppins\',sans-serif;flex:1;">Python Output</span>\n                <span id="py-run-time" style="font-size:9px;color:var(--text-color);opacity:0.4;font-family:\'Poppins\',sans-serif;"></span>\n                <button onclick="_pyRunCode()" title="Run again" style="background:var(--accent-dim);border:none;border-radius:6px;padding:3px 8px;font-size:9px;font-weight:700;color:var(--accent);font-family:\'Poppins\',sans-serif;cursor:pointer;display:flex;align-items:center;gap:3px;">\n                    <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="pointer-events:none;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Run\n                </button>\n                <button onclick="switchTab(\'editor\')" style="background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--text-color);opacity:0.4;display:flex;align-items:center;" title="Back to editor">\n                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>\n                </button>\n            </div>\n            <!-- Output content -->\n            <div id="py-out-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 14px;font-size:12px;line-height:1.6;color:#e0e0e0;white-space:pre;word-break:normal;-webkit-overflow-scrolling:touch;box-sizing:border-box;"></div>\n            <!-- Loading state -->\n            <div id="py-loading" style="display:none;position:absolute;inset:0;background:#0d0d10;z-index:5;align-items:center;justify-content:center;flex-direction:column;gap:12px;">\n                <div style="width:36px;height:36px;border-radius:50%;border:3px solid rgba(16,185,129,0.2);border-top-color:var(--accent);animation:commitSpin 0.8s linear infinite;"></div>\n                <div style="font-size:11px;font-weight:700;color:var(--accent);font-family:\'Poppins\',sans-serif;" id="py-loading-msg">Loading Python...</div>\n            </div>\n        </div>\n        <!-- Preview welcome overlay — shown when no project is loaded -->\n                <div id="preview-welcome" style="\n            position:absolute;top:0;left:0;right:0;bottom:0;\n            background:#10b981;\n            display:none;flex-direction:column;align-items:center;justify-content:center;\n            z-index:25;padding:28px;\n        ">\n            <div style="font-size:38px;font-weight:900;color:white;font-family:monospace;margin-bottom:8px;">&lt;/&gt;</div>\n            <div style="font-size:20px;font-weight:700;color:white;margin-bottom:6px;">CodX Editor</div>\n            <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:32px;text-align:center;line-height:1.6;">Write, preview &amp; sync code<br>from your phone.</div>\n            <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:260px;">\n                <button onclick="dismissPreviewWelcome();openNewProjectModal();" style="\n                    padding:15px;border:none;border-radius:14px;\n                    background:white;color:#10b981;\n                    font-size:15px;font-weight:700;font-family:\'Poppins\',sans-serif;\n                    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;\n                "><span style="font-size:20px;font-family:\'Material Icons Round\';font-style:normal;">add_box</span>New Project</button>\n                <button onclick="dismissPreviewWelcome();document.getElementById(\'file-input\').click();" style="\n                    padding:15px;border:1.5px solid rgba(255,255,255,0.5);border-radius:14px;\n                    background:transparent;color:white;\n                    font-size:15px;font-weight:700;font-family:\'Poppins\',sans-serif;\n                    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;\n                "><span style="font-size:20px;font-family:\'Material Icons Round\';font-style:normal;">folder_open</span>Open Project</button>\n            </div>\n        </div>\n        \n        <div class="scroll-jumpers no-select" id="jumpers">\n            <div class="jumper-btn" onclick="customFastScroll(\'up\')"><span class="material-icons-round">keyboard_double_arrow_up</span></div>\n            <div class="jumper-btn" onclick="customFastScroll(\'down\')"><span class="material-icons-round">keyboard_double_arrow_down</span></div>\n        </div>\n\n    </div>\n\n    <div class="bottom-wrapper no-select" id="bottom-outer">\n        <div class="bottom-area">\n                <!-- Inline Split Chat Panel -->\n        <div id="chat-panel-toast"><span class="cpt-dot" id="cpt-dot"></span><span id="cpt-text"></span></div>\n        <div id="inline-chat-panel">\n\n            <!-- Header: avatar + name + model selector + settings + close -->\n            <div id="inline-chat-header">\n                <!-- Entire left block is clickable — opens model dropdown -->\n                <div onclick="_inlineToggleModelDropdown()" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;position:relative;" id="inline-model-trigger-area">\n                    <div class="inline-chat-avatar" style="flex-shrink:0;">\n                        <span class="material-icons-round">smart_toy</span>\n                    </div>\n                    <div style="min-width:0;flex:1;">\n                        <div id="inline-chat-name" style="font-size:11px;font-weight:700;color:var(--text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">AI Agent</div>\n                        <div style="display:flex;align-items:center;gap:3px;">\n                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;pointer-events:none;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>\n                            <span id="inline-model-label" style="font-size:9px;font-weight:600;color:var(--accent);font-family:\'Poppins\',sans-serif;pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Select Model</span>\n                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" id="inline-model-chevron" style="pointer-events:none;transition:transform 0.2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>\n                        </div>\n                    </div>\n                    <!-- Model dropdown -->\n                    <div id="inline-model-dropdown" style="display:none;position:absolute;left:0;top:calc(100% + 8px);min-width:200px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;overflow:hidden;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.10);max-height:calc(4 * 44px);overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>\n                </div>\n                <!-- Custom file selector -->\n                <div id="inline-file-selector" style="position:relative;flex-shrink:0;">\n                    <button id="inline-file-trigger" onclick="_inlineToggleFileDropdown(event)" style="background:rgba(128,128,128,0.1);border:1px solid var(--glass-border);border-radius:8px;padding:3px 8px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-color);font-family:\'Poppins\',sans-serif;font-size:9px;font-weight:600;transition:all 0.15s;">\n                        <span class="material-icons-round" style="font-size:13px;pointer-events:none;color:var(--accent);">description</span>\n                        <span id="inline-file-label" style="max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">Current File</span>\n                        <span class="material-icons-round" id="inline-file-chevron" style="font-size:12px;pointer-events:none;transition:transform 0.2s;">expand_more</span>\n                    </button>\n                    <div id="inline-file-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;min-width:160px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;z-index:200;box-shadow:0 4px 14px rgba(0,0,0,0.10);">\n                    </div>\n                </div>\n                <button onclick="_inlineClearChatUI()" title="Clear conversation" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.5;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.5">\n                    <span class="material-icons-round" style="font-size:15px;pointer-events:none;">delete_sweep</span>\n                </button>\n                <button id="inline-chat-fullscreen" onclick="_toggleChatFullscreen()" title="Fullscreen">\n                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="fs-icon" pointer-events="none"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>\n                </button>\n                <button id="inline-chat-close" onclick="closeInlineChat()" style="background:rgba(239,68,68,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ef4444;flex-shrink:0;">\n                    <span class="material-icons-round" style="font-size:16px;pointer-events:none;">close</span>\n                </button>\n            </div>\n\n            <div id="inline-chat-messages">\n                <div id="inline-chat-empty">\n                    <span class="material-icons-round">chat</span>\n                    <p>Ask me about your code.<br>I can explain, fix &amp; apply changes.</p>\n                    <p style="font-size:9px;opacity:0.55;margin-top:6px;line-height:1.7;">\n                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>\n                        Chat mode &nbsp;·&nbsp;\n                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>\n                        Edit mode — toggle via buttons below\n                    </p>\n                </div>\n            </div>\n\n            <div id="inline-attach-bar" style="display:none;align-items:center;gap:6px;padding:4px 10px;background:var(--accent-dim);border-top:1px solid var(--accent);font-size:10px;font-weight:600;color:var(--accent);">\n                <span class="material-icons-round" style="font-size:14px;">attach_file</span>\n                <span id="inline-attach-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>\n                <span class="material-icons-round" onclick="_inlineClearAttach()" style="font-size:14px;cursor:pointer;opacity:0.6;pointer-events:auto;">close</span>\n            </div>\n\n            <div id="inline-chat-input-row">\n                <button onclick="_inlineTriggerAttach()" title="Attach file" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">\n                    <span class="material-icons-round" style="font-size:16px;pointer-events:none;">attach_file</span>\n                </button>\n                <button id="inline-chat-mode-btn" onclick="_toggleChatMode()" title="Chat Mode — only chat, no edits" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s;">\n                    <svg id="chat-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>\n                </button>\n                <button id="chat-code-access-btn" onclick="_toggleChatCodeAccess()" title="Give AI access to file code" style="width:32px;height:32px;border-radius:50%;border:1.5px solid transparent;background:rgba(128,128,128,0.12);color:var(--text-color);display:none;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s,border-color 0.2s;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>\n                <textarea id="inline-chat-textarea" placeholder="Ask agent..." rows="1"></textarea>\n                <button id="inline-chat-send-btn" onclick="sendInlineChat()">\n                    <span class="material-icons-round">send</span>\n                </button>\n            </div>\n        </div>\n\n            <!-- AGENT BAR — legacy compat, hidden -->\n\n    <div class="bottom-wrapper no-select" id="bottom-panel">\n        <!-- Arrow pill sits on top border of bottom-area: half outside half inside -->\n        <div style="position:relative;height:0;overflow:visible;display:flex;justify-content:center;z-index:51;">\n            <button id="nav-toggle-btn" onclick="toggleNavSize()" style="\n                background:var(--glass-bg);\n                border:1.5px solid var(--accent);\n                border-radius:999px;\n                cursor:pointer;\n                color:var(--accent);\n                display:flex;\n                align-items:center;\n                justify-content:center;\n                width:52px;\n                height:26px;\n                flex-shrink:0;\n                box-shadow:none;\n                position:absolute;\n                top:-13px;\n                padding:0;\n            ">\n                <span class="material-icons-round" id="nav-toggle-icon" style="font-size:20px;pointer-events:none;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);">expand_more</span>\n            </button>\n        </div>\n        <div class="bottom-area">\n            <!-- AGENT BAR — compact strip, sits at top of nav panel -->\n            <div id="agent-bar">\n                <div id="agent-file-selector" style="display:none;">\n                    <select id="agent-file-select" onchange="agentSelectFile(this.value)"></select>\n                </div>\n                <div id="agent-compact-row">\n                    <div class="agent-status-dot"></div>\n                    <span id="agent-bar-label" onclick="openAgentModal()" style="cursor:pointer;" title="Switch agent">AI</span>\n                    <textarea id="agent-prompt" placeholder="Ask agent to edit code..." rows="1"></textarea>\n                    <button id="agent-attach-btn" onclick="document.getElementById(\'agent-file-input\').click()">\n                        <span class="material-icons-round">attach_file</span>\n                    </button>\n                    <button id="agent-send-btn" onclick="sendAgentPrompt()">\n                        <span class="material-icons-round">send</span>\n                    </button>\n                    <span class="material-icons-round" id="agent-close-btn" onclick="closeAgentBar()">close</span>\n                </div>\n                <div id="agent-thinking"><div class="agent-dots"><span></span><span></span><span></span></div> Analysing...</div>\n            </div>\n\n            <!-- ROW 0: Cursor Navigation (scroll row) -->\n            <div class="cursor-nav">\n                <button class="icon-btn" onclick="editor.gotoLine(1)"><span class="material-icons-round">vertical_align_top</span></button>\n                <button class="icon-btn" onclick="editor.gotoLine(editor.session.getLength())"><span class="material-icons-round">vertical_align_bottom</span></button>\n                <div style="width:1px;background:var(--glass-border);margin:4px 3px;flex-shrink:0;"></div>\n                <button class="icon-btn" onclick="editor.navigateLineStart()"><span class="material-icons-round">first_page</span></button>\n                <button class="icon-btn" onclick="editor.navigateLineEnd()"><span class="material-icons-round">last_page</span></button>\n                <button class="icon-btn" onclick="editor.navigateLeft()"><span class="material-icons-round">chevron_left</span></button>\n                <button class="icon-btn" onclick="editor.navigateRight()"><span class="material-icons-round">chevron_right</span></button>\n                <button class="icon-btn" onclick="editor.navigateUp()"><span class="material-icons-round">keyboard_arrow_up</span></button>\n                <button class="icon-btn" onclick="editor.navigateDown()"><span class="material-icons-round">keyboard_arrow_down</span></button>\n                <div style="width:1px;background:var(--glass-border);margin:4px 3px;flex-shrink:0;"></div>\n                <button class="icon-btn" onclick="editorUndo()"><span class="material-icons-round">undo</span></button>\n                <button class="icon-btn" onclick="editorRedo()"><span class="material-icons-round">redo</span></button>\n            </div>\n\n            <div class="toolbar-rows-wrap"><div class="toolbar-rows">\n                <!-- ROW 1: File & Project -->\n                <div class="dt-section-label" style="display:none;">File</div>\n                <div class="toolbar-row">\n                    <button class="toolbar-btn" onclick="openNewProjectModal()"><span class="material-icons-round">add_box</span>New</button>\n                    <button class="toolbar-btn" onclick="document.getElementById(\'file-input\').click()"><span class="material-icons-round">folder_open</span>Open</button>\n                    <button class="toolbar-btn" onclick="saveFile()"><span class="material-icons-round">save</span>Save</button>\n                    <button class="toolbar-btn" onclick="saveFileToRepo()"><span class="material-icons-round">cloud_upload</span>Commit</button>\n                    <button class="toolbar-btn" onclick="closeAllTabs()"><span class="material-icons-round">playlist_remove</span>Close All</button>\n                    <button class="toolbar-btn" onclick="openGithubModal()"><span class="material-icons-round">hub</span>GitHub</button>\n                </div>\n                <!-- ROW 2: Edit -->\n                <div class="dt-section-label" style="display:none;">Edit</div>\n                <div class="toolbar-row">\n                    <button class="toolbar-btn" onclick="editor.selectAll()"><span class="material-icons-round">select_all</span>Select All</button>\n                    <button class="toolbar-btn" onclick="copyClipboard()"><span class="material-icons-round">content_copy</span>Copy</button>\n                    <button class="toolbar-btn" onclick="cutClipboard()"><span class="material-icons-round">content_cut</span>Cut</button>\n                    <button class="toolbar-btn" onclick="pasteClipboard()"><span class="material-icons-round">content_paste</span>Paste</button>\n                    <button class="toolbar-btn" onclick="deleteSelection()"><span class="material-icons-round">delete</span>Delete</button>\n                    <button class="toolbar-btn" onclick="toggleFindReplace()"><span class="material-icons-round">find_replace</span>Find</button>\n                </div>\n                <div class="dt-section-label" style="display:none;">Tools</div>\n                <div style="display: flex; justify-content: center; width: 100%; margin-top: 4px; gap: 4px;">\n                    <button class="toolbar-btn" id="ai-agent-btn" onclick="toggleInlineChat()" style="width: 68px;"><span class="material-icons-round">smart_toy</span>AI Agent</button>\n                    <button class="toolbar-btn" onclick="location.reload()" title="Restart app" style="width: 60px;"><span class="material-icons-round">refresh</span>Refresh</button>\n                    <button class="toolbar-btn" id="no-anim-btn" onclick="toggleAnimations()" title="Disable all animations" style="width: 68px;"><span class="material-icons-round">motion_photos_off</span>No Anim</button>\n                    <button class="toolbar-btn" id="plain-text-btn" onclick="togglePlainTextMode()" title="Force plain text mode" style="width: 68px;"><span class="material-icons-round">text_fields</span>Plain Text</button>\n                </div>\n                <!-- Desktop only: Zoom buttons -->\n                <div id="desktop-zoom-btns" style="display:none; justify-content:center; width:100%; margin-top:4px; gap:4px;">\n                    <button class="toolbar-btn" onclick="desktopZoomIn()" title="Zoom In" style="width:68px;"><span class="material-icons-round">zoom_in</span>Zoom In</button>\n                    <button class="toolbar-btn" onclick="desktopZoomOut()" title="Zoom Out" style="width:68px;"><span class="material-icons-round">zoom_out</span>Zoom Out</button>\n                </div>\n            </div></div>\n        </div>\n    </div>\n</div>\n\n<input type="file" id="file-input" accept=".html,.htm,.css,.js,.ts,.jsx,.tsx,.json,.md,.txt,.xml,.svg" onchange="loadFile(event)" style="display: none !important; position: absolute; left: -9999px;">\n\n<div class="modal no-select" id="find-modal">\n\n    <!-- Shimmer top bar -->\n    <div style="height:2px;background:linear-gradient(90deg,#10b981,#34d399,#10b981);background-size:200% 100%;animation:shimmer 2.5s linear infinite;border-radius:20px 20px 0 0;"></div>\n\n    <!-- Header row: icon + title + undo/redo + close -->\n    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px 8px;">\n        <div style="width:30px;height:30px;border-radius:9px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">\n            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">\n                <circle id="fm-scan-circle" cx="11" cy="11" r="8" stroke="var(--accent)" fill="none"/>\n                <circle id="fm-lens-dot" cx="11" cy="11" r="2.2" fill="var(--accent)" stroke="none"/>\n                <line x1="16.65" y1="16.65" x2="21" y2="21" stroke="var(--accent)" stroke-width="2"/>\n            </svg>\n        </div>\n        <span style="font-weight:700;font-size:12px;color:var(--text-color);font-family:\'Poppins\',sans-serif;flex:1;">Find &amp; Replace</span>\n        <button onclick="editorUndo()" title="Undo" style="background:none;border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.4;border-radius:6px;transition:opacity 0.15s,background 0.15s;" onmouseenter="this.style.opacity=1;this.style.background=\'rgba(128,128,128,0.1)\'" onmouseleave="this.style.opacity=0.4;this.style.background=\'none\'">\n            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 7v6h6"/><path d="M3 13C5.5 6.5 13 4 18 8s5 10 1 14"/></svg>\n        </button>\n        <button onclick="editorRedo()" title="Redo" style="background:none;border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.4;border-radius:6px;transition:opacity 0.15s,background 0.15s;" onmouseenter="this.style.opacity=1;this.style.background=\'rgba(128,128,128,0.1)\'" onmouseleave="this.style.opacity=0.4;this.style.background=\'none\'">\n            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 7v6h-6"/><path d="M21 13C18.5 6.5 11 4 6 8s-5 10-1 14"/></svg>\n        </button>\n        <button onclick="toggleFindReplace()" title="Close" style="background:rgba(239,68,68,0.08);border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ef4444;border-radius:6px;transition:background 0.15s;" onmouseenter="this.style.background=\'rgba(239,68,68,0.18)\'" onmouseleave="this.style.background=\'rgba(239,68,68,0.08)\'">\n            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>\n        </button>\n    </div>\n\n    <!-- Thin divider -->\n    <div style="height:1px;background:var(--glass-border);mx:12px;"></div>\n\n    <!-- Fields block -->\n    <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">\n\n        <!-- Find row -->\n        <div style="display:flex;align-items:center;gap:7px;">\n            <span style="font-size:9px;font-weight:700;color:var(--accent);font-family:\'Poppins\',sans-serif;width:42px;flex-shrink:0;letter-spacing:0.3px;">FIND</span>\n            <textarea id="find-input" class="fm-field" placeholder="Find" style="height:42px;flex:1;"></textarea>\n        </div>\n\n        <!-- Replace row -->\n        <div style="display:flex;align-items:center;gap:7px;">\n            <span style="font-size:9px;font-weight:700;color:rgba(96,165,250,0.9);font-family:\'Poppins\',sans-serif;width:42px;flex-shrink:0;letter-spacing:0.3px;">WITH</span>\n            <textarea id="replace-input" class="fm-field" placeholder="Replace" style="height:42px;flex:1;"></textarea>\n        </div>\n\n    </div>\n\n    <!-- Hidden checkboxes required by JS for case/regex state -->\n    <input type="checkbox" id="find-case" style="display:none;">\n    <input type="checkbox" id="find-regex" style="display:none;">\n\n    <!-- Footer: chips left, actions right -->\n    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 12px 10px;gap:6px;">\n        <div style="display:flex;gap:4px;">\n            <button class="fm-chip" id="fm-chip-case" onclick="_fmToggle(\'case\',this)">Aa</button>\n            <button class="fm-chip" id="fm-chip-regex" onclick="_fmToggle(\'regex\',this)">.*</button>\n        </div>\n        <div style="display:flex;gap:5px;">\n            <button onclick="clearFind()" title="Clear" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.07);color:#ef4444;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background=\'rgba(239,68,68,0.15)\'" onmouseleave="this.style.background=\'rgba(239,68,68,0.07)\'">\n                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>\n            </button>\n            <button onclick="findText(true)" style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:\'Poppins\',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;" onmouseenter="this.style.background=\'var(--accent-dim)\';this.style.color=\'var(--accent)\';this.style.borderColor=\'var(--accent)\'" onmouseleave="this.style.background=\'rgba(128,128,128,0.08)\';this.style.color=\'var(--text-color)\';this.style.borderColor=\'var(--glass-border)\'">\n                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>\n                Find\n            </button>\n            <button onclick="replaceText()" style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:none;background:var(--accent);color:white;font-family:\'Poppins\',sans-serif;font-size:11px;font-weight:700;cursor:pointer;" ontouchstart="this.style.opacity=\'0.8\'" ontouchend="this.style.opacity=\'1\'">\n                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>\n                Replace\n            </button>\n        </div>\n    </div>\n\n</div>';
-document.body.appendChild(_d);
+var d=document.createElement("div");
+d.innerHTML=`<!-- Welcome Screen (first launch only) -->
+<div id="welcome-screen" class="hidden">
+    <div class="welcome-card">
+        <div class="welcome-logo">&lt;/&gt;</div>
+        <div class="welcome-title">CodX Editor</div>
+        <div class="welcome-sub">Your pocket-sized code editor.<br>Write, edit & sync with GitHub — anywhere.</div>
+        <div class="welcome-features">
+            <div class="welcome-feature">
+                <span class="material-icons-round">code</span>
+                <span>Full code editor with syntax highlighting</span>
+            </div>
+            <div class="welcome-feature">
+                <span class="material-icons-round">cloud_sync</span>
+                <span>GitHub sync — load, edit & commit</span>
+            </div>
+            <div class="welcome-feature">
+                <span class="material-icons-round">smart_toy</span>
+                <span>AI Agent with multiple model support</span>
+            </div>
+            <div class="welcome-feature">
+                <span class="material-icons-round">preview</span>
+                <span>Live preview with instant refresh</span>
+            </div>
+        </div>
+        <button class="welcome-start-btn" onclick="dismissWelcome()">
+            <span class="material-icons-round">rocket_launch</span>
+            Start Coding
+        </button>
+    </div>
+</div>
+
+<!-- Repo Load Progress Bar -->
+<div id="repo-progress-overlay">
+    <div class="repo-progress-card">
+        <div class="repo-progress-title">Loading Repository</div>
+        <div class="repo-progress-sub" id="repo-progress-sub">Fetching files...</div>
+        <div class="repo-progress-bar-track">
+            <div class="repo-progress-bar-fill" id="repo-progress-fill"></div>
+        </div>
+        <div class="repo-progress-count" id="repo-progress-count">0 / 0</div>
+    </div>
+</div>
+
+<div class="app-layout">
+    <div class="app-header" id="header">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <div class="tabs">
+                <div class="tab active" id="tab-code" onclick="switchTab('editor')">Code</div>
+                <div class="tab" id="tab-preview" onclick="switchTab('preview')">Preview</div>
+            </div>
+        </div>
+
+        <!-- Language chip — centered absolutely -->
+        <button id="lang-chip" onclick="_toggleLangMode()" title="Switch language" style="
+            position:absolute;left:50%;transform:translateX(-50%);
+            display:flex;align-items:center;gap:5px;
+            padding:4px 10px 4px 8px;
+            border-radius:8px;
+            border:1px solid rgba(250,204,21,0.45);
+            background:rgba(250,204,21,0.08);
+            color:#facc15;
+            font-family:'Poppins',sans-serif;
+            font-size:10px;font-weight:700;
+            cursor:pointer;
+            transition:border-color 0.2s,background 0.2s,color 0.2s;
+            flex-shrink:0;
+            z-index:10;
+        ">
+            <span id="lang-chip-icon" style="display:flex;align-items:center;flex-shrink:0;">
+                <!-- HTML icon: </> -->
+                <svg id="lang-icon-html" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <!-- Python icon: snake -->
+                <svg id="lang-icon-py" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M6 4h5a3 3 0 0 1 3 3v3H9a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3h1"/><path d="M18 20h-5a3 3 0 0 1-3-3v-3h5a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3h-1"/><circle cx="8.5" cy="6.5" r="1" fill="#facc15" stroke="none"/><circle cx="15.5" cy="17.5" r="1" fill="#facc15" stroke="none"/></svg>
+            </span>
+            <span id="lang-chip-label">HTML</span>
+        </button>
+        
+        <div style="display:flex; align-items:center; gap:4px;">
+            <button class="icon-btn no-select" id="install-btn" style="display:none; width:30px; height:30px; background:var(--accent-dim); min-width:30px; border: 1px solid var(--accent); margin-right: 5px;">
+                <span class="material-icons-round" style="color:var(--accent); font-size:16px;">download</span>
+            </button>
+            <!-- Zoom Out — desktop only -->
+            <button class="icon-btn no-select" id="header-zoom-out-btn" onclick="desktopZoomOut()" title="Zoom Out" style="display:none;width:30px;height:30px;background:none;min-width:30px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </button>
+            <!-- Zoom In — desktop only -->
+            <button class="icon-btn no-select" id="header-zoom-in-btn" onclick="desktopZoomIn()" title="Zoom In" style="display:none;width:30px;height:30px;background:none;min-width:30px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>
+            </button>
+            <!-- Find & Replace shortcut -->
+            <button class="icon-btn no-select" id="header-find-btn" style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleFindReplace()" title="Find &amp; Replace">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>
+            </button>
+            <!-- Nav hide/show toggle -->
+            <button class="icon-btn no-select" id="nav-hide-btn" style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleNavVisibility()" title="Hide/Show toolbar">
+                <svg id="nav-hide-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.35s cubic-bezier(0.4,0,0.2,1),opacity 0.25s ease;">
+                    <rect x="3" y="3" width="18" height="18" rx="3"/>
+                    <line x1="3" y1="15" x2="21" y2="15"/>
+                    <line x1="9" y1="15" x2="9" y2="21"/>
+                    <line x1="15" y1="15" x2="15" y2="21"/>
+                </svg>
+            </button>
+            <button class="icon-btn no-select" style="width:30px; height:30px; background:none; min-width:30px;" onclick="toggleTheme()">
+                <span class="material-icons-round" id="theme-icon" style="color:var(--accent); font-size:18px;">light_mode</span>
+            </button>
+        </div>
+    </div>
+
+        <div class="file-tabs-bar no-select" id="file-tabs-bar"></div>
+
+    <div class="main-container" id="editor-wrapper">
+        <div id="editor"></div>
+
+        <!-- Editor empty state placeholder -->
+        <div id="editor-placeholder">
+            <div class="ep-icon" id="ep-icon">
+                <!-- icon set by JS -->
+            </div>
+            <div class="ep-title" id="ep-title">Start coding</div>
+            <div class="ep-sub" id="ep-sub">Your code will appear here</div>
+        </div>
+        <iframe id="preview" allow="geolocation; microphone; camera; fullscreen; payment; clipboard-read; clipboard-write"></iframe>
+
+        <!-- Python output terminal -->
+        <div id="python-output" style="
+            position:absolute;top:0;right:0;bottom:0;left:0;
+            background:#0d0d10;
+            visibility:hidden;opacity:0;z-index:21;
+            display:flex;flex-direction:column;
+            font-family:'Courier New',Courier,monospace;
+            transition:opacity 0.15s;
+        ">
+            <!-- Python output header bar -->
+            <div id="py-out-header" style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(16,185,129,0.08);border-bottom:1px solid rgba(16,185,129,0.2);flex-shrink:0;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="var(--accent-dim)"/><path d="M8 12l2 2 4-4" stroke="var(--accent)" stroke-width="2.2"/></svg>
+                <span style="font-size:10px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Python Output</span>
+                <span id="py-run-time" style="font-size:9px;color:var(--text-color);opacity:0.4;font-family:'Poppins',sans-serif;"></span>
+                <button onclick="_pyRunCode()" title="Run again" style="background:var(--accent-dim);border:none;border-radius:6px;padding:3px 8px;font-size:9px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:3px;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="pointer-events:none;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Run
+                </button>
+                <button onclick="switchTab('editor')" style="background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--text-color);opacity:0.4;display:flex;align-items:center;" title="Back to editor">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <!-- Output content -->
+            <div id="py-out-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 14px;font-size:12px;line-height:1.6;color:#e0e0e0;white-space:pre;word-break:normal;-webkit-overflow-scrolling:touch;box-sizing:border-box;"></div>
+            <!-- Loading state -->
+            <div id="py-loading" style="display:none;position:absolute;inset:0;background:#0d0d10;z-index:5;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+                <div style="width:36px;height:36px;border-radius:50%;border:3px solid rgba(16,185,129,0.2);border-top-color:var(--accent);animation:commitSpin 0.8s linear infinite;"></div>
+                <div style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;" id="py-loading-msg">Loading Python...</div>
+            </div>
+        </div>
+        <!-- Preview welcome overlay — shown when no project is loaded -->
+                <div id="preview-welcome" style="
+            position:absolute;top:0;left:0;right:0;bottom:0;
+            background:#10b981;
+            display:none;flex-direction:column;align-items:center;justify-content:center;
+            z-index:25;padding:28px;
+        ">
+            <div style="font-size:38px;font-weight:900;color:white;font-family:monospace;margin-bottom:8px;">&lt;/&gt;</div>
+            <div style="font-size:20px;font-weight:700;color:white;margin-bottom:6px;">CodX Editor</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:32px;text-align:center;line-height:1.6;">Write, preview &amp; sync code<br>from your phone.</div>
+            <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:260px;">
+                <button onclick="dismissPreviewWelcome();openNewProjectModal();" style="
+                    padding:15px;border:none;border-radius:14px;
+                    background:white;color:#10b981;
+                    font-size:15px;font-weight:700;font-family:'Poppins',sans-serif;
+                    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+                "><span style="font-size:20px;font-family:'Material Icons Round';font-style:normal;">add_box</span>New Project</button>
+                <button onclick="dismissPreviewWelcome();document.getElementById('file-input').click();" style="
+                    padding:15px;border:1.5px solid rgba(255,255,255,0.5);border-radius:14px;
+                    background:transparent;color:white;
+                    font-size:15px;font-weight:700;font-family:'Poppins',sans-serif;
+                    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+                "><span style="font-size:20px;font-family:'Material Icons Round';font-style:normal;">folder_open</span>Open Project</button>
+            </div>
+        </div>
+        
+        <div class="scroll-jumpers no-select" id="jumpers">
+            <div class="jumper-btn" onclick="customFastScroll('up')"><span class="material-icons-round">keyboard_double_arrow_up</span></div>
+            <div class="jumper-btn" onclick="customFastScroll('down')"><span class="material-icons-round">keyboard_double_arrow_down</span></div>
+        </div>
+
+    </div>
+
+    <div class="bottom-wrapper no-select" id="bottom-outer">
+        <div class="bottom-area">
+                <!-- Inline Split Chat Panel -->
+        <div id="chat-panel-toast"><span class="cpt-dot" id="cpt-dot"></span><span id="cpt-text"></span></div>
+        <div id="inline-chat-panel">
+
+            <!-- Header: avatar + name + model selector + settings + close -->
+            <div id="inline-chat-header">
+                <!-- Entire left block is clickable — opens model dropdown -->
+                <div onclick="_inlineToggleModelDropdown()" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;position:relative;" id="inline-model-trigger-area">
+                    <div class="inline-chat-avatar" style="flex-shrink:0;">
+                        <span class="material-icons-round">smart_toy</span>
+                    </div>
+                    <div style="min-width:0;flex:1;">
+                        <div id="inline-chat-name" style="font-size:11px;font-weight:700;color:var(--text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">AI Agent</div>
+                        <div style="display:flex;align-items:center;gap:3px;">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;pointer-events:none;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+                            <span id="inline-model-label" style="font-size:9px;font-weight:600;color:var(--accent);font-family:'Poppins',sans-serif;pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Select Model</span>
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" id="inline-model-chevron" style="pointer-events:none;transition:transform 0.2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                    </div>
+                    <!-- Model dropdown -->
+                    <div id="inline-model-dropdown" style="display:none;position:absolute;left:0;top:calc(100% + 8px);min-width:200px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;overflow:hidden;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.10);max-height:calc(4 * 44px);overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+                </div>
+                <!-- Custom file selector -->
+                <div id="inline-file-selector" style="position:relative;flex-shrink:0;">
+                    <button id="inline-file-trigger" onclick="_inlineToggleFileDropdown(event)" style="background:rgba(128,128,128,0.1);border:1px solid var(--glass-border);border-radius:8px;padding:3px 8px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-color);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;transition:all 0.15s;">
+                        <span class="material-icons-round" style="font-size:13px;pointer-events:none;color:var(--accent);">description</span>
+                        <span id="inline-file-label" style="max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">Current File</span>
+                        <span class="material-icons-round" id="inline-file-chevron" style="font-size:12px;pointer-events:none;transition:transform 0.2s;">expand_more</span>
+                    </button>
+                    <div id="inline-file-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;min-width:160px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;z-index:200;box-shadow:0 4px 14px rgba(0,0,0,0.10);">
+                    </div>
+                </div>
+                <button onclick="_inlineClearChatUI()" title="Clear conversation" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.5;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.5">
+                    <span class="material-icons-round" style="font-size:15px;pointer-events:none;">delete_sweep</span>
+                </button>
+                <button id="inline-chat-fullscreen" onclick="_toggleChatFullscreen()" title="Fullscreen">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="fs-icon" pointer-events="none"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
+                <button id="inline-chat-close" onclick="closeInlineChat()" style="background:rgba(239,68,68,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ef4444;flex-shrink:0;">
+                    <span class="material-icons-round" style="font-size:16px;pointer-events:none;">close</span>
+                </button>
+            </div>
+
+            <div id="inline-chat-messages">
+                <div id="inline-chat-empty">
+                    <span class="material-icons-round">chat</span>
+                    <p>Ask me about your code.<br>I can explain, fix &amp; apply changes.</p>
+                    <p style="font-size:9px;opacity:0.55;margin-top:6px;line-height:1.7;">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        Chat mode &nbsp;·&nbsp;
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit mode — toggle via buttons below
+                    </p>
+                </div>
+            </div>
+
+            <div id="inline-attach-bar" style="display:none;align-items:center;gap:6px;padding:4px 10px;background:var(--accent-dim);border-top:1px solid var(--accent);font-size:10px;font-weight:600;color:var(--accent);">
+                <span class="material-icons-round" style="font-size:14px;">attach_file</span>
+                <span id="inline-attach-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                <span class="material-icons-round" onclick="_inlineClearAttach()" style="font-size:14px;cursor:pointer;opacity:0.6;pointer-events:auto;">close</span>
+            </div>
+
+            <div id="inline-chat-input-row">
+                <button onclick="_inlineTriggerAttach()" title="Attach file" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                    <span class="material-icons-round" style="font-size:16px;pointer-events:none;">attach_file</span>
+                </button>
+                <button id="inline-chat-mode-btn" onclick="_toggleChatMode()" title="Chat Mode — only chat, no edits" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s;">
+                    <svg id="chat-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                </button>
+                <button id="chat-code-access-btn" onclick="_toggleChatCodeAccess()" title="Give AI access to file code" style="width:32px;height:32px;border-radius:50%;border:1.5px solid transparent;background:rgba(128,128,128,0.12);color:var(--text-color);display:none;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s,border-color 0.2s;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+                <textarea id="inline-chat-textarea" placeholder="Ask agent..." rows="1"></textarea>
+                <button id="inline-chat-send-btn" onclick="sendInlineChat()">
+                    <span class="material-icons-round">send</span>
+                </button>
+            </div>
+        </div>
+
+            <!-- AGENT BAR — legacy compat, hidden -->
+
+    <div class="bottom-wrapper no-select" id="bottom-panel">
+        <!-- Arrow pill sits on top border of bottom-area: half outside half inside -->
+        <div style="position:relative;height:0;overflow:visible;display:flex;justify-content:center;z-index:51;">
+            <button id="nav-toggle-btn" onclick="toggleNavSize()" style="
+                background:var(--glass-bg);
+                border:1.5px solid var(--accent);
+                border-radius:999px;
+                cursor:pointer;
+                color:var(--accent);
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                width:52px;
+                height:26px;
+                flex-shrink:0;
+                box-shadow:none;
+                position:absolute;
+                top:-13px;
+                padding:0;
+            ">
+                <span class="material-icons-round" id="nav-toggle-icon" style="font-size:20px;pointer-events:none;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);">expand_more</span>
+            </button>
+        </div>
+        <div class="bottom-area">
+            <!-- AGENT BAR — compact strip, sits at top of nav panel -->
+            <div id="agent-bar">
+                <div id="agent-file-selector" style="display:none;">
+                    <select id="agent-file-select" onchange="agentSelectFile(this.value)"></select>
+                </div>
+                <div id="agent-compact-row">
+                    <div class="agent-status-dot"></div>
+                    <span id="agent-bar-label" onclick="openAgentModal()" style="cursor:pointer;" title="Switch agent">AI</span>
+                    <textarea id="agent-prompt" placeholder="Ask agent to edit code..." rows="1"></textarea>
+                    <button id="agent-attach-btn" onclick="document.getElementById('agent-file-input').click()">
+                        <span class="material-icons-round">attach_file</span>
+                    </button>
+                    <button id="agent-send-btn" onclick="sendAgentPrompt()">
+                        <span class="material-icons-round">send</span>
+                    </button>
+                    <span class="material-icons-round" id="agent-close-btn" onclick="closeAgentBar()">close</span>
+                </div>
+                <div id="agent-thinking"><div class="agent-dots"><span></span><span></span><span></span></div> Analysing...</div>
+            </div>
+
+            <!-- ROW 0: Cursor Navigation (scroll row) -->
+            <div class="cursor-nav">
+                <button class="icon-btn" onclick="editor.gotoLine(1)"><span class="material-icons-round">vertical_align_top</span></button>
+                <button class="icon-btn" onclick="editor.gotoLine(editor.session.getLength())"><span class="material-icons-round">vertical_align_bottom</span></button>
+                <div style="width:1px;background:var(--glass-border);margin:4px 3px;flex-shrink:0;"></div>
+                <button class="icon-btn" onclick="editor.navigateLineStart()"><span class="material-icons-round">first_page</span></button>
+                <button class="icon-btn" onclick="editor.navigateLineEnd()"><span class="material-icons-round">last_page</span></button>
+                <button class="icon-btn" onclick="editor.navigateLeft()"><span class="material-icons-round">chevron_left</span></button>
+                <button class="icon-btn" onclick="editor.navigateRight()"><span class="material-icons-round">chevron_right</span></button>
+                <button class="icon-btn" onclick="editor.navigateUp()"><span class="material-icons-round">keyboard_arrow_up</span></button>
+                <button class="icon-btn" onclick="editor.navigateDown()"><span class="material-icons-round">keyboard_arrow_down</span></button>
+                <div style="width:1px;background:var(--glass-border);margin:4px 3px;flex-shrink:0;"></div>
+                <button class="icon-btn" onclick="editorUndo()"><span class="material-icons-round">undo</span></button>
+                <button class="icon-btn" onclick="editorRedo()"><span class="material-icons-round">redo</span></button>
+            </div>
+
+            <div class="toolbar-rows-wrap"><div class="toolbar-rows">
+                <!-- ROW 1: File & Project -->
+                <div class="dt-section-label" style="display:none;">File</div>
+                <div class="toolbar-row">
+                    <button class="toolbar-btn" onclick="openNewProjectModal()"><span class="material-icons-round">add_box</span>New</button>
+                    <button class="toolbar-btn" onclick="document.getElementById('file-input').click()"><span class="material-icons-round">folder_open</span>Open</button>
+                    <button class="toolbar-btn" onclick="saveFile()"><span class="material-icons-round">save</span>Save</button>
+                    <button class="toolbar-btn" onclick="saveFileToRepo()"><span class="material-icons-round">cloud_upload</span>Commit</button>
+                    <button class="toolbar-btn" onclick="closeAllTabs()"><span class="material-icons-round">playlist_remove</span>Close All</button>
+                    <button class="toolbar-btn" onclick="openGithubModal()"><span class="material-icons-round">hub</span>GitHub</button>
+                </div>
+                <!-- ROW 2: Edit -->
+                <div class="dt-section-label" style="display:none;">Edit</div>
+                <div class="toolbar-row">
+                    <button class="toolbar-btn" onclick="editor.selectAll()"><span class="material-icons-round">select_all</span>Select All</button>
+                    <button class="toolbar-btn" onclick="copyClipboard()"><span class="material-icons-round">content_copy</span>Copy</button>
+                    <button class="toolbar-btn" onclick="cutClipboard()"><span class="material-icons-round">content_cut</span>Cut</button>
+                    <button class="toolbar-btn" onclick="pasteClipboard()"><span class="material-icons-round">content_paste</span>Paste</button>
+                    <button class="toolbar-btn" onclick="deleteSelection()"><span class="material-icons-round">delete</span>Delete</button>
+                    <button class="toolbar-btn" onclick="toggleFindReplace()"><span class="material-icons-round">find_replace</span>Find</button>
+                </div>
+                <div class="dt-section-label" style="display:none;">Tools</div>
+                <div style="display: flex; justify-content: center; width: 100%; margin-top: 4px; gap: 4px;">
+                    <button class="toolbar-btn" id="ai-agent-btn" onclick="toggleInlineChat()" style="width: 68px;"><span class="material-icons-round">smart_toy</span>AI Agent</button>
+                    <button class="toolbar-btn" onclick="location.reload()" title="Restart app" style="width: 60px;"><span class="material-icons-round">refresh</span>Refresh</button>
+                    <button class="toolbar-btn" id="no-anim-btn" onclick="toggleAnimations()" title="Disable all animations" style="width: 68px;"><span class="material-icons-round">motion_photos_off</span>No Anim</button>
+                    <button class="toolbar-btn" id="plain-text-btn" onclick="togglePlainTextMode()" title="Force plain text mode" style="width: 68px;"><span class="material-icons-round">text_fields</span>Plain Text</button>
+                </div>
+                <!-- Desktop only: Zoom buttons -->
+                <div id="desktop-zoom-btns" style="display:none; justify-content:center; width:100%; margin-top:4px; gap:4px;">
+                    <button class="toolbar-btn" onclick="desktopZoomIn()" title="Zoom In" style="width:68px;"><span class="material-icons-round">zoom_in</span>Zoom In</button>
+                    <button class="toolbar-btn" onclick="desktopZoomOut()" title="Zoom Out" style="width:68px;"><span class="material-icons-round">zoom_out</span>Zoom Out</button>
+                </div>
+            </div></div>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="file-input" accept=".html,.htm,.css,.js,.ts,.jsx,.tsx,.json,.md,.txt,.xml,.svg" onchange="loadFile(event)" style="display: none !important; position: absolute; left: -9999px;">
+
+<div class="modal no-select" id="find-modal">
+
+    <!-- Shimmer top bar -->
+    <div style="height:2px;background:linear-gradient(90deg,#10b981,#34d399,#10b981);background-size:200% 100%;animation:shimmer 2.5s linear infinite;border-radius:20px 20px 0 0;"></div>
+
+    <!-- Header row: icon + title + undo/redo + close -->
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px 8px;">
+        <div style="width:30px;height:30px;border-radius:9px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+                <circle id="fm-scan-circle" cx="11" cy="11" r="8" stroke="var(--accent)" fill="none"/>
+                <circle id="fm-lens-dot" cx="11" cy="11" r="2.2" fill="var(--accent)" stroke="none"/>
+                <line x1="16.65" y1="16.65" x2="21" y2="21" stroke="var(--accent)" stroke-width="2"/>
+            </svg>
+        </div>
+        <span style="font-weight:700;font-size:12px;color:var(--text-color);font-family:'Poppins',sans-serif;flex:1;">Find &amp; Replace</span>
+        <button onclick="editorUndo()" title="Undo" style="background:none;border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.4;border-radius:6px;transition:opacity 0.15s,background 0.15s;" onmouseenter="this.style.opacity=1;this.style.background='rgba(128,128,128,0.1)'" onmouseleave="this.style.opacity=0.4;this.style.background='none'">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 7v6h6"/><path d="M3 13C5.5 6.5 13 4 18 8s5 10 1 14"/></svg>
+        </button>
+        <button onclick="editorRedo()" title="Redo" style="background:none;border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.4;border-radius:6px;transition:opacity 0.15s,background 0.15s;" onmouseenter="this.style.opacity=1;this.style.background='rgba(128,128,128,0.1)'" onmouseleave="this.style.opacity=0.4;this.style.background='none'">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 7v6h-6"/><path d="M21 13C18.5 6.5 11 4 6 8s-5 10-1 14"/></svg>
+        </button>
+        <button onclick="toggleFindReplace()" title="Close" style="background:rgba(239,68,68,0.08);border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ef4444;border-radius:6px;transition:background 0.15s;" onmouseenter="this.style.background='rgba(239,68,68,0.18)'" onmouseleave="this.style.background='rgba(239,68,68,0.08)'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+
+    <!-- Thin divider -->
+    <div style="height:1px;background:var(--glass-border);mx:12px;"></div>
+
+    <!-- Fields block -->
+    <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+
+        <!-- Find row -->
+        <div style="display:flex;align-items:center;gap:7px;">
+            <span style="font-size:9px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;width:42px;flex-shrink:0;letter-spacing:0.3px;">FIND</span>
+            <textarea id="find-input" class="fm-field" placeholder="Find" style="height:42px;flex:1;"></textarea>
+        </div>
+
+        <!-- Replace row -->
+        <div style="display:flex;align-items:center;gap:7px;">
+            <span style="font-size:9px;font-weight:700;color:rgba(96,165,250,0.9);font-family:'Poppins',sans-serif;width:42px;flex-shrink:0;letter-spacing:0.3px;">WITH</span>
+            <textarea id="replace-input" class="fm-field" placeholder="Replace" style="height:42px;flex:1;"></textarea>
+        </div>
+
+    </div>
+
+    <!-- Hidden checkboxes required by JS for case/regex state -->
+    <input type="checkbox" id="find-case" style="display:none;">
+    <input type="checkbox" id="find-regex" style="display:none;">
+
+    <!-- Footer: chips left, actions right -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 12px 10px;gap:6px;">
+        <div style="display:flex;gap:4px;">
+            <button class="fm-chip" id="fm-chip-case" onclick="_fmToggle('case',this)">Aa</button>
+            <button class="fm-chip" id="fm-chip-regex" onclick="_fmToggle('regex',this)">.*</button>
+        </div>
+        <div style="display:flex;gap:5px;">
+            <button onclick="clearFind()" title="Clear" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.07);color:#ef4444;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(239,68,68,0.15)'" onmouseleave="this.style.background='rgba(239,68,68,0.07)'">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <button onclick="findText(true)" style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;" onmouseenter="this.style.background='var(--accent-dim)';this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseleave="this.style.background='rgba(128,128,128,0.08)';this.style.color='var(--text-color)';this.style.borderColor='var(--glass-border)'">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Find
+            </button>
+            <button onclick="replaceText()" style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:700;cursor:pointer;" ontouchstart="this.style.opacity='0.8'" ontouchend="this.style.opacity='1'">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Replace
+            </button>
+        </div>
+    </div>
+
+</div>`;
+while(d.firstChild){document.body.appendChild(d.firstChild);}
 })();
 
 
