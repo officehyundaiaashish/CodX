@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Modern Scientific Calculator</title>
+<style>
+  :root {
+    --bg-light: #f5f7fa;
+    --surface-light: rgba(255,255,255,0.8);
+    --text-light: #222;
+    --accent-light: #4a90e2;
+    --operator-light: #ff6b6b;
+    --equals-light: #7ed321;
+    --shadow-light: 0 8px 32px rgba(0,0,0,0.1);
+
+    --bg-dark: #1e1e2f;
+    --surface-dark: rgba(30,30,47,0.6);
+    --text-dark: #e0e0e0;
+    --accent-dark: #64b5f6;
+    --operator-dark: #ff8a80;
+    --equals-dark: #a5d6a7;
+    --shadow-dark: 0 8px 32px rgba(0,0,0,0.4);
+
+    --radius: 12px;
+    --transition: 0.2s ease;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-light);
+    color: var(--text-light);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: background var(--transition), color var(--transition);
+  }
+  body.dark {
+    background: var(--bg-dark);
+    color: var(--text-dark);
+  }
+
+  .calculator {
+    width: 94%;
+    max-width: 420px;
+    background: var(--surface-light);
+    backdrop-filter: blur(12px);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-light);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: background var(--transition), box-shadow var(--transition);
+  }
+  body.dark .calculator {
+    background: var(--surface-dark);
+    box-shadow: var(--shadow-dark);
+  }
+
+  .display {
+    text-align: right;
+  }
+  .display input {
+    width: 100%;
+    font-size: 2rem;
+    padding: 0.5rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: right;
+    outline: none;
+  }
+  .display .preview {
+    font-size: 1rem;
+    color: rgba(var(--text-light-rgb,34,34,34),0.6);
+    margin-top: 0.25rem;
+    text-align: right;
+    min-height: 1.2rem;
+  }
+  body.dark .display .preview {
+    color: rgba(var(--text-dark-rgb,224,224,224),0.6);
+  }
+
+  .buttons {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  button {
+    font-size: 1.1rem;
+    padding: 0.75rem;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--surface-light);
+    color: var(--text-light);
+    cursor: pointer;
+    transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  body.dark button {
+    background: var(--surface-dark);
+    color: var(--text-dark);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  button.num { background: var(--surface-light); }
+  body.dark button.num { background: var(--surface-dark); }
+  button.op { background: var(--operator-light); color: #fff; }
+  body.dark button.op { background: var(--operator-dark); color: #fff; }
+  button.eq { background: var(--equals-light); color: #fff; font-weight: 600; }
+  body.dark button.eq { background: var(--equals-dark); color: #fff; }
+  button.fn { background: var(--accent-light); color: #fff; }
+  body.dark button.fn { background: var(--accent-dark); color: #fff; }
+
+  button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+  }
+  button:active {
+    transform: scale(0.98);
+  }
+
+     align-self: flex-end;
+     background: transparent;
+     border: none;
+     font-size: 1.2rem;
+     cursor: pointer;
+     color: inherit;
+     padding: 0.25rem;
+     transition: transform var(--transition), opacity var(--transition);
+   }
+   .theme-toggle:hover { opacity: 0.8; }
+   body.dark .theme-toggle {
+     transform: rotate(180deg);
+   }
+
+  @media (max-width: 350px) {
+    .calculator { padding: 1rem; }
+    .display input { font-size: 1.6rem; }
+    button { font-size: 0.95rem; padding: 0.6rem; }
+  }
+</style>
+</head>
+<body>
+<div class="calculator">
+  <div class="display">
+    <input type="text" id="expression" readonly placeholder="0">
+    <div class="preview" id="preview"></div>
+  </div>
+  <button class="theme-toggle" id="themeToggle">🌓</button>
+
+  <div class="buttons">
+    <!-- Row 1 -->
+    <button class="fn" data-key="sin">sin</button>
+    <button class="fn" data-key="cos">cos</button>
+    <button class="fn" data-key="tan">tan</button>
+    <button class="op" data-key="(">(</button>
+
+    <!-- Row 2 -->
+    <button class="fn" data-key="log">log</button>
+    <button class="fn" data-key="ln">ln</button>
+    <button class="fn" data-key="sqrt">√</button>
+    <button class="op" data-key=")">)</button>
+
+    <!-- Row 3 -->
+    <button class="fn" data-key="x2">x²</button>
+    <button class="fn" data-key="pow">xʸ</button>
+    <button class="op" data-key="/">÷</button>
+    <button class="op" data-key="*">×</button>
+
+    <!-- Row 4 -->
+    <button class="num" data-key="7">7</button>
+    <button class="num" data-key="8">8</button>
+    <button class="num" data-key="9">9</button>
+    <button class="op" data-key="-">−</button>
+
+    <!-- Row 5 -->
+    <button class="num" data-key="4">4</button>
+    <button class="num" data-key="5">5</button>
+    <button class="num" data-key="6">6</button>
+    <button class="op" data-key="+">+</button>
+
+    <!-- Row 6 -->
+    <button class="num" data-key="1">1</button>
+    <button class="num" data-key="2">2</button>
+    <button class="num" data-key="3">3</button>
+    <button class="eq" data-key="=">=</button>
+
+    <!-- Row 7 -->
+    <button class="num" data-key="0">0</button>
+    <button class="num" data-key="." data-key=".">.</button>
+    <button class="op" data-key="C">C</button>
+    <button class="op" data-key="⌫">⌫</button>
+  </div>
+</div>
+
+<script>
+  const expressionInput = document.getElementById('expression');
+  const previewEl = document.getElementById('preview');
+  const themeToggle = document.getElementById('themeToggle');
+
+  // Detect system preference and apply dark mode if needed
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.body.classList.add('dark');
+  }
+
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+  });
+
+  let current = '';
+
+  function updatePreview() {
+    try {
+      // Replace display symbols with JS equivalents for eval
+      let expr = current
+        .replace(/×/g, '*')
+        .replace(/÷/g, '/')
+        .replace(/−/g, '-')
+        .replace(/x²/g, '**2')
+        .replace(/xʸ/g, '**')
+        .replace(/√/g, 'Math.sqrt')
+        .replace(/sin/g, 'Math.sin')
+        .replace(/cos/g, 'Math.cos')
+        .replace(/tan/g, 'Math.tan')
+        .replace(/log/g, 'Math.log10')
+        .replace(/ln/g, 'Math.log');
+
+      // Wrap trig arguments in radians conversion if needed (assuming user inputs degrees)
+      // For simplicity, we treat input as radians; you could add a degree toggle later.
+      const result = eval(expr);
+      previewEl.textContent = `= ${result}`;
+    } catch (e) {
+      previewEl.textContent = '';
+    }
+  }
+
+  document.querySelectorAll('.buttons button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key;
+      if (key === 'C') {
+        current = '';
+        expressionInput.value = '';
+        previewEl.textContent = '';
+      } else if (key === '⌫') {
+        current = current.slice(0, -1);
+        expressionInput.value = current;
+      } else if (key === '=') {
+        try {
+          let expr = current
+            .replace(/×/g, '*')
+            .replace(/÷/g, '/')
+            .replace(/−/g, '-')
+            .replace(/x²/g, '**2')
+            .replace(/xʸ/g, '**')
+            .replace(/√/g, 'Math.sqrt')
+            .replace(/sin/g, 'Math.sin')
+            .replace(/cos/g, 'Math.cos')
+            .replace(/tan/g, 'Math.tan')
+            .replace(/log/g, 'Math.log10')
+            .replace(/ln/g, 'Math.log');
+          const result = eval(expr);
+          current = result.toString();
+          expressionInput.value = current;
+          previewEl.textContent = `= ${result}`;
+        } catch (e) {
+          expressionInput.value = 'Error';
+          previewEl.textContent = '';
+        }
+      } else {
+        current += key;
+        expressionInput.value = current;
+      }
+      updatePreview();
+    });
+  });
+
+  // Live preview on input change (for keyboard or programmatic changes)
+  expressionInput.addEventListener('input', () => {
+    current = expressionInput.value;
+    updatePreview();
+  });
+
+  // Optional: keyboard support
+  document.addEventListener('keydown', e => {
+    const key = e.key;
+    if (/[0-9+\-*/.()]/.test(key)) {
+      current += key;
+      expressionInput.value = current;
+      updatePreview();
+    } else if (key === 'Enter') {
+      e.preventDefault();
+      document.querySelector('[data-key="="]').click();
+    } else if (key === 'Backspace') {
+      e.preventDefault();
+      document.querySelector('[data-key="⌫"]').click();
+    } else if (key.toLowerCase() === 'c') {
+      document.querySelector('[data-key="C"]').click();
+    }
+  });
+</script>
+</body>
+</html>
