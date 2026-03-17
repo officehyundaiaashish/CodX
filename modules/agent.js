@@ -1434,16 +1434,34 @@ Rules:
         const addReadme = document.getElementById('np-repo-readme').checked;
         const addGitignore = document.getElementById('np-repo-gitignore').checked;
         const addLicense = document.getElementById('np-repo-license').checked;
+        const deployPages = document.getElementById('np-repo-deploy')?.checked || false;
+        // GitHub Pages requires public repo
+        if (deployPages && isPrivate) {
+            cdAlert('GitHub Pages', 'GitHub Pages free tier requires a Public repo. Please switch to Public or uncheck Deploy.', 'warn'); return;
+        }
         try {
-            const payload = { name, description: desc, private: isPrivate, auto_init: addReadme };
+            const payload = { name, description: desc, private: isPrivate, auto_init: true };
             if (addGitignore) payload.gitignore_template = 'Node';
             if (addLicense) payload.license_template = 'mit';
             const result = await ghApi('/user/repos', 'POST', payload);
             closeNewProjectModal();
-            // Invalidate repo cache so GitSync reloads
             _ghReposLoaded = false;
-            // Show repo link with copy button
-            _showRepoCreatedLink(result.full_name, result.html_url);
+            const repoUrl  = result.html_url;
+            const fullName = result.full_name;
+            let pagesUrl = null;
+            // Enable GitHub Pages if checkbox ticked
+            if (deployPages) {
+                try {
+                    await ghApi('/repos/' + fullName + '/pages', 'POST', {
+                        source: { branch: 'main', path: '/' }
+                    });
+                    pagesUrl = 'https://' + fullName.split('/')[0] + '.github.io/' + name;
+                } catch(pe) {
+                    // Pages might already exist or take time — still show link
+                    pagesUrl = 'https://' + fullName.split('/')[0] + '.github.io/' + name;
+                }
+            }
+            _showRepoCreatedLink(fullName, repoUrl, pagesUrl);
         } catch (e) {
             let msg = e.message || 'Failed to create repo.';
             try { const j = JSON.parse(msg); msg = j.message || msg; } catch(ee) {}
@@ -1452,39 +1470,62 @@ Rules:
     }
 
     // ===== REPO CREATED LINK DIALOG =====
-    function _showRepoCreatedLink(fullName, htmlUrl) {
+    function _showRepoCreatedLink(fullName, htmlUrl, pagesUrl) {
         const _cdOverlay = document.getElementById('custom-dialog-overlay');
         document.getElementById('custom-dialog-icon').innerHTML = '<span class="material-icons-round" style="color:#10b981">check_circle</span>';
-        document.getElementById('custom-dialog-title').textContent = 'Repo Created!';
-        document.getElementById('custom-dialog-msg').textContent = '"' + fullName + '" is live on GitHub.';
+        document.getElementById('custom-dialog-title').textContent = pagesUrl ? 'Repo Created & Deployed!' : 'Repo Created!';
+        document.getElementById('custom-dialog-msg').innerHTML = pagesUrl
+            ? '<div style="font-size:12px;line-height:1.8;">' +
+              '<div style="margin-bottom:6px;">&#128279; <b>GitHub Repo:</b><br>' +
+              '<span style="font-size:11px;color:var(--accent);word-break:break-all;">' + htmlUrl + '</span></div>' +
+              '<div>&#128640; <b>Live Site:</b><br>' +
+              '<span style="font-size:11px;color:var(--accent);word-break:break-all;">' + pagesUrl + '</span></div>' +
+              '<div style="margin-top:6px;font-size:10px;opacity:0.5;">Live site may take 1-2 min to go live.</div>' +
+              '</div>'
+            : '"' + fullName + '" is live on GitHub.';
         const inp = document.getElementById('custom-dialog-input');
-        inp.style.display = 'block';
-        inp.value = htmlUrl;
-        inp.style.userSelect = 'text';
-        inp.style.webkitUserSelect = 'text';
-        inp.readOnly = true;
-        inp.style.cursor = 'text';
-        setTimeout(() => { inp.focus(); inp.select(); }, 120);
+        inp.style.display = 'none';
         const btnsEl = document.getElementById('custom-dialog-btns');
         btnsEl.innerHTML = '';
-        // Copy button
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'cdlg-btn primary';
-        copyBtn.textContent = 'Copy Link';
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(htmlUrl).then(() => {
+        // Copy repo link button
+        const copyRepoBtn = document.createElement('button');
+        copyRepoBtn.className = 'cdlg-btn secondary';
+        copyRepoBtn.textContent = 'Copy Repo';
+        copyRepoBtn.onclick = () => {
+            navigator.clipboard.writeText(htmlUrl).catch(() => {});
+            copyRepoBtn.textContent = 'Copied!';
+            setTimeout(() => { copyRepoBtn.textContent = 'Copy Repo'; }, 2000);
+        };
+        btnsEl.appendChild(copyRepoBtn);
+        // Copy deploy link button (if pages)
+        if (pagesUrl) {
+            const copyPagesBtn = document.createElement('button');
+            copyPagesBtn.className = 'cdlg-btn primary';
+            copyPagesBtn.textContent = 'Copy Live Link';
+            copyPagesBtn.onclick = () => {
+                navigator.clipboard.writeText(pagesUrl).catch(() => {});
+                copyPagesBtn.textContent = 'Copied!';
+                setTimeout(() => { copyPagesBtn.textContent = 'Copy Live Link'; }, 2000);
+            };
+            btnsEl.appendChild(copyPagesBtn);
+        } else {
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'cdlg-btn primary';
+            copyBtn.textContent = 'Copy Link';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(htmlUrl).catch(() => {});
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.textContent = 'Copy Link'; }, 2000);
-            }).catch(() => { inp.select(); document.execCommand('copy'); copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy Link'; }, 2000); });
-        };
+            };
+            btnsEl.appendChild(copyBtn);
+        }
         const closeBtn = document.createElement('button');
         closeBtn.className = 'cdlg-btn secondary';
         closeBtn.textContent = 'Done';
         closeBtn.onclick = () => {
-            inp.readOnly = false; inp.style.cursor = '';
+            inp.style.display = 'none';
             document.getElementById('custom-dialog-overlay').classList.remove('active');
         };
-        btnsEl.appendChild(copyBtn);
         btnsEl.appendChild(closeBtn);
         _cdOverlay.classList.add('active');
     }
