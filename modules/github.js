@@ -1,13 +1,608 @@
 (function(){
-const _s=document.createElement("style");
-_s.textContent="/* GitHub modal — full screen sheet */\n        #github-modal {\n            position: fixed;\n            top: 50%; left: 50%;\n            transform: translate(-50%, -50%) scale(0.88);\n            bottom: auto !important;\n            width: 88%;\n            max-width: 380px;\n            max-height: 82vh;\n            overflow-y: auto;\n            background: var(--glass-bg);\n            border: 1px solid var(--glass-border);\n            border-radius: 20px;\n            padding: 14px;\n            z-index: 110;\n            box-shadow: 0 4px 20px rgba(0,0,0,0.10);\n            opacity: 0;\n            pointer-events: none;\n            transition: opacity 0.2s ease, transform 0.2s ease;\n        }\n        #github-modal::-webkit-scrollbar { display: none; }\n        #github-modal.active {\n            opacity: 1;\n            pointer-events: auto;\n            transform: translate(-50%, -50%) scale(1);\n        }\n        #gh-overlay {\n            position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 105;\n            display: none; opacity: 0; transition: opacity 0.2s ease;\n        }\n        #gh-overlay.active { display: block; opacity: 1; }\n        #github-modal { pointer-events: none; }\n        #github-modal.active { pointer-events: auto; }\n        .gh-select-wrap { position: relative; margin-bottom: 8px; }\n        .gh-select-wrap select {\n            width: 100%; padding: 11px 36px 11px 12px; border-radius: 10px;\n            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);\n            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px;\n            appearance: none; -webkit-appearance: none; cursor: pointer;\n            transition: border-color 0.15s;\n        }\n        .gh-select-wrap select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); outline: none; }\n        #github-modal input { font-family: 'Poppins', sans-serif; border-radius: 10px; padding: 11px 12px; transition: border-color 0.15s; }\n        #github-modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); outline: none; }\n\n        /* GitHub file tree */\n        #gh-file-tree { margin-top: 8px; max-height: 260px; overflow-y: auto; border-radius: 10px; background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); }\n        #gh-file-tree::-webkit-scrollbar { display: none; }\n        .gh-tree-item {\n            display: flex; align-items: center; gap: 8px; padding: 9px 12px;\n            border-bottom: 1px solid var(--glass-border); cursor: pointer;\n            transition: background 0.15s; position: relative;\n        }\n        .gh-tree-item:last-child { border-bottom: none; }\n        .gh-tree-item:active { background: var(--accent-dim); }\n        .gh-tree-item.selected { background: var(--accent-dim); }\n        .gh-tree-item .gh-item-icon { font-size: 16px; color: var(--accent); flex-shrink: 0; }\n        .gh-tree-item .gh-item-name { flex: 1; font-size: 12px; font-weight: 600; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n        .gh-tree-item .gh-item-actions { display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 0.15s; flex-shrink: 0; }\n        .gh-tree-item:hover .gh-item-actions, .gh-tree-item.selected .gh-item-actions { opacity: 1; pointer-events: auto; }\n        .gh-item-action-btn { width: 26px; height: 26px; border-radius: 6px; border: none; background: rgba(128,128,128,0.15); color: var(--text-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }\n        .gh-item-action-btn:active { background: var(--accent-dim); color: var(--accent); transform: scale(0.9); }\n        .gh-item-action-btn .material-icons-round { font-size: 14px; pointer-events: none; }\n        .gh-breadcrumb { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; padding: 6px 10px; background: rgba(0,0,0,0.15); border-radius: 8px; }\n        .gh-crumb { font-size: 11px; font-weight: 600; color: var(--accent); cursor: pointer; }\n        .gh-crumb-sep { font-size: 11px; opacity: 0.3; }\n        .gh-tree-loading { text-align: center; padding: 20px; font-size: 11px; opacity: 0.5; }\n\n        \n/* File Tabs Bar */\n        .file-tabs-bar { flex-shrink: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 0 6px; gap: 2px; }\n        .file-tabs-bar::-webkit-scrollbar { display: none; }\n\n        /* Chat open: keep header + tabbar pinned so keyboard can't push them */\n        body.chat-kb-open .app-header {\n            position: fixed !important;\n            top: 0; left: 0; right: 0;\n            z-index: 50;\n        }\n        body.chat-kb-open .file-tabs-bar {\n            position: fixed !important;\n            top: var(--chat-hdr-h, 48px);\n            left: 0; right: 0;\n            z-index: 49;\n        }\n        /* Prevent editor area going black when keyboard opens */\n        body.chat-kb-open #editor-wrapper {\n            background: var(--editor-bg) !important;\n        }\n        body.chat-kb-open #editor {\n            background: var(--editor-bg) !important;\n        }\n        .file-tab { display: flex; align-items: center; gap: 5px; padding: 6px 12px 6px 12px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.55; border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }\n        .file-tab.active { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }\n        .file-tab .ft-close { font-size: 13px; opacity: 0.4; margin-left: 2px; line-height: 1; transition: opacity 0.15s; pointer-events: auto; }\n        .file-tab .ft-close:active { opacity: 1; }\n\n        \n/* ===== WELCOME SCREEN ===== */\n        #welcome-screen {\n            position: fixed; inset: 0; z-index: 1000;\n            background: linear-gradient(135deg, #064e3b 0%, #065f46 40%, #0a0a0c 100%);\n            display: flex; flex-direction: column; align-items: center; justify-content: center;\n            padding: 30px;\n            transition: opacity 0.25s ease, transform 0.25s ease;\n        }\n        #welcome-screen.hiding { opacity: 0; transform: scale(1.04); pointer-events: none; }\n        #welcome-screen.hidden { display: none; }\n        .welcome-card {\n            background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 28px;\n            padding: 36px 28px 28px; width: 100%; max-width: 360px;\n            box-shadow: none;\n            animation: welcomeCardIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;\n            text-align: center;\n        }\n        @keyframes welcomeCardIn {\n            from { opacity: 0; transform: translateY(40px) scale(0.92); }\n            to { opacity: 1; transform: translateY(0) scale(1); }\n        }\n        .welcome-logo {\n            width: 72px; height: 72px; border-radius: 20px; background: #10b981;\n            display: flex; align-items: center; justify-content: center;\n            margin: 0 auto 20px; font-size: 28px; font-weight: 900; color: white;\n            font-family: monospace; box-shadow: none;\n            animation: welcomeLogoPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.4s both;\n        }\n        @keyframes welcomeLogoPop { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }\n        .welcome-title {\n            font-size: 28px; font-weight: 700; color: white; letter-spacing: -0.5px;\n            margin-bottom: 8px;\n            animation: welcomeFadeUp 0.5s ease 0.55s both;\n        }\n        .welcome-sub {\n            font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; margin-bottom: 28px;\n            animation: welcomeFadeUp 0.5s ease 0.65s both;\n        }\n        @keyframes welcomeFadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }\n        .welcome-features {\n            display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px;\n            animation: welcomeFadeUp 0.5s ease 0.75s both;\n        }\n        .welcome-feature {\n            display: flex; align-items: center; gap: 10px;\n            background: rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;\n            border: 1px solid rgba(255,255,255,0.08); text-align: left;\n        }\n        .welcome-feature .material-icons-round { color: #10b981; font-size: 18px; flex-shrink:0; }\n        .welcome-feature span:last-child { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 600; }\n        .welcome-start-btn {\n            width: 100%; padding: 15px; border: none; border-radius: 16px;\n            background: linear-gradient(135deg, #10b981, #059669);\n            color: white; font-size: 15px; font-weight: 700; font-family: 'Poppins', sans-serif;\n            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;\n            box-shadow: none;\n            transition: transform 0.2s, box-shadow 0.2s;\n            animation: welcomeFadeUp 0.5s ease 0.85s both;\n        }\n        .welcome-start-btn:active { transform: scale(0.97); box-shadow: none; }\n        .welcome-start-btn .material-icons-round { font-size: 20px; }\n\n        \n/* ===== REPO LOAD PROGRESS BAR ===== */\n        #repo-progress-overlay {\n            position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.7);\n            display: none; flex-direction: column;\n            align-items: center; justify-content: center; gap: 20px;\n        }\n        #repo-progress-overlay.visible { display: flex; }\n        .repo-progress-card {\n            background: var(--glass-bg); border: 1px solid var(--glass-border);\n            border-radius: 20px; padding: 28px 24px; width: 85%; max-width: 320px;\n            box-shadow: none;\n            animation: welcomeCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;\n        }\n        .repo-progress-title { font-size: 14px; font-weight: 700; color: var(--text-color); margin-bottom: 6px; }\n        .repo-progress-sub { font-size: 11px; color: var(--text-color); opacity: 0.5; margin-bottom: 18px; }\n        .repo-progress-bar-track {\n            height: 6px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin-bottom: 10px;\n        }\n        .repo-progress-bar-fill {\n            height: 100%; background: linear-gradient(90deg, #10b981, #34d399);\n            border-radius: 10px; width: 0%; transition: width 0.3s ease;\n            box-shadow: none;\n        }\n        .repo-progress-count { font-size: 11px; color: var(--accent); font-weight: 600; text-align:right; }\n\n        \n/* ===== NEW PROJECT MODAL ===== */\n        #new-project-overlay {\n            position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;\n            display: flex; align-items: center; justify-content: center;\n        }\n        #new-project-overlay.active { opacity: 1; pointer-events: auto; }\n        #new-project-modal {\n            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px;\n            padding: 22px 20px; width: 88%; max-width: 400px;\n            box-shadow: 0 4px 20px rgba(0,0,0,0.10);\n            transform: scale(0.9) translateY(10px); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);\n            font-family: 'Poppins', sans-serif; max-height: 90vh; overflow-y: auto;\n        }\n        #new-project-overlay.active #new-project-modal { transform: scale(1) translateY(0); }\n        #new-project-modal input, #new-project-modal select, #new-project-modal textarea {\n            width: 100%; padding: 11px 12px; border-radius: 10px; background: rgba(0,0,0,0.25);\n            border: 1px solid var(--glass-border); color: var(--text-color);\n            font-family: 'Poppins', sans-serif; font-size: 13px; margin-bottom: 10px;\n            transition: border-color 0.15s;\n        }\n        #new-project-modal input:focus, #new-project-modal select:focus, #new-project-modal textarea:focus {\n            border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim);\n        }\n        .np-section-label { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase;\n            letter-spacing: 0.8px; margin-bottom: 8px; margin-top: 14px; opacity: 0.9; }\n        .np-save-options { display: flex; gap: 8px; margin-bottom: 10px; }\n        .np-save-opt {\n            flex: 1; padding: 12px 8px; border: 1.5px solid var(--glass-border); border-radius: 12px;\n            background: rgba(0,0,0,0.15); cursor: pointer; text-align: center; transition: all 0.2s;\n            font-family: 'Poppins', sans-serif;\n        }\n        .np-save-opt.selected { border-color: var(--accent); background: var(--accent-dim); }\n        .np-save-opt .material-icons-round { font-size: 22px; color: var(--accent); display: block; margin-bottom: 4px; }\n        .np-save-opt span:last-child { font-size: 10px; font-weight: 600; color: var(--text-color); }\n        .np-tab-bar { display: flex; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 3px; margin-bottom: 14px; }\n        .np-tab { flex: 1; padding: 7px; text-align: center; font-size: 11px; font-weight: 600;\n            border-radius: 8px; cursor: pointer; color: var(--text-color); opacity: 0.5; transition: all 0.2s; }\n        .np-tab.active { background: var(--accent); color: white; opacity: 1; }\n        .np-pane { display: none; }\n        .np-pane.active { display: block; }\n        .np-repo-visibility { display: flex; gap: 8px; margin-bottom: 10px; }\n        .np-vis-opt {\n            flex: 1; padding: 10px 8px; border: 1.5px solid var(--glass-border); border-radius: 10px;\n            background: rgba(0,0,0,0.15); cursor: pointer; text-align: center;\n            font-family: 'Poppins', sans-serif; transition: all 0.2s;\n        }\n        .np-vis-opt.selected { border-color: var(--accent); background: var(--accent-dim); }\n        .np-vis-opt .material-icons-round { font-size: 18px; color: var(--accent); display: block; margin-bottom: 3px; }\n        .np-vis-opt span:last-child { font-size: 10px; font-weight: 600; color: var(--text-color); }\n\n        \n        /* ──────────────────────── Custom Dialog ──────────────────────── */\n#custom-dialog-overlay {\n            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;\n            display: flex; align-items: center; justify-content: center;\n        }\n        #custom-dialog-overlay.active { opacity: 1; pointer-events: auto; }\n        #custom-dialog-box {\n            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 18px;\n            padding: 22px 20px 16px; width: 82%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.10);\n            transform: scale(0.9) translateY(10px); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);\n            font-family: 'Poppins', sans-serif;\n        }\n        #custom-dialog-overlay.active #custom-dialog-box { transform: scale(1) translateY(0); }\n        #custom-dialog-icon { font-size: 28px; margin-bottom: 10px; }\n        #custom-dialog-title { font-size: 15px; font-weight: 600; color: var(--text-color); margin-bottom: 6px; }\n        #custom-dialog-msg { font-size: 12px; color: var(--text-color); opacity: 0.65; margin-bottom: 14px; line-height: 1.5; }\n        #custom-dialog-input { width: 100%; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px; margin-bottom: 12px; user-select: text; -webkit-user-select: text; }\n        #custom-dialog-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }\n        #custom-dialog-btns { display: flex; gap: 8px; }\n        .cdlg-btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-family: 'Poppins', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: transform 0.15s, opacity 0.15s; }\n        .cdlg-btn:active { transform: scale(0.96); opacity: 0.85; }\n        .cdlg-btn.primary { background: var(--accent); color: #fff; }\n        .cdlg-btn.danger { background: #ef4444; color: #fff; }\n        .cdlg-btn.secondary { background: rgba(128,128,128,0.18); color: var(--text-color); }\n\n        \n/* ===== CUSTOM GITHUB DROPDOWNS ===== */\n        .gh-custom-select { position: relative; margin-bottom: 10px; }\n        .gh-custom-trigger {\n            width: 100%; padding: 11px 36px 11px 12px; border-radius: 10px;\n            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);\n            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px;\n            cursor: pointer; display: flex; align-items: center; justify-content: space-between;\n             user-select: none;\n        }\n        .gh-custom-trigger.open { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }\n        .gh-custom-trigger .gh-trigger-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }\n        .gh-custom-trigger .gh-trigger-text.selected { opacity: 1; color: var(--text-color); }\n        .gh-custom-trigger .material-icons-round { font-size: 18px; color: var(--accent); transition: transform 0.2s; flex-shrink: 0; }\n        .gh-custom-trigger.open .material-icons-round { transform: rotate(180deg); }\n        .gh-custom-list {\n            position: absolute; left: 0; right: 0; top: calc(100% + 4px);\n            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px;\n            box-shadow: none; z-index: 200; max-height: 200px; overflow-y: auto;\n            opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none;\n            transition: opacity 0.2s ease, transform 0.2s ease;\n        }\n        .gh-custom-list::-webkit-scrollbar { display: none; }\n        .gh-custom-list.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }\n        .gh-custom-option {\n            padding: 11px 14px; font-family: 'Poppins', sans-serif; font-size: 12px;\n            color: var(--text-color); cursor: pointer; \n            display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--glass-border);\n        }\n        .gh-custom-option:last-child { border-bottom: none; }\n        .gh-custom-option:active, .gh-custom-option.selected { background: var(--accent-dim); color: var(--accent); }\n        .gh-custom-option .material-icons-round { font-size: 15px; opacity: 0.6; }\n\n        \n/* ===== AGENT MODAL ===== */\n        #agent-overlay {\n            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;\n        }\n        #agent-overlay.active { opacity: 1; pointer-events: auto; }\n        #agent-modal {\n            position: fixed; top: 50%; left: 50%;\n            transform: translate(-50%, -50%) scale(0.88);\n            width: 88%; max-width: 380px;\n            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 24px; padding: 0;\n            z-index: 210; box-shadow: 0 8px 32px rgba(0,0,0,0.18);\n            opacity: 0; pointer-events: none;\n            transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34,1.2,0.64,1);\n            font-family: 'Poppins', sans-serif;\n            overflow: hidden;\n        }\n        #agent-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }\n\n        /* Modal header strip */\n        #agent-modal-header {\n            display: flex; align-items: center; gap: 10px;\n            padding: 16px 18px 14px;\n            border-bottom: 1px solid var(--glass-border);\n        }\n        #agent-modal-avatar {\n            width: 36px; height: 36px; border-radius: 12px;\n            background: linear-gradient(135deg, #10b981, #059669);\n            display: flex; align-items: center; justify-content: center; flex-shrink: 0;\n        }\n        #agent-modal-avatar .material-icons-round { font-size: 18px; color: white; }\n\n        /* Scrollable body */\n        #agent-modal-body { padding: 16px 18px; overflow-y: auto; max-height: 72vh; }\n        #agent-modal-body::-webkit-scrollbar { display: none; }\n\n        /* Connected agent pill */\n        .am-agent-row {\n            display: flex; align-items: center; gap: 10px;\n            padding: 10px 12px; border-radius: 12px;\n            border: 1.5px solid var(--glass-border);\n            background: transparent; cursor: pointer;\n            transition: border-color 0.18s, background 0.18s, transform 0.12s;\n            margin-bottom: 6px;\n        }\n        .am-agent-row.active { border-color: var(--accent); background: var(--accent-dim); }\n        .am-agent-row:active { transform: scale(0.98); }\n        .am-agent-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; flex-shrink: 0; transition: background 0.3s; }\n        .am-agent-row.active .am-agent-dot { background: #10b981; }\n        .am-agent-name { flex: 1; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n        .am-agent-del { background: none; border: none; cursor: pointer; padding: 4px; opacity: 0.3; color: var(--text-color); border-radius: 6px; transition: opacity 0.15s, color 0.15s; display: flex; align-items: center; }\n        .am-agent-del:active { opacity: 1; color: #ef4444; }\n        .am-agent-del .material-icons-round { font-size: 15px; pointer-events: none; }\n\n        /* Key input */\n        #agent-api-key {\n            width: 100%; padding: 11px 13px; border-radius: 12px;\n            background: rgba(0,0,0,0.18); border: 1.5px solid var(--glass-border);\n            color: var(--text-color); font-family: 'Poppins', sans-serif;\n            font-size: 12px; margin-bottom: 8px;\n            user-select: text; -webkit-user-select: text;\n            transition: border-color 0.18s, box-shadow 0.18s; outline: none;\n        }\n        #agent-api-key:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }\n\n        /* Provider quick-links */\n        .am-provider-row {\n            display: flex; align-items: center; gap: 10px;\n            padding: 9px 12px; border-radius: 10px;\n            border: 1px solid var(--glass-border);\n            background: rgba(0,0,0,0.1); cursor: pointer;\n            text-decoration: none; transition: background 0.15s, border-color 0.15s;\n            margin-bottom: 5px;\n        }\n        .am-provider-row:active { background: var(--accent-dim); border-color: var(--accent); }\n        .am-provider-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }\n        .am-provider-name { font-size: 12px; font-weight: 700; color: var(--text-color); }\n        .am-provider-tag { font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 5px; margin-left: 5px; }\n\n        .agent-provider-grid { display: none; }\n        .agent-provider-btn { display: none; }\n\n        /* Animated provider selection list */\n        #agent-model-list {\n            max-height: 0;\n            overflow: hidden;\n            transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;\n            opacity: 0;\n        }\n        #agent-model-list.open {\n            max-height: 280px;\n            opacity: 1;\n        }\n        #agent-model-list-inner {\n            max-height: 260px;\n            overflow-y: auto;\n            -webkit-overflow-scrolling: touch;\n            display: flex;\n            flex-direction: column;\n            gap: 3px;\n            padding: 4px 0 6px;\n        }\n        #agent-model-list-inner::-webkit-scrollbar { display: none; }\n        .am-model-row {\n            display: flex; align-items: center; gap: 9px;\n            padding: 8px 10px;\n            border-radius: 10px;\n            border: 1.5px solid var(--glass-border);\n            background: transparent;\n            cursor: pointer;\n            transition: border-color 0.15s, background 0.15s, transform 0.12s;\n            animation: amRowIn 0.2s ease both;\n        }\n        @keyframes amRowIn {\n            from { opacity:0; transform:translateY(6px); }\n            to   { opacity:1; transform:translateY(0); }\n        }\n        .am-model-row:active { transform: scale(0.97); }\n        .am-model-row:hover, .am-model-row.selected { border-color: var(--accent); background: var(--accent-dim); }\n        .am-model-dot { width:15px; height:15px; border-radius:4px; border:1.5px solid var(--glass-border); background:transparent; flex-shrink:0; transition:background 0.15s,border-color 0.15s; display:flex; align-items:center; justify-content:center; }\n        .am-model-row.selected .am-model-dot { background:var(--accent); border-color:var(--accent); }\n        .am-model-dot::after { content:''; display:none; width:4px; height:7px; border:2px solid white; border-top:none; border-left:none; transform:rotate(45deg) translate(0px,-1px); }\n        .am-model-row.selected .am-model-dot::after { display:block; }\n        .am-model-name { flex:1; font-size:11px; font-weight:700; color:var(--text-color); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'Poppins',sans-serif; }\n        .am-model-tag { font-size:8px; font-weight:700; padding:2px 6px; border-radius:5px; flex-shrink:0; font-family:'Poppins',sans-serif; }\n\n        \n/* ===== AGENT BAR — compact strip inside nav panel ===== */\n        #agent-bar {\n            display: none; flex-direction: column; gap: 0;\n            border-bottom: 1px solid var(--glass-border);\n            background: var(--glass-bg);\n        }\n        #agent-bar.visible { display: flex; }\n        #agent-compact-row {\n            display: flex; align-items: center; gap: 6px;\n            padding: 6px 10px;\n        }\n        .agent-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; flex-shrink: 0; transition: background 0.3s; }\n        #agent-prompt {\n            flex: 1; padding: 7px 10px; border-radius: 10px;\n            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);\n            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 12px;\n            resize: none; height: 34px; max-height: 90px; overflow-y: auto; line-height: 1.4;\n            user-select: text; -webkit-user-select: text;\n            transition: border-color 0.2s;\n        }\n        #agent-prompt:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }\n        #agent-attach-btn, #agent-send-btn {\n            width: 34px; height: 34px; border-radius: 10px; border: none; flex-shrink: 0;\n            display: flex; align-items: center; justify-content: center; cursor: pointer;\n            transition: transform 0.15s, opacity 0.15s;\n        }\n        #agent-attach-btn:active, #agent-send-btn:active { transform: scale(0.9); }\n        #agent-attach-btn { background: rgba(128,128,128,0.12); color: var(--text-color); }\n        #agent-send-btn { background: var(--accent); color: white; }\n        #agent-send-btn .material-icons-round, #agent-attach-btn .material-icons-round { font-size: 16px; pointer-events: none; }\n        #agent-bar-label { font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }\n        #agent-close-btn { font-size: 16px; opacity: 0.4; cursor: pointer; pointer-events: auto; flex-shrink: 0; }\n        #agent-thinking {\n            display: none; align-items: center; gap: 6px; font-size: 10px; color: var(--accent); font-weight: 600;\n            padding: 0 10px 5px;\n        }\n        #agent-thinking.visible { display: flex; }\n        .agent-dots span { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin-right: 2px; animation: agentBounce 0.8s infinite; }\n        .agent-dots span:nth-child(2) { animation-delay: 0.2s; }\n        .agent-dots span:nth-child(3) { animation-delay: 0.4s; }\n        @keyframes agentBounce { 0%,80%,100%{ transform:translateY(0); opacity:0.6; } 40%{ transform:translateY(-4px); opacity:1; } } @keyframes activityFadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:0.7; transform:translateY(0); } }\n        @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }\n        @keyframes commitSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }\n        #agent-file-selector { padding: 0 10px 5px; }\n        #agent-file-select {\n            width:100%; padding:5px 8px; border-radius:7px;\n            background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);\n            color:var(--text-color); font-family:Poppins,sans-serif; font-size:10px;\n            font-weight:600; appearance:none; -webkit-appearance:none; cursor:pointer;\n        }\n    \n";
-document.head.appendChild(_s);
+var s=document.createElement("style");
+s.textContent=`/* GitHub modal — full screen sheet */
+        #github-modal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.88);
+            bottom: auto !important;
+            width: 88%;
+            max-width: 380px;
+            max-height: 82vh;
+            overflow-y: auto;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 14px;
+            z-index: 110;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #github-modal::-webkit-scrollbar { display: none; }
+        #github-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #gh-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 105;
+            display: none; opacity: 0; transition: opacity 0.2s ease;
+        }
+        #gh-overlay.active { display: block; opacity: 1; }
+        #github-modal { pointer-events: none; }
+        #github-modal.active { pointer-events: auto; }
+        .gh-select-wrap { position: relative; margin-bottom: 8px; }
+        .gh-select-wrap select {
+            width: 100%; padding: 11px 36px 11px 12px; border-radius: 10px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px;
+            appearance: none; -webkit-appearance: none; cursor: pointer;
+            transition: border-color 0.15s;
+        }
+        .gh-select-wrap select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); outline: none; }
+        #github-modal input { font-family: 'Poppins', sans-serif; border-radius: 10px; padding: 11px 12px; transition: border-color 0.15s; }
+        #github-modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); outline: none; }
+
+        /* GitHub file tree */
+        #gh-file-tree { margin-top: 8px; max-height: 260px; overflow-y: auto; border-radius: 10px; background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); }
+        #gh-file-tree::-webkit-scrollbar { display: none; }
+        .gh-tree-item {
+            display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+            border-bottom: 1px solid var(--glass-border); cursor: pointer;
+            transition: background 0.15s; position: relative;
+        }
+        .gh-tree-item:last-child { border-bottom: none; }
+        .gh-tree-item:active { background: var(--accent-dim); }
+        .gh-tree-item.selected { background: var(--accent-dim); }
+        .gh-tree-item .gh-item-icon { font-size: 16px; color: var(--accent); flex-shrink: 0; }
+        .gh-tree-item .gh-item-name { flex: 1; font-size: 12px; font-weight: 600; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gh-tree-item .gh-item-actions { display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 0.15s; flex-shrink: 0; }
+        .gh-tree-item:hover .gh-item-actions, .gh-tree-item.selected .gh-item-actions { opacity: 1; pointer-events: auto; }
+        .gh-item-action-btn { width: 26px; height: 26px; border-radius: 6px; border: none; background: rgba(128,128,128,0.15); color: var(--text-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .gh-item-action-btn:active { background: var(--accent-dim); color: var(--accent); transform: scale(0.9); }
+        .gh-item-action-btn .material-icons-round { font-size: 14px; pointer-events: none; }
+        .gh-breadcrumb { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; padding: 6px 10px; background: rgba(0,0,0,0.15); border-radius: 8px; }
+        .gh-crumb { font-size: 11px; font-weight: 600; color: var(--accent); cursor: pointer; }
+        .gh-crumb-sep { font-size: 11px; opacity: 0.3; }
+        .gh-tree-loading { text-align: center; padding: 20px; font-size: 11px; opacity: 0.5; }
+
+        
+/* File Tabs Bar */
+        .file-tabs-bar { flex-shrink: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 0 6px; gap: 2px; }
+        .file-tabs-bar::-webkit-scrollbar { display: none; }
+
+        /* Chat open: keep header + tabbar pinned so keyboard can't push them */
+        body.chat-kb-open .app-header {
+            position: fixed !important;
+            top: 0; left: 0; right: 0;
+            z-index: 50;
+        }
+        body.chat-kb-open .file-tabs-bar {
+            position: fixed !important;
+            top: var(--chat-hdr-h, 48px);
+            left: 0; right: 0;
+            z-index: 49;
+        }
+        /* Prevent editor area going black when keyboard opens */
+        body.chat-kb-open #editor-wrapper {
+            background: var(--editor-bg) !important;
+        }
+        body.chat-kb-open #editor {
+            background: var(--editor-bg) !important;
+        }
+        .file-tab { display: flex; align-items: center; gap: 5px; padding: 6px 12px 6px 12px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.55; border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .file-tab.active { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }
+        .file-tab .ft-close { font-size: 13px; opacity: 0.4; margin-left: 2px; line-height: 1; transition: opacity 0.15s; pointer-events: auto; }
+        .file-tab .ft-close:active { opacity: 1; }
+
+        
+/* ===== WELCOME SCREEN ===== */
+        #welcome-screen {
+            position: fixed; inset: 0; z-index: 1000;
+            background: linear-gradient(135deg, #064e3b 0%, #065f46 40%, #0a0a0c 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 30px;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        #welcome-screen.hiding { opacity: 0; transform: scale(1.04); pointer-events: none; }
+        #welcome-screen.hidden { display: none; }
+        .welcome-card {
+            background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 28px;
+            padding: 36px 28px 28px; width: 100%; max-width: 360px;
+            box-shadow: none;
+            animation: welcomeCardIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+            text-align: center;
+        }
+        @keyframes welcomeCardIn {
+            from { opacity: 0; transform: translateY(40px) scale(0.92); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .welcome-logo {
+            width: 72px; height: 72px; border-radius: 20px; background: #10b981;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px; font-size: 28px; font-weight: 900; color: white;
+            font-family: monospace; box-shadow: none;
+            animation: welcomeLogoPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.4s both;
+        }
+        @keyframes welcomeLogoPop { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }
+        .welcome-title {
+            font-size: 28px; font-weight: 700; color: white; letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            animation: welcomeFadeUp 0.5s ease 0.55s both;
+        }
+        .welcome-sub {
+            font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; margin-bottom: 28px;
+            animation: welcomeFadeUp 0.5s ease 0.65s both;
+        }
+        @keyframes welcomeFadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        .welcome-features {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px;
+            animation: welcomeFadeUp 0.5s ease 0.75s both;
+        }
+        .welcome-feature {
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;
+            border: 1px solid rgba(255,255,255,0.08); text-align: left;
+        }
+        .welcome-feature .material-icons-round { color: #10b981; font-size: 18px; flex-shrink:0; }
+        .welcome-feature span:last-child { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 600; }
+        .welcome-start-btn {
+            width: 100%; padding: 15px; border: none; border-radius: 16px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white; font-size: 15px; font-weight: 700; font-family: 'Poppins', sans-serif;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: welcomeFadeUp 0.5s ease 0.85s both;
+        }
+        .welcome-start-btn:active { transform: scale(0.97); box-shadow: none; }
+        .welcome-start-btn .material-icons-round { font-size: 20px; }
+
+        
+/* ===== REPO LOAD PROGRESS BAR ===== */
+        #repo-progress-overlay {
+            position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.7);
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 20px;
+        }
+        #repo-progress-overlay.visible { display: flex; }
+        .repo-progress-card {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 20px; padding: 28px 24px; width: 85%; max-width: 320px;
+            box-shadow: none;
+            animation: welcomeCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        .repo-progress-title { font-size: 14px; font-weight: 700; color: var(--text-color); margin-bottom: 6px; }
+        .repo-progress-sub { font-size: 11px; color: var(--text-color); opacity: 0.5; margin-bottom: 18px; }
+        .repo-progress-bar-track {
+            height: 6px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin-bottom: 10px;
+        }
+        .repo-progress-bar-fill {
+            height: 100%; background: linear-gradient(90deg, #10b981, #34d399);
+            border-radius: 10px; width: 0%; transition: width 0.3s ease;
+            box-shadow: none;
+        }
+        .repo-progress-count { font-size: 11px; color: var(--accent); font-weight: 600; text-align:right; }
+
+        
+/* ===== NEW PROJECT MODAL ===== */
+        #new-project-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #new-project-overlay.active { opacity: 1; pointer-events: auto; }
+        #new-project-modal {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px;
+            padding: 22px 20px; width: 88%; max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            transform: scale(0.9) translateY(10px); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+            font-family: 'Poppins', sans-serif; max-height: 90vh; overflow-y: auto;
+        }
+        #new-project-overlay.active #new-project-modal { transform: scale(1) translateY(0); }
+        #new-project-modal input, #new-project-modal select, #new-project-modal textarea {
+            width: 100%; padding: 11px 12px; border-radius: 10px; background: rgba(0,0,0,0.25);
+            border: 1px solid var(--glass-border); color: var(--text-color);
+            font-family: 'Poppins', sans-serif; font-size: 13px; margin-bottom: 10px;
+            transition: border-color 0.15s;
+        }
+        #new-project-modal input:focus, #new-project-modal select:focus, #new-project-modal textarea:focus {
+            border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        .np-section-label { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase;
+            letter-spacing: 0.8px; margin-bottom: 8px; margin-top: 14px; opacity: 0.9; }
+        .np-save-options { display: flex; gap: 8px; margin-bottom: 10px; }
+        .np-save-opt {
+            flex: 1; padding: 12px 8px; border: 1.5px solid var(--glass-border); border-radius: 12px;
+            background: rgba(0,0,0,0.15); cursor: pointer; text-align: center; transition: all 0.2s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .np-save-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+        .np-save-opt .material-icons-round { font-size: 22px; color: var(--accent); display: block; margin-bottom: 4px; }
+        .np-save-opt span:last-child { font-size: 10px; font-weight: 600; color: var(--text-color); }
+        .np-tab-bar { display: flex; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+        .np-tab { flex: 1; padding: 7px; text-align: center; font-size: 11px; font-weight: 600;
+            border-radius: 8px; cursor: pointer; color: var(--text-color); opacity: 0.5; transition: all 0.2s; }
+        .np-tab.active { background: var(--accent); color: white; opacity: 1; }
+        .np-pane { display: none; }
+        .np-pane.active { display: block; }
+        .np-repo-visibility { display: flex; gap: 8px; margin-bottom: 10px; }
+        .np-vis-opt {
+            flex: 1; padding: 10px 8px; border: 1.5px solid var(--glass-border); border-radius: 10px;
+            background: rgba(0,0,0,0.15); cursor: pointer; text-align: center;
+            font-family: 'Poppins', sans-serif; transition: all 0.2s;
+        }
+        .np-vis-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+        .np-vis-opt .material-icons-round { font-size: 18px; color: var(--accent); display: block; margin-bottom: 3px; }
+        .np-vis-opt span:last-child { font-size: 10px; font-weight: 600; color: var(--text-color); }
+
+        
+        /* ──────────────────────── Custom Dialog ──────────────────────── */
+#custom-dialog-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #custom-dialog-overlay.active { opacity: 1; pointer-events: auto; }
+        #custom-dialog-box {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 18px;
+            padding: 22px 20px 16px; width: 82%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            transform: scale(0.9) translateY(10px); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+            font-family: 'Poppins', sans-serif;
+        }
+        #custom-dialog-overlay.active #custom-dialog-box { transform: scale(1) translateY(0); }
+        #custom-dialog-icon { font-size: 28px; margin-bottom: 10px; }
+        #custom-dialog-title { font-size: 15px; font-weight: 600; color: var(--text-color); margin-bottom: 6px; }
+        #custom-dialog-msg { font-size: 12px; color: var(--text-color); opacity: 0.65; margin-bottom: 14px; line-height: 1.5; }
+        #custom-dialog-input { width: 100%; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px; margin-bottom: 12px; user-select: text; -webkit-user-select: text; }
+        #custom-dialog-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+        #custom-dialog-btns { display: flex; gap: 8px; }
+        .cdlg-btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-family: 'Poppins', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: transform 0.15s, opacity 0.15s; }
+        .cdlg-btn:active { transform: scale(0.96); opacity: 0.85; }
+        .cdlg-btn.primary { background: var(--accent); color: #fff; }
+        .cdlg-btn.danger { background: #ef4444; color: #fff; }
+        .cdlg-btn.secondary { background: rgba(128,128,128,0.18); color: var(--text-color); }
+
+        
+/* ===== CUSTOM GITHUB DROPDOWNS ===== */
+        .gh-custom-select { position: relative; margin-bottom: 10px; }
+        .gh-custom-trigger {
+            width: 100%; padding: 11px 36px 11px 12px; border-radius: 10px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px;
+            cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+             user-select: none;
+        }
+        .gh-custom-trigger.open { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+        .gh-custom-trigger .gh-trigger-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
+        .gh-custom-trigger .gh-trigger-text.selected { opacity: 1; color: var(--text-color); }
+        .gh-custom-trigger .material-icons-round { font-size: 18px; color: var(--accent); transition: transform 0.2s; flex-shrink: 0; }
+        .gh-custom-trigger.open .material-icons-round { transform: rotate(180deg); }
+        .gh-custom-list {
+            position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px;
+            box-shadow: none; z-index: 200; max-height: 200px; overflow-y: auto;
+            opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .gh-custom-list::-webkit-scrollbar { display: none; }
+        .gh-custom-list.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        .gh-custom-option {
+            padding: 11px 14px; font-family: 'Poppins', sans-serif; font-size: 12px;
+            color: var(--text-color); cursor: pointer; 
+            display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--glass-border);
+        }
+        .gh-custom-option:last-child { border-bottom: none; }
+        .gh-custom-option:active, .gh-custom-option.selected { background: var(--accent-dim); color: var(--accent); }
+        .gh-custom-option .material-icons-round { font-size: 15px; opacity: 0.6; }
+
+        
+/* ===== AGENT MODAL ===== */
+        #agent-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        #agent-overlay.active { opacity: 1; pointer-events: auto; }
+        #agent-modal {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.88);
+            width: 88%; max-width: 380px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 24px; padding: 0;
+            z-index: 210; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+        }
+        #agent-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+
+        /* Modal header strip */
+        #agent-modal-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 16px 18px 14px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        #agent-modal-avatar {
+            width: 36px; height: 36px; border-radius: 12px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        #agent-modal-avatar .material-icons-round { font-size: 18px; color: white; }
+
+        /* Scrollable body */
+        #agent-modal-body { padding: 16px 18px; overflow-y: auto; max-height: 72vh; }
+        #agent-modal-body::-webkit-scrollbar { display: none; }
+
+        /* Connected agent pill */
+        .am-agent-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 12px;
+            border: 1.5px solid var(--glass-border);
+            background: transparent; cursor: pointer;
+            transition: border-color 0.18s, background 0.18s, transform 0.12s;
+            margin-bottom: 6px;
+        }
+        .am-agent-row.active { border-color: var(--accent); background: var(--accent-dim); }
+        .am-agent-row:active { transform: scale(0.98); }
+        .am-agent-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; flex-shrink: 0; transition: background 0.3s; }
+        .am-agent-row.active .am-agent-dot { background: #10b981; }
+        .am-agent-name { flex: 1; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .am-agent-del { background: none; border: none; cursor: pointer; padding: 4px; opacity: 0.3; color: var(--text-color); border-radius: 6px; transition: opacity 0.15s, color 0.15s; display: flex; align-items: center; }
+        .am-agent-del:active { opacity: 1; color: #ef4444; }
+        .am-agent-del .material-icons-round { font-size: 15px; pointer-events: none; }
+
+        /* Key input */
+        #agent-api-key {
+            width: 100%; padding: 11px 13px; border-radius: 12px;
+            background: rgba(0,0,0,0.18); border: 1.5px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 12px; margin-bottom: 8px;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.18s, box-shadow 0.18s; outline: none;
+        }
+        #agent-api-key:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+        /* Provider quick-links */
+        .am-provider-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.1); cursor: pointer;
+            text-decoration: none; transition: background 0.15s, border-color 0.15s;
+            margin-bottom: 5px;
+        }
+        .am-provider-row:active { background: var(--accent-dim); border-color: var(--accent); }
+        .am-provider-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .am-provider-name { font-size: 12px; font-weight: 700; color: var(--text-color); }
+        .am-provider-tag { font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 5px; margin-left: 5px; }
+
+        .agent-provider-grid { display: none; }
+        .agent-provider-btn { display: none; }
+
+        /* Animated provider selection list */
+        #agent-model-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+            opacity: 0;
+        }
+        #agent-model-list.open {
+            max-height: 280px;
+            opacity: 1;
+        }
+        #agent-model-list-inner {
+            max-height: 260px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 4px 0 6px;
+        }
+        #agent-model-list-inner::-webkit-scrollbar { display: none; }
+        .am-model-row {
+            display: flex; align-items: center; gap: 9px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1.5px solid var(--glass-border);
+            background: transparent;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, transform 0.12s;
+            animation: amRowIn 0.2s ease both;
+        }
+        @keyframes amRowIn {
+            from { opacity:0; transform:translateY(6px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .am-model-row:active { transform: scale(0.97); }
+        .am-model-row:hover, .am-model-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+        .am-model-dot { width:15px; height:15px; border-radius:4px; border:1.5px solid var(--glass-border); background:transparent; flex-shrink:0; transition:background 0.15s,border-color 0.15s; display:flex; align-items:center; justify-content:center; }
+        .am-model-row.selected .am-model-dot { background:var(--accent); border-color:var(--accent); }
+        .am-model-dot::after { content:''; display:none; width:4px; height:7px; border:2px solid white; border-top:none; border-left:none; transform:rotate(45deg) translate(0px,-1px); }
+        .am-model-row.selected .am-model-dot::after { display:block; }
+        .am-model-name { flex:1; font-size:11px; font-weight:700; color:var(--text-color); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'Poppins',sans-serif; }
+        .am-model-tag { font-size:8px; font-weight:700; padding:2px 6px; border-radius:5px; flex-shrink:0; font-family:'Poppins',sans-serif; }
+
+        
+/* ===== AGENT BAR — compact strip inside nav panel ===== */
+        #agent-bar {
+            display: none; flex-direction: column; gap: 0;
+            border-bottom: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+        }
+        #agent-bar.visible { display: flex; }
+        #agent-compact-row {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 10px;
+        }
+        .agent-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; flex-shrink: 0; transition: background 0.3s; }
+        #agent-prompt {
+            flex: 1; padding: 7px 10px; border-radius: 10px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 12px;
+            resize: none; height: 34px; max-height: 90px; overflow-y: auto; line-height: 1.4;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.2s;
+        }
+        #agent-prompt:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+        #agent-attach-btn, #agent-send-btn {
+            width: 34px; height: 34px; border-radius: 10px; border: none; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+        #agent-attach-btn:active, #agent-send-btn:active { transform: scale(0.9); }
+        #agent-attach-btn { background: rgba(128,128,128,0.12); color: var(--text-color); }
+        #agent-send-btn { background: var(--accent); color: white; }
+        #agent-send-btn .material-icons-round, #agent-attach-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+        #agent-bar-label { font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+        #agent-close-btn { font-size: 16px; opacity: 0.4; cursor: pointer; pointer-events: auto; flex-shrink: 0; }
+        #agent-thinking {
+            display: none; align-items: center; gap: 6px; font-size: 10px; color: var(--accent); font-weight: 600;
+            padding: 0 10px 5px;
+        }
+        #agent-thinking.visible { display: flex; }
+        .agent-dots span { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin-right: 2px; animation: agentBounce 0.8s infinite; }
+        .agent-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .agent-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes agentBounce { 0%,80%,100%{ transform:translateY(0); opacity:0.6; } 40%{ transform:translateY(-4px); opacity:1; } } @keyframes activityFadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:0.7; transform:translateY(0); } }
+        @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+        @keyframes commitSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+        #agent-file-selector { padding: 0 10px 5px; }
+        #agent-file-select {
+            width:100%; padding:5px 8px; border-radius:7px;
+            background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);
+            color:var(--text-color); font-family:Poppins,sans-serif; font-size:10px;
+            font-weight:600; appearance:none; -webkit-appearance:none; cursor:pointer;
+        }
+    
+`;
+document.head.appendChild(s);
 })();
 
 (function(){
-const _d=document.createElement("div");
-_d.innerHTML='<div id="gh-overlay" onclick="closeGithubModal()"></div>\n\n<div class="no-select" id="github-modal">\n    <!-- Header -->\n    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">\n        <div style="display:flex;align-items:center;gap:9px;">\n            <div style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">\n                <span class="material-icons-round" style="color:var(--accent);font-size:18px;">cloud_sync</span>\n            </div>\n            <div>\n                <div style="font-weight:700;font-size:14px;color:var(--text-color);font-family:\'Poppins\',sans-serif;">GitSync</div>\n                <div id="gh-header-status" style="font-size:10px;color:var(--accent);font-weight:600;font-family:\'Poppins\',sans-serif;">Not connected</div>\n            </div>\n        </div>\n        <button onclick="closeGithubModal()" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.6;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.6">\n            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>\n        </button>\n    </div>\n\n    <!-- LOGIN SECTION -->\n    <div id="gh-login-section">\n        <div style="background:var(--accent-dim);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:12px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--text-color);font-family:\'Poppins\',sans-serif;">\n            <div style="font-weight:700;color:var(--accent);margin-bottom:3px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg> GitHub Personal Access Token</div>\n            <div style="opacity:0.7;">Generate at github.com → Settings → Developer settings → Personal access tokens</div>\n        </div>\n        <input type="text" id="gh-token" placeholder="Personal access token" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" style="user-select:text;-webkit-user-select:text;margin-bottom:10px;">\n        <button class="modal-btn" onclick="saveGhToken()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;">\n            <span class="material-icons-round" style="font-size:16px;pointer-events:none;">login</span>Connect GitHub\n        </button>\n    </div>\n\n    <!-- CONNECTED SECTION -->\n    <div id="gh-repo-section" style="display:none;" class="gh-section-anim">\n\n        <!-- Connected status bar -->\n        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:8px 12px;margin-bottom:12px;">\n            <div style="display:flex;align-items:center;gap:7px;">\n                <div style="width:7px;height:7px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>\n                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:\'Poppins\',sans-serif;">Connected</span>\n            </div>\n            <button onclick="ghLogout()" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--text-color);opacity:0.45;font-family:\'Poppins\',sans-serif;padding:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.45">\n                <span class="material-icons-round" style="font-size:13px;">logout</span>Logout\n            </button>\n        </div>\n\n        <!-- Repo selector row -->\n        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">\n            <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.6px;font-family:\'Poppins\',sans-serif;">Repository</div>\n            <div style="display:flex;align-items:center;gap:2px;">\n                <button onclick="_ghDownloadRepo()" title="Download repository as ZIP" style="background:none;border:none;cursor:pointer;padding:3px;opacity:0.45;color:var(--text-color);display:flex;align-items:center;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.45">\n                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>\n                </button>\n                <button onclick="_ghRenameRepo()" title="Rename repository" style="background:none;border:none;cursor:pointer;padding:3px;opacity:0.45;color:var(--text-color);display:flex;align-items:center;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.45">\n                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>\n                </button>\n            </div>\n        </div>\n        <div style="display:flex;gap:7px;margin-bottom:10px;">\n            <div class="gh-select-wrap" style="flex:1;margin-bottom:0;">\n                <select id="gh-repo-select" onchange="fetchGhFiles()">\n                    <option value="">Select Repository...</option>\n                </select>\n            </div>\n            <button onclick="_ghForceRefresh()" title="Refresh — fetch latest from GitHub" style="width:38px;height:38px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.15s;" onmouseenter="this.style.background=\'var(--accent-dim)\'" onmouseleave="this.style.background=\'rgba(128,128,128,0.08)\'">\n                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">refresh</span>\n            </button>\n        </div>\n\n        <!-- Breadcrumb path -->\n        <div class="gh-breadcrumb" id="gh-breadcrumb" style="display:none;"></div>\n\n        <!-- File tree -->\n        <div id="gh-file-tree" style="display:none;">\n            <div class="gh-tree-loading">Loading files...</div>\n        </div>\n\n        <!-- Divider -->\n        <div style="height:1px;background:var(--glass-border);margin:12px 0;"></div>\n\n        <!-- CREATE section -->\n        <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.7px;font-family:\'Poppins\',sans-serif;margin-bottom:7px;">Create &amp; Upload</div>\n        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;" id="gh-create-bar">\n            <button onclick="createGhFile()" id="gh-new-file-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:\'Poppins\',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;" ontouchstart="this.style.opacity=\'0.75\';this.style.transform=\'scale(0.95)\'" ontouchend="this.style.opacity=\'1\';this.style.transform=\'scale(1)\'">\n                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">add_circle</span>New File\n            </button>\n            <button onclick="createGhFolder()" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:\'Poppins\',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;" ontouchstart="this.style.opacity=\'0.75\';this.style.transform=\'scale(0.95)\'" ontouchend="this.style.opacity=\'1\';this.style.transform=\'scale(1)\'">\n                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">create_new_folder</span>New Folder\n            </button>\n            <button onclick="uploadGhFile()" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:\'Poppins\',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;" ontouchstart="this.style.opacity=\'0.75\';this.style.transform=\'scale(0.95)\'" ontouchend="this.style.opacity=\'1\';this.style.transform=\'scale(1)\'">\n                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">upload_file</span>Upload\n            </button>\n        </div>\n\n        <!-- OPEN section -->\n        <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.7px;font-family:\'Poppins\',sans-serif;margin-bottom:7px;">Open</div>\n        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">\n            <button id="gh-load-btn" onclick="loadGhFile()" disabled style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:\'Poppins\',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;" ontouchstart="if(!this.disabled){this.style.opacity=\'0.75\';this.style.transform=\'scale(0.95)\'}" ontouchend="if(!this.disabled){this.style.opacity=\'1\';this.style.transform=\'scale(1)\'}">\n                <span class="material-icons-round" style="font-size:15px;pointer-events:none;">file_open</span>Load File\n            </button>\n            <button id="gh-load-repo-btn" onclick="loadGhRepo()" disabled style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:\'Poppins\',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;" ontouchstart="if(!this.disabled){this.style.opacity=\'0.75\';this.style.transform=\'scale(0.95)\'}" ontouchend="if(!this.disabled){this.style.opacity=\'1\';this.style.transform=\'scale(1)\'}">\n                <span class="material-icons-round" style="font-size:15px;pointer-events:none;">folder_zip</span>Load All\n            </button>\n        </div>\n\n        <!-- SYNC section -->\n        <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.7px;font-family:\'Poppins\',sans-serif;margin-bottom:7px;">Sync</div>\n        <div style="display:flex;gap:6px;">\n            <button class="modal-btn" id="gh-commit-btn" onclick="commitGhFile()" disabled style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:linear-gradient(135deg,#10b981,#059669);">\n                <span class="material-icons-round" style="font-size:16px;pointer-events:none;">upload</span>Commit\n            </button>\n            <button class="modal-btn" id="gh-undo-btn" onclick="undoLastCommit()" disabled style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:linear-gradient(135deg,#10b981,#059669);">\n                <span class="material-icons-round" style="font-size:16px;pointer-events:none;">history</span>Undo\n            </button>\n        </div>\n        <!-- Commit history dropdown (shown when Undo clicked) -->\n        <div id="gh-commit-history" style="display:none;margin-top:8px;border-radius:12px;border:1px solid var(--glass-border);overflow:hidden;background:var(--glass-bg);max-height:180px;overflow-y:auto;"></div>\n    </div>\n</div>\n\n<input type="file" id="gh-upload-input" style="display:none;" multiple>\n<input type="file" id="agent-file-input" style="display:none;">\n<input type="file" id="inline-chat-file-input" style="display:none;">';
-document.body.appendChild(_d);
+var d=document.createElement("div");
+d.innerHTML=`<div id="gh-overlay" onclick="closeGithubModal()"></div>
+
+<div class="no-select" id="github-modal">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:9px;">
+            <div style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span class="material-icons-round" style="color:var(--accent);font-size:18px;">cloud_sync</span>
+            </div>
+            <div>
+                <div style="font-weight:700;font-size:14px;color:var(--text-color);font-family:'Poppins',sans-serif;">GitSync</div>
+                <div id="gh-header-status" style="font-size:10px;color:var(--accent);font-weight:600;font-family:'Poppins',sans-serif;">Not connected</div>
+            </div>
+        </div>
+        <button onclick="closeGithubModal()" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.6;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.6">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+
+    <!-- LOGIN SECTION -->
+    <div id="gh-login-section">
+        <div style="background:var(--accent-dim);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:12px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--text-color);font-family:'Poppins',sans-serif;">
+            <div style="font-weight:700;color:var(--accent);margin-bottom:3px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg> GitHub Personal Access Token</div>
+            <div style="opacity:0.7;">Generate at github.com → Settings → Developer settings → Personal access tokens</div>
+        </div>
+        <input type="text" id="gh-token" placeholder="Personal access token" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" style="user-select:text;-webkit-user-select:text;margin-bottom:10px;">
+        <button class="modal-btn" onclick="saveGhToken()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span class="material-icons-round" style="font-size:16px;pointer-events:none;">login</span>Connect GitHub
+        </button>
+    </div>
+
+    <!-- CONNECTED SECTION -->
+    <div id="gh-repo-section" style="display:none;" class="gh-section-anim">
+
+        <!-- Connected status bar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:8px 12px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:7px;">
+                <div style="width:7px;height:7px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>
+                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;">Connected</span>
+            </div>
+            <button onclick="ghLogout()" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--text-color);opacity:0.45;font-family:'Poppins',sans-serif;padding:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.45">
+                <span class="material-icons-round" style="font-size:13px;">logout</span>Logout
+            </button>
+        </div>
+
+        <!-- Repo selector row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.6px;font-family:'Poppins',sans-serif;">Repository</div>
+            <div style="display:flex;align-items:center;gap:2px;">
+                <button onclick="_ghDownloadRepo()" title="Download repository as ZIP" style="background:none;border:none;cursor:pointer;padding:3px;opacity:0.45;color:var(--text-color);display:flex;align-items:center;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.45">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <button onclick="_ghRenameRepo()" title="Rename repository" style="background:none;border:none;cursor:pointer;padding:3px;opacity:0.45;color:var(--text-color);display:flex;align-items:center;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.45">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:10px;">
+            <div class="gh-select-wrap" style="flex:1;margin-bottom:0;">
+                <select id="gh-repo-select" onchange="fetchGhFiles()">
+                    <option value="">Select Repository...</option>
+                </select>
+            </div>
+            <button onclick="_ghForceRefresh()" title="Refresh — fetch latest from GitHub" style="width:38px;height:38px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-dim)'" onmouseleave="this.style.background='rgba(128,128,128,0.08)'">
+                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">refresh</span>
+            </button>
+        </div>
+
+        <!-- Breadcrumb path -->
+        <div class="gh-breadcrumb" id="gh-breadcrumb" style="display:none;"></div>
+
+        <!-- File tree -->
+        <div id="gh-file-tree" style="display:none;">
+            <div class="gh-tree-loading">Loading files...</div>
+        </div>
+
+        <!-- Divider -->
+        <div style="height:1px;background:var(--glass-border);margin:12px 0;"></div>
+
+        <!-- CREATE section -->
+        <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.7px;font-family:'Poppins',sans-serif;margin-bottom:7px;">Create &amp; Upload</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;" id="gh-create-bar">
+            <button onclick="createGhFile()" id="gh-new-file-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;" ontouchstart="this.style.opacity='0.75';this.style.transform='scale(0.95)'" ontouchend="this.style.opacity='1';this.style.transform='scale(1)'">
+                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">add_circle</span>New File
+            </button>
+            <button onclick="createGhFolder()" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;" ontouchstart="this.style.opacity='0.75';this.style.transform='scale(0.95)'" ontouchend="this.style.opacity='1';this.style.transform='scale(1)'">
+                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">create_new_folder</span>New Folder
+            </button>
+            <button onclick="uploadGhFile()" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;" ontouchstart="this.style.opacity='0.75';this.style.transform='scale(0.95)'" ontouchend="this.style.opacity='1';this.style.transform='scale(1)'">
+                <span class="material-icons-round" style="font-size:17px;pointer-events:none;">upload_file</span>Upload
+            </button>
+        </div>
+
+        <!-- OPEN section -->
+        <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.7px;font-family:'Poppins',sans-serif;margin-bottom:7px;">Open</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+            <button id="gh-load-btn" onclick="loadGhFile()" disabled style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;" ontouchstart="if(!this.disabled){this.style.opacity='0.75';this.style.transform='scale(0.95)'}" ontouchend="if(!this.disabled){this.style.opacity='1';this.style.transform='scale(1)'}">
+                <span class="material-icons-round" style="font-size:15px;pointer-events:none;">file_open</span>Load File
+            </button>
+            <button id="gh-load-repo-btn" onclick="loadGhRepo()" disabled style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;" ontouchstart="if(!this.disabled){this.style.opacity='0.75';this.style.transform='scale(0.95)'}" ontouchend="if(!this.disabled){this.style.opacity='1';this.style.transform='scale(1)'}">
+                <span class="material-icons-round" style="font-size:15px;pointer-events:none;">folder_zip</span>Load All
+            </button>
+        </div>
+
+        <!-- SYNC section -->
+        <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.7px;font-family:'Poppins',sans-serif;margin-bottom:7px;">Sync</div>
+        <div style="display:flex;gap:6px;">
+            <button class="modal-btn" id="gh-commit-btn" onclick="commitGhFile()" disabled style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:linear-gradient(135deg,#10b981,#059669);">
+                <span class="material-icons-round" style="font-size:16px;pointer-events:none;">upload</span>Commit
+            </button>
+            <button class="modal-btn" id="gh-undo-btn" onclick="undoLastCommit()" disabled style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:linear-gradient(135deg,#10b981,#059669);">
+                <span class="material-icons-round" style="font-size:16px;pointer-events:none;">history</span>Undo
+            </button>
+        </div>
+        <!-- Commit history dropdown (shown when Undo clicked) -->
+        <div id="gh-commit-history" style="display:none;margin-top:8px;border-radius:12px;border:1px solid var(--glass-border);overflow:hidden;background:var(--glass-bg);max-height:180px;overflow-y:auto;"></div>
+    </div>
+</div>
+
+<input type="file" id="gh-upload-input" style="display:none;" multiple>
+<input type="file" id="agent-file-input" style="display:none;">
+<input type="file" id="inline-chat-file-input" style="display:none;">`;
+while(d.firstChild){document.body.appendChild(d.firstChild);}
 })();
 
     // ── COMMIT MODAL — custom inline, no browser dialogs ──
