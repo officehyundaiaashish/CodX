@@ -10,6 +10,7 @@
         return words.length > 32 ? words.slice(0, 32) + '…' : words;
     }
 
+
     // ── Close the chat panel ──
     function closeChatPanel() {
         document.getElementById('agent-chat-overlay').classList.remove('active');
@@ -1385,6 +1386,7 @@ Rules:
         }
     }
 
+
     // ── Gemini rate limit warning — shown in chat as compact bar ──
     function _geminiWarnInChat(model, type, used, limit) {
         const warnId = 'gemini-warn-' + model.replace(/\./g,'_') + '-' + type;
@@ -1454,6 +1456,7 @@ Rules:
         const box = document.getElementById('inline-chat-messages');
         if (box) { box.appendChild(wrap); _inlineChatScroll(); }
     }
+
 
     // ── Build Reorganize card with full file diff ──
     function _buildInlineReorganizeCard(newContent, targetTab) {
@@ -1725,7 +1728,7 @@ Rules:
                     failReasons.push(`Line ${edit.line_start} is out of range (file has ${lines.length} lines)`);
                     return;
                 }
-                const newLines = (edit.replace || '').split('\n').map(l =>
+                const newLines = (edit.replace || '').split('\n').map(l => 
                     l.replace(/\t/g, '  ')      // all tabs → 2 spaces
                      .replace(/\s+$/, '')        // trailing whitespace per line
                 );
@@ -2063,6 +2066,7 @@ Use only line numbers visible in the context. Be precise.`;
         showToast('Fix confirmed!', 'verified');
     }
 
+
     function _applyInlineSplit(btn, files) {
         if (!files || !files.length) return;
         files.forEach(f => openFileInTab(f.filename, f.content, true));
@@ -2072,6 +2076,7 @@ Use only line numbers visible in the context. Be precise.`;
         </div>`;
         showToast(`${files.length} files created`, 'call_split');
     }
+
 
     function _applyInlineNewFile(btn, filename, content) {
         openFileInTab(filename, content, true);
@@ -2215,35 +2220,35 @@ Use only line numbers visible in the context. Be precise.`;
             hdr.innerHTML = `<span style="color:${color};display:flex;align-items:center;">${iconSvg.replace('stroke="currentColor"','stroke="'+color+'"')}</span><span style="font-size:9px;font-weight:700;color:${color};font-family:Poppins,sans-serif;letter-spacing:0.05em;text-transform:uppercase;">${cat}</span>`;
             dd.appendChild(hdr);
             // Models in this category
-    groups[cat].forEach(({ ag, i }) => {
-      const isSelected = i === activeAgentIdx;
-      const row = document.createElement('div');
-      row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isSelected ? 'var(--accent-dim)' : 'transparent'};`;
-      row.innerHTML = `
-        <span class="material-icons-round" style="font-size:14px;color:${isSelected ? 'var(--accent)' : 'var(--text-color)'};opacity:${isSelected ? '1' : '0.45'};pointer-events:none;">radio_button_${isSelected ? 'checked' : 'unchecked'}</span>
-        <span style="flex:1;font-size:11px;font-weight:${isSelected ? '700' : '600'};color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${ag.providerName}</span>
-      `;
-      row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
-      row.ontouchend = () => { setTimeout(() => { if (!row.matches(':hover')) row.style.background = ''; }, 100); };
-      row.ontouchmove = () => { row.style.background = ''; };
-      row.ontouchcancel = () => { row.style.background = ''; };
-      row.onclick = (e) => {
-        e.stopPropagation();
-        _inlineSwitchModel(i);
-        _inlineCloseModelDropdown();
-      };
-      dd.appendChild(row);
-    });
+            groups[cat].forEach(({ ag, i }) => {
+                const isSelected = i === activeAgentIdx;
+                const row = document.createElement('div');
+                row.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px 8px 24px;cursor:pointer;border-bottom:1px solid var(--glass-border);background:${isSelected ? 'var(--accent-dim)' : 'transparent'};transition:background 0.15s;`;
+                row.innerHTML = `
+                    <span style="flex:1;font-size:12px;font-weight:600;color:${isSelected ? 'var(--accent)' : 'var(--text-color)'};font-family:'Poppins',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${ag.providerName}</span>
+                    ${ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor||'var(--accent)'};background:${ag.tagColor||'var(--accent)'}22;pointer-events:none;">${ag.tag}</span>` : ''}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;opacity:${isSelected ? '1' : '0'};flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`;
+                row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
+                row.onclick = (e) => {
+                    e.stopPropagation();
+                    _inlineSwitchModel(i);
+                    _inlineCloseModelDropdown();
+                };
+                dd.appendChild(row);
+            });
+        });
         // Divider + Settings
         const divider = document.createElement('div');
         divider.style.cssText = 'height:1px;background:var(--glass-border);margin:0;';
         dd.appendChild(divider);
         const settings = document.createElement('div');
-settings.ontouchstart = () => { settings.style.background = 'rgba(128,128,128,0.08)'; };
-settings.ontouchend = () => { setTimeout(() => { if (!settings.matches(':hover')) settings.style.background = ''; }, 100); };
-settings.ontouchmove = () => { settings.style.background = ''; };
-settings.ontouchcancel = () => { settings.style.background = ''; };
-settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); openAgentModal(); };
+        settings.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s;';
+        settings.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-color)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;pointer-events:none;opacity:0.5;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span style="font-size:12px;font-weight:600;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;pointer-events:none;">Agent Settings</span>`;
+        settings.ontouchstart = () => { settings.style.background = 'rgba(128,128,128,0.08)'; };
+        settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); openAgentModal(); };
+        dd.appendChild(settings);
     }
 
     // ── Inline chat: switch active model from dropdown ──
@@ -2306,10 +2311,8 @@ settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); op
     function _inlineRenderFileDropdown() {
         const dd = document.getElementById('inline-file-dropdown');
         const label = document.getElementById('inline-file-label');
-  if (!dd) return;
-  dd.innerHTML = '';
-  dd.style.maxHeight = '300px';
-  dd.style.overflowY = 'auto';
+        if (!dd) return;
+        dd.innerHTML = '';
 
         // ── Section header ──
         const header = document.createElement('div');
@@ -2325,18 +2328,15 @@ settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); op
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;">add_circle</span>
             <span style="flex:1;font-size:11px;font-weight:700;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File</span>
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isNewSelected ? '1' : '0'};">radio_button_checked</span>`;
-newRow.ontouchstart = () => newRow.style.background = 'rgba(16,185,129,0.12)';
-newRow.ontouchend = () => { setTimeout(() => { if (!newRow.matches(':hover')) newRow.style.background = ''; }, 100); };
-newRow.ontouchmove = () => { newRow.style.background = ''; };
-newRow.ontouchcancel = () => { newRow.style.background = ''; };
-newRow.onclick = (e) => {
-  e.stopPropagation();
-  _inlineSelectedTabId = 'new';
-  _agentTargetTabId = null;
-  if(label) label.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File';
-  _inlineCloseFileDropdown();
-  _inlineRenderFileDropdown();
-};
+        newRow.ontouchstart = () => newRow.style.background = 'rgba(16,185,129,0.12)';
+        newRow.onclick = (e) => {
+            e.stopPropagation();
+            _inlineSelectedTabId = 'new';
+            _agentTargetTabId = null;
+            if(label) label.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File';
+            _inlineCloseFileDropdown();
+            _inlineRenderFileDropdown();
+        };
         dd.appendChild(newRow);
 
         // ── Existing file tabs — tap = set as target, long context icon = toggle context ──
@@ -2354,28 +2354,24 @@ newRow.onclick = (e) => {
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
 
             // Tap row = set as target file
-// Tap row = set as target file
-row.ontouchstart = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) row.style.background = 'var(--accent-dim)'; };
-row.ontouchend = () => { setTimeout(() => { if (!row.matches(':hover')) row.style.background = ''; }, 100); };
-row.ontouchmove = () => { row.style.background = ''; };
-row.ontouchcancel = () => { row.style.background = ''; };
-row.onclick = (e) => {
-  e.stopPropagation();
-  if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
-    // Toggle context
-    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
-    else _inlineContextTabIds.add(t.id);
-    _inlineRenderFileDropdown();
-    return;
-  }
-  // Set as target
-  _inlineSelectedTabId = t.id;
-  _agentTargetTabId = t.id;
-  _inlineContextTabIds.delete(t.id); // target can't also be context
-  if(label) label.textContent = t.name;
-  _inlineCloseFileDropdown();
-  _inlineRenderFileDropdown();
-};
+            row.ontouchstart = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) row.style.background = 'var(--accent-dim)'; };
+            row.onclick = (e) => {
+                e.stopPropagation();
+                if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
+                    // Toggle context
+                    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
+                    else _inlineContextTabIds.add(t.id);
+                    _inlineRenderFileDropdown();
+                    return;
+                }
+                // Set as target
+                _inlineSelectedTabId = t.id;
+                _agentTargetTabId = t.id;
+                _inlineContextTabIds.delete(t.id); // target can't also be context
+                if(label) label.textContent = t.name;
+                _inlineCloseFileDropdown();
+                _inlineRenderFileDropdown();
+            };
             dd.appendChild(row);
         });
 
@@ -2451,6 +2447,8 @@ row.onclick = (e) => {
     // When Chat Mode is ON, user can additionally grant AI read-access to target file code.
     // Default OFF — AI gets empty code in chat mode unless user explicitly enables this.
     // _chatCodeAccessOn declared early at top (default: false)
+
+
 
     // Chat mode switch toast — centered, animated icon swap
     function _showChatModeToast(isChatMode) {
@@ -2667,6 +2665,7 @@ row.onclick = (e) => {
             localStorage.setItem('codx_plain_text', '0'); // user explicitly disabled
         }
     }
+
 
     // ══════════════════════════════════════════════════════
     //  PYTHON MODE — Pyodide-powered in-browser Python runner
