@@ -2215,19 +2215,25 @@ Use only line numbers visible in the context. Be precise.`;
             hdr.innerHTML = `<span style="color:${color};display:flex;align-items:center;">${iconSvg.replace('stroke="currentColor"','stroke="'+color+'"')}</span><span style="font-size:9px;font-weight:700;color:${color};font-family:Poppins,sans-serif;letter-spacing:0.05em;text-transform:uppercase;">${cat}</span>`;
             dd.appendChild(hdr);
             // Models in this category
-            groups[cat].forEach(({ ag, i }) => {
-                const isSelected = i === activeAgentIdx;
-row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
-row.ontouchend = () => { setTimeout(() => { if (!row.matches(':hover')) row.style.background = ''; }, 100); };
-row.ontouchmove = () => { row.style.background = ''; };
-row.ontouchcancel = () => { row.style.background = ''; };
-row.onclick = (e) => {
-  e.stopPropagation();
-  _inlineSwitchModel(i);
-  _inlineCloseModelDropdown();
-};
-            });
-        });
+    groups[cat].forEach(({ ag, i }) => {
+      const isSelected = i === activeAgentIdx;
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isSelected ? 'var(--accent-dim)' : 'transparent'};`;
+      row.innerHTML = `
+        <span class="material-icons-round" style="font-size:14px;color:${isSelected ? 'var(--accent)' : 'var(--text-color)'};opacity:${isSelected ? '1' : '0.45'};pointer-events:none;">radio_button_${isSelected ? 'checked' : 'unchecked'}</span>
+        <span style="flex:1;font-size:11px;font-weight:${isSelected ? '700' : '600'};color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${ag.providerName}</span>
+      `;
+      row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
+      row.ontouchend = () => { setTimeout(() => { if (!row.matches(':hover')) row.style.background = ''; }, 100); };
+      row.ontouchmove = () => { row.style.background = ''; };
+      row.ontouchcancel = () => { row.style.background = ''; };
+      row.onclick = (e) => {
+        e.stopPropagation();
+        _inlineSwitchModel(i);
+        _inlineCloseModelDropdown();
+      };
+      dd.appendChild(row);
+    });
         // Divider + Settings
         const divider = document.createElement('div');
         divider.style.cssText = 'height:1px;background:var(--glass-border);margin:0;';
