@@ -1347,6 +1347,7 @@
             border-radius: 0 !important;
             padding-top: 0;
             max-height: calc(100svh - var(--header-full-h, 80px)) !important;
+            overflow: hidden !important;
         }
 
         /* Chat mode button — animated glow ring when ON */
@@ -2561,18 +2562,20 @@
         const kbOpen   = kbHeight > 50;
 
         if (_chatIsFullscreen) {
-            // Use header-full-h (header + tabbar) so panel never covers either
-            const hh = parseInt(getComputedStyle(document.documentElement)
-                .getPropertyValue('--header-full-h')) || 80;
+            // Always measure live so we don't rely on stale CSS variable
+            const header  = document.getElementById('header');
+            const tabsBar = document.getElementById('file-tabs-bar');
+            const hh = (header  ? header.offsetHeight  : 48)
+                     + (tabsBar ? tabsBar.offsetHeight : 32);
             if (kbOpen) {
                 // Keyboard open — shrink panel to visible area only, never touch editor/tabbar
                 panel.style.top    = hh + 'px';
                 panel.style.height = (window.innerHeight - kbHeight - hh) + 'px';
                 panel.style.bottom = '';
             } else {
-                // Keyboard closed — restore fullscreen (CSS handles top/height via class)
-                panel.style.height = '';
-                panel.style.top    = '';
+                // Keyboard closed — restore fullscreen with live values
+                panel.style.top    = hh + 'px';
+                panel.style.height = 'calc(100svh - ' + hh + 'px)';
                 panel.style.bottom = '';
             }
         } else {
@@ -9328,14 +9331,22 @@ Use only line numbers visible in the context. Be precise.`;
         const icon    = document.getElementById('fs-icon');
         const header  = document.getElementById('header');
         const tabsBar = document.getElementById('file-tabs-bar');
-        const hh      = (header  ? header.offsetHeight  : 48)
-                      + (tabsBar ? tabsBar.offsetHeight : 32);
+        const hdrH    = (header  ? header.offsetHeight  : 48);
+        const tabH    = (tabsBar ? tabsBar.offsetHeight : 32);
+        const hh      = hdrH + tabH;
         if (_chatIsFullscreen) {
-            document.documentElement.style.setProperty('--header-h',      (header ? header.offsetHeight : 48) + 'px');
-            document.documentElement.style.setProperty('--header-full-h', hh + 'px');
+            document.documentElement.style.setProperty('--header-h',      hdrH + 'px');
+            document.documentElement.style.setProperty('--header-full-h', hh   + 'px');
+            // Apply inline so panel sits exactly below tabbar, never overlapping
+            panel.style.top    = hh + 'px';
+            panel.style.height = 'calc(100svh - ' + hh + 'px)';
+            panel.style.bottom = '';
             panel.classList.add('chat-fullscreen');
             if (icon) icon.innerHTML = '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>';
         } else {
+            panel.style.top    = '';
+            panel.style.height = '';
+            panel.style.bottom = '';
             panel.classList.remove('chat-fullscreen');
             if (icon) icon.innerHTML = '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>';
         }
