@@ -403,18 +403,6 @@
         .file-tabs-bar { flex-shrink: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 0 6px; gap: 2px; }
         .file-tabs-bar::-webkit-scrollbar { display: none; }
 
-        /* Chat open: keep header + tabbar pinned so keyboard can't push them */
-        body.chat-kb-open .app-header {
-            position: fixed !important;
-            top: 0; left: 0; right: 0;
-            z-index: 50;
-        }
-        body.chat-kb-open .file-tabs-bar {
-            position: fixed !important;
-            top: var(--chat-hdr-h, 48px);
-            left: 0; right: 0;
-            z-index: 49;
-        }
         /* Prevent editor area going black when keyboard opens */
         body.chat-kb-open #editor-wrapper {
             background: var(--editor-bg) !important;
@@ -2569,55 +2557,33 @@
         const panel = document.getElementById('inline-chat-panel');
         if (!panel) return;
 
+        const kbHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+        const kbOpen   = kbHeight > 50;
+
         if (_chatIsFullscreen) {
-            const kbHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+            // Use header-full-h (header + tabbar) so panel never covers either
             const hh = parseInt(getComputedStyle(document.documentElement)
-                .getPropertyValue('--header-h')) || 48;
-            if (kbHeight > 50) {
-                // Keyboard open — pin panel below header, shrink to visible area only
+                .getPropertyValue('--header-full-h')) || 80;
+            if (kbOpen) {
+                // Keyboard open — shrink panel to visible area only, never touch editor/tabbar
                 panel.style.top    = hh + 'px';
                 panel.style.height = (window.innerHeight - kbHeight - hh) + 'px';
                 panel.style.bottom = '';
             } else {
-                // Keyboard closed — restore fullscreen
+                // Keyboard closed — restore fullscreen (CSS handles top/height via class)
                 panel.style.height = '';
                 panel.style.top    = '';
                 panel.style.bottom = '';
             }
         } else {
-            // Non-fullscreen chat: keyboard appears — keep editor visible above chat panel
-            if (_inPreview) return; // extra guard
-            const kbHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
-            const kbOpen   = kbHeight > 50;
-            const hdrH     = (document.getElementById('header') || {}).offsetHeight || 0;
-            const tabH     = (document.getElementById('file-tabs-bar') || {}).offsetHeight || 0;
-            const chatPanel = document.getElementById('inline-chat-panel');
-            const chatH    = (chatPanel && chatPanel.classList.contains('chat-open')) ? (chatPanel.offsetHeight || 0) : 0;
-
+            // Half-screen mode: ONLY move chat panel up by keyboard height
+            // Never touch editor, header, tabbar or any other element
             if (kbOpen) {
-                // Lock body height
-                document.body.style.height = window.innerHeight + 'px';
-                // Calculate available height for editor area
-                const availH = window.innerHeight - kbHeight;
-                // Make sure editor-wrapper fills the space above chat panel
-                const mc = document.getElementById('editor-wrapper');
-                if (mc) {
-                    mc.style.height = Math.max(60, availH - hdrH - tabH - chatH) + 'px';
-                    mc.style.minHeight = '60px';
-                    mc.style.background = 'var(--editor-bg)';
-                }
-                document.documentElement.style.setProperty('--chat-hdr-h', hdrH + 'px');
-                document.body.classList.add('chat-kb-open');
+                panel.style.bottom = kbHeight + 'px';
+                panel.style.transform = 'translateY(0)';
             } else {
-                // Keyboard closed — restore
-                document.body.style.height = window.innerHeight + 'px';
-                const mc = document.getElementById('editor-wrapper');
-                if (mc) {
-                    mc.style.height = '';
-                    mc.style.minHeight = '';
-                    mc.style.background = '';
-                }
-                document.body.classList.remove('chat-kb-open');
+                panel.style.bottom = '';
+                panel.style.transform = '';
             }
         }
     }
