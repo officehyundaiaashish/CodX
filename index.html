@@ -1785,7 +1785,7 @@
             </button>
             <!-- Find & Replace shortcut -->
             <button class="icon-btn no-select" id="header-find-btn" style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleFindReplace()" title="Find &amp; Replace">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </button>
             <!-- Nav hide/show toggle -->
             <button class="icon-btn no-select" id="nav-hide-btn" style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleNavVisibility()" title="Hide/Show toolbar">
@@ -1916,8 +1916,8 @@
                 <button onclick="openChatHistoryPanel()" title="Chat History" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--accent);opacity:0.7;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">history</span>
                 </button>
-                <button onclick="_inlineClearChatUI()" title="New Chat" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.5;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.5">
-                    <span class="material-icons-round" style="font-size:15px;pointer-events:none;">add_comment</span>
+                <button onclick="_inlineClearChatUI()" title="Clear Chat" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.5;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.5">
+                    <span class="material-icons-round" style="font-size:15px;pointer-events:none;">delete_sweep</span>
                 </button>
                 <button id="inline-chat-fullscreen" onclick="_toggleChatFullscreen()" title="Fullscreen">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="fs-icon" pointer-events="none"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
