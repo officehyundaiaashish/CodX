@@ -2777,25 +2777,18 @@ Use only line numbers visible in the context. Be precise.`;
             `;
             row.ontouchstart = (e) => {
                 e.stopPropagation();
-                e.target._touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                // Don't highlight yet
+                row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, scrolled: false };
             };
             row.ontouchmove = (e) => {
-                if (e.target._touchStart) {
-                    const dx = Math.abs(e.touches[0].clientX - e.target._touchStart.x);
-                    const dy = Math.abs(e.touches[0].clientY - e.target._touchStart.y);
-                    if (dx > 6 || dy > 6) e.target._touchStart._scrolled = true;
+                if (row._ts) {
+                    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
+                    const dy = Math.abs(e.touches[0].clientY - row._ts.y);
+                    if (dx > 5 || dy > 5) row._ts.scrolled = true;
                 }
             };
             row.ontouchend = (e) => {
-                const touchEnd = e.changedTouches[0];
-                const start = e.target._touchStart;
-                if (!start || start._scrolled) { row.style.background = ''; return; }
-                const dx = Math.abs(touchEnd.clientX - start.x);
-                const dy = Math.abs(touchEnd.clientY - start.y);
-                if (dx > 10 || dy > 10) { row.style.background = ''; return; }
-                row.style.background = 'var(--accent-dim)';
-                setTimeout(() => { row.style.background = ''; }, 150);
+                if (!row._ts || row._ts.scrolled) { row._ts = null; return; }
+                row._ts = null;
                 e.stopPropagation();
                 e.preventDefault();
                 _inlineSwitchModel(i);
@@ -2930,33 +2923,18 @@ Use only line numbers visible in the context. Be precise.`;
             // Tap row = set as target file
 row.ontouchstart = (e) => {
   e.stopPropagation();
-  e.target._touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  // Don't highlight yet — wait to confirm tap vs scroll
+  row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, scrolled: false };
 };
 row.ontouchmove = (e) => {
-  // Mark as scroll if moved
-  if (e.target._touchStart) {
-    const dx = Math.abs(e.touches[0].clientX - e.target._touchStart.x);
-    const dy = Math.abs(e.touches[0].clientY - e.target._touchStart.y);
-    if (dx > 6 || dy > 6) e.target._touchStart._scrolled = true;
+  if (row._ts) {
+    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
+    const dy = Math.abs(e.touches[0].clientY - row._ts.y);
+    if (dx > 5 || dy > 5) row._ts.scrolled = true;
   }
 };
 row.ontouchend = (e) => {
-  const touchEnd = e.changedTouches[0];
-  const start = e.target._touchStart;
-  if (!start || start._scrolled) {
-    row.style.background = '';
-    return;
-  }
-  const dx = Math.abs(touchEnd.clientX - start.x);
-  const dy = Math.abs(touchEnd.clientY - start.y);
-  if (dx > 10 || dy > 10) {
-    row.style.background = '';
-    return;
-  }
-  // Confirmed tap — briefly highlight then select
-  row.style.background = 'var(--accent-dim)';
-  setTimeout(() => { row.style.background = ''; }, 150);
+  if (!row._ts || row._ts.scrolled) { row._ts = null; return; }
+  row._ts = null;
   e.stopPropagation();
   e.preventDefault();
   if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
