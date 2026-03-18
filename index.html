@@ -5876,112 +5876,7 @@ Rules:
     }
     function _getBlankContentForFile(fname) {
         const ext = fname.split('.').pop().toLowerCase();
-        if (ext === 'html' || ext === 'htm') return `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${fname.replace(/\.[^.]+$/,'')}</title>\n</head>\n<body>\n\n
-<!-- ══════════════ AI MAIL PANEL ══════════════ -->
-<div id="ai-mail-panel">
-
-  <!-- LOGIN -->
-  <div class="am-screen am-hidden" id="am-login-screen">
-    <div class="am-login-card">
-      <div class="am-login-logo"><span class="material-icons-round">mail</span></div>
-      <div class="am-login-title">AI Mail</div>
-      <div class="am-login-sub">RediffMail Pro — AI-powered inbox</div>
-      <div class="am-field-label">EMAIL</div>
-      <input class="am-field" id="am-email" type="email" placeholder="you@rediffmail.com" autocomplete="username"
-        onkeydown="if(event.key==='Enter')document.getElementById('am-pass').focus()">
-      <div class="am-field-label">PASSWORD</div>
-      <input class="am-field" id="am-pass" type="password" placeholder="••••••••" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')_amLogin()">
-      <button class="am-btn-primary" id="am-login-btn" onclick="_amLogin()">Sign In</button>
-      <div class="am-login-err" id="am-login-err"></div>
-      <div class="am-login-note">Credentials sirf mail fetch karne ke liye use hoti hain.<br>CodX inhe store nahi karta.</div>
-    </div>
-    <div style="position:absolute;top:14px;left:14px;">
-      <button class="am-icon-btn" onclick="closeAIMail()"><span class="material-icons-round">close</span></button>
-    </div>
-    <div style="position:absolute;top:14px;right:14px;">
-      <button class="am-icon-btn" onclick="_amShowScreen('am-config-screen')" title="Backend settings"><span class="material-icons-round">settings</span></button>
-    </div>
-  </div>
-
-  <!-- INBOX -->
-  <div class="am-screen am-hidden" id="am-inbox-screen">
-    <div class="am-topbar">
-      <button class="am-icon-btn" onclick="closeAIMail()"><span class="material-icons-round">close</span></button>
-      <div class="am-topbar-title"><span>AI</span> Mail</div>
-      <button class="am-icon-btn" id="am-refresh-btn" onclick="_amRefresh()" title="Refresh"><span class="material-icons-round">refresh</span></button>
-      <button class="am-icon-btn" onclick="_amShowScreen('am-config-screen')" title="Settings"><span class="material-icons-round">settings</span></button>
-      <button class="am-icon-btn" onclick="_amLogout()" title="Logout"><span class="material-icons-round">logout</span></button>
-    </div>
-    <div class="am-toolbar">
-      <input class="am-search" placeholder="Search mail…" oninput="_amFilterMail(this.value)">
-    </div>
-    <div class="am-load-bar" id="am-load-bar"></div>
-    <div id="am-inbox-list"></div>
-    <div style="flex-shrink:0;padding:6px 14px;font-size:10px;color:rgba(224,224,224,0.3);text-align:center;" id="am-account-label"></div>
-  </div>
-
-  <!-- DETAIL -->
-  <div class="am-screen am-hidden" id="am-detail-screen">
-    <div class="am-topbar">
-      <button class="am-icon-btn" onclick="_amShowScreen('am-inbox-screen')"><span class="material-icons-round">arrow_back</span></button>
-      <div class="am-topbar-title" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="am-detail-topbar">Mail</div>
-    </div>
-    <div class="am-detail-body">
-      <div class="am-detail-subject" id="am-detail-subject"></div>
-      <div class="am-detail-meta">
-        <div class="am-avatar" id="am-detail-avatar"></div>
-        <div>
-          <div class="am-detail-from-name" id="am-detail-name"></div>
-          <div class="am-detail-from-email" id="am-detail-email"></div>
-        </div>
-        <div class="am-detail-time" id="am-detail-time"></div>
-      </div>
-      <div class="am-detail-content" id="am-detail-body"></div>
-    </div>
-    <div class="am-reply-panel">
-      <div class="am-reply-header">
-        <div class="am-ai-badge"><span class="material-icons-round">smart_toy</span>AI Reply</div>
-        <div class="am-reply-status" id="am-reply-status">Ready</div>
-        <button class="am-icon-btn" onclick="_amRegenerate()" title="Regenerate" style="width:28px;height:28px;"><span class="material-icons-round" style="font-size:16px;">autorenew</span></button>
-      </div>
-      <div class="am-reply-box" id="am-reply-box"></div>
-      <div class="am-guide-row">
-        <input class="am-guide-input" id="am-guide" placeholder="Guide AI: e.g. be brief, apologise, ask for more time…">
-        <button class="am-icon-btn" onclick="_amRegenerate()" style="background:var(--accent-dim);color:var(--accent);border:1px solid rgba(16,185,129,0.2);flex-shrink:0;">
-          <span class="material-icons-round" style="font-size:16px;">send</span>
-        </button>
-      </div>
-      <div class="am-to-row">
-        <span class="am-to-label">TO</span>
-        <input class="am-to-input" id="am-reply-to" placeholder="reply@example.com">
-      </div>
-      <div class="am-send-row">
-        <button class="am-btn-copy" onclick="_amCopyReply()"><span class="material-icons-round">content_copy</span>Copy</button>
-        <button class="am-btn-send" id="am-send-btn" onclick="_amSendReply()">
-          <span class="material-icons-round">send</span>Send Reply
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- CONFIG -->
-  <div class="am-screen am-hidden" id="am-config-screen">
-    <div style="position:absolute;top:14px;left:14px;">
-      <button class="am-icon-btn" onclick="_amEmail?_amShowScreen('am-inbox-screen'):_amShowScreen('am-login-screen')"><span class="material-icons-round">arrow_back</span></button>
-    </div>
-    <div class="am-config-card">
-      <div style="font-size:15px;font-weight:700;margin-bottom:5px;">⚙ Backend URL</div>
-      <div style="font-size:11px;color:rgba(224,224,224,0.45);margin-bottom:18px;">Apna deployed Vercel backend URL dalo</div>
-      <div class="am-field-label">VERCEL URL</div>
-      <input class="am-field" id="am-backend-input" placeholder="https://your-app.vercel.app"
-        onkeydown="if(event.key==='Enter')_amSaveBackend()">
-      <button class="am-btn-primary" onclick="_amSaveBackend()">Save</button>
-    </div>
-  </div>
-
-</div>
-</body>\n</html>`;
+        if (ext === 'html' || ext === 'htm') return `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${fname.replace(/\.[^.]+$/,'')}</title>\n</head>\n<body>\n\n\n</body>\n</html>`;
         if (ext === 'css') return `/* ${fname} */\n\n* {\n  box-sizing: border-box;\n  margin: 0;\n  padding: 0;\n}\n`;
         if (ext === 'js')   return `// ${fname}\n\n`;
         if (ext === 'json') return `{\n  \n}\n`;
@@ -9546,13 +9441,16 @@ Use only line numbers visible in the context. Be precise.`;
     const AM_COLORS  = ['#10b981','#6366f1','#f59e0b','#ef4444','#8b5cf6','#ec4899','#0ea5e9','#14b8a6'];
 
     function openAIMail() {
-        const panel = document.getElementById('ai-mail-panel');
-        if (!panel) return;
-        panel.classList.add('am-active');
-        document.body.classList.add('aimail-open');
-        if (!AM_BACKEND()) { _amShowScreen('am-config-screen'); return; }
-        if (_amEmail)       { _amShowScreen('am-inbox-screen'); }
-        else                { _amShowScreen('am-login-screen'); }
+        try {
+            const panel = document.getElementById('ai-mail-panel');
+            if (!panel) { showToast('AI Mail panel not found', 'error_outline'); return; }
+            panel.style.display = 'flex';
+            panel.classList.add('am-active');
+            document.body.classList.add('aimail-open');
+            if (!AM_BACKEND()) { _amShowScreen('am-config-screen'); return; }
+            if (_amEmail)       { _amShowScreen('am-inbox-screen'); }
+            else                { _amShowScreen('am-login-screen'); }
+        } catch(e) { showToast('AI Mail error: ' + e.message, 'error_outline'); }
     }
     function closeAIMail() {
         document.getElementById('ai-mail-panel').classList.remove('am-active');
@@ -10066,5 +9964,112 @@ _codx_stderr = None
 
 
 </script>
+
+<!-- ══════════════ AI MAIL PANEL ══════════════ -->
+<!-- ══════════════ AI MAIL PANEL ══════════════ -->
+<div id="ai-mail-panel">
+
+  <!-- LOGIN -->
+  <div class="am-screen am-hidden" id="am-login-screen">
+    <div class="am-login-card">
+      <div class="am-login-logo"><span class="material-icons-round">mail</span></div>
+      <div class="am-login-title">AI Mail</div>
+      <div class="am-login-sub">RediffMail Pro — AI-powered inbox</div>
+      <div class="am-field-label">EMAIL</div>
+      <input class="am-field" id="am-email" type="email" placeholder="you@rediffmail.com" autocomplete="username"
+        onkeydown="if(event.key==='Enter')document.getElementById('am-pass').focus()">
+      <div class="am-field-label">PASSWORD</div>
+      <input class="am-field" id="am-pass" type="password" placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')_amLogin()">
+      <button class="am-btn-primary" id="am-login-btn" onclick="_amLogin()">Sign In</button>
+      <div class="am-login-err" id="am-login-err"></div>
+      <div class="am-login-note">Credentials sirf mail fetch karne ke liye use hoti hain.<br>CodX inhe store nahi karta.</div>
+    </div>
+    <div style="position:absolute;top:14px;left:14px;">
+      <button class="am-icon-btn" onclick="closeAIMail()"><span class="material-icons-round">close</span></button>
+    </div>
+    <div style="position:absolute;top:14px;right:14px;">
+      <button class="am-icon-btn" onclick="_amShowScreen('am-config-screen')" title="Backend settings"><span class="material-icons-round">settings</span></button>
+    </div>
+  </div>
+
+  <!-- INBOX -->
+  <div class="am-screen am-hidden" id="am-inbox-screen">
+    <div class="am-topbar">
+      <button class="am-icon-btn" onclick="closeAIMail()"><span class="material-icons-round">close</span></button>
+      <div class="am-topbar-title"><span>AI</span> Mail</div>
+      <button class="am-icon-btn" id="am-refresh-btn" onclick="_amRefresh()" title="Refresh"><span class="material-icons-round">refresh</span></button>
+      <button class="am-icon-btn" onclick="_amShowScreen('am-config-screen')" title="Settings"><span class="material-icons-round">settings</span></button>
+      <button class="am-icon-btn" onclick="_amLogout()" title="Logout"><span class="material-icons-round">logout</span></button>
+    </div>
+    <div class="am-toolbar">
+      <input class="am-search" placeholder="Search mail…" oninput="_amFilterMail(this.value)">
+    </div>
+    <div class="am-load-bar" id="am-load-bar"></div>
+    <div id="am-inbox-list"></div>
+    <div style="flex-shrink:0;padding:6px 14px;font-size:10px;color:rgba(224,224,224,0.3);text-align:center;" id="am-account-label"></div>
+  </div>
+
+  <!-- DETAIL -->
+  <div class="am-screen am-hidden" id="am-detail-screen">
+    <div class="am-topbar">
+      <button class="am-icon-btn" onclick="_amShowScreen('am-inbox-screen')"><span class="material-icons-round">arrow_back</span></button>
+      <div class="am-topbar-title" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="am-detail-topbar">Mail</div>
+    </div>
+    <div class="am-detail-body">
+      <div class="am-detail-subject" id="am-detail-subject"></div>
+      <div class="am-detail-meta">
+        <div class="am-avatar" id="am-detail-avatar"></div>
+        <div>
+          <div class="am-detail-from-name" id="am-detail-name"></div>
+          <div class="am-detail-from-email" id="am-detail-email"></div>
+        </div>
+        <div class="am-detail-time" id="am-detail-time"></div>
+      </div>
+      <div class="am-detail-content" id="am-detail-body"></div>
+    </div>
+    <div class="am-reply-panel">
+      <div class="am-reply-header">
+        <div class="am-ai-badge"><span class="material-icons-round">smart_toy</span>AI Reply</div>
+        <div class="am-reply-status" id="am-reply-status">Ready</div>
+        <button class="am-icon-btn" onclick="_amRegenerate()" title="Regenerate" style="width:28px;height:28px;"><span class="material-icons-round" style="font-size:16px;">autorenew</span></button>
+      </div>
+      <div class="am-reply-box" id="am-reply-box"></div>
+      <div class="am-guide-row">
+        <input class="am-guide-input" id="am-guide" placeholder="Guide AI: e.g. be brief, apologise, ask for more time…">
+        <button class="am-icon-btn" onclick="_amRegenerate()" style="background:var(--accent-dim);color:var(--accent);border:1px solid rgba(16,185,129,0.2);flex-shrink:0;">
+          <span class="material-icons-round" style="font-size:16px;">send</span>
+        </button>
+      </div>
+      <div class="am-to-row">
+        <span class="am-to-label">TO</span>
+        <input class="am-to-input" id="am-reply-to" placeholder="reply@example.com">
+      </div>
+      <div class="am-send-row">
+        <button class="am-btn-copy" onclick="_amCopyReply()"><span class="material-icons-round">content_copy</span>Copy</button>
+        <button class="am-btn-send" id="am-send-btn" onclick="_amSendReply()">
+          <span class="material-icons-round">send</span>Send Reply
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="am-screen am-hidden" id="am-config-screen">
+    <div style="position:absolute;top:14px;left:14px;">
+      <button class="am-icon-btn" onclick="_amEmail?_amShowScreen('am-inbox-screen'):_amShowScreen('am-login-screen')"><span class="material-icons-round">arrow_back</span></button>
+    </div>
+    <div class="am-config-card">
+      <div style="font-size:15px;font-weight:700;margin-bottom:5px;">⚙ Backend URL</div>
+      <div style="font-size:11px;color:rgba(224,224,224,0.45);margin-bottom:18px;">Apna deployed Vercel backend URL dalo</div>
+      <div class="am-field-label">VERCEL URL</div>
+      <input class="am-field" id="am-backend-input" placeholder="https://your-app.vercel.app"
+        onkeydown="if(event.key==='Enter')_amSaveBackend()">
+      <button class="am-btn-primary" onclick="_amSaveBackend()">Save</button>
+    </div>
+  </div>
+
+</div>
+
 </body>
 </html>
