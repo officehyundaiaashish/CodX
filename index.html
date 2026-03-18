@@ -245,7 +245,7 @@
         
 /* Shared Modal CSS */
         .modal { 
-            position: fixed; left: 5%; width: 90%; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--panel-round); padding: 15px; z-index: 100; 
+            position: fixed; left: 5%; width: 90%; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--panel-round); padding: 15px; z-index: 99999; 
             box-shadow: 0 4px 20px rgba(0,0,0,0.10); transition: opacity 0.15s, transform 0.15s;
             bottom: -150%; opacity: 0; pointer-events: none; transform: scale(0.96);
         }
@@ -3471,6 +3471,15 @@
         this.value = this.value.slice(0, start) + cleaned + this.value.slice(end);
         this.selectionStart = this.selectionEnd = start + cleaned.length;
     });
+    // Find field: same trim on paste
+    document.getElementById('find-input').addEventListener('paste', function(e) {
+        e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text');
+        const cleaned = pasted.replace(/^\s+|\s+$/g, '').replace(/\r\n|\r/g, '\n');
+        const start = this.selectionStart, end = this.selectionEnd;
+        this.value = this.value.slice(0, start) + cleaned + this.value.slice(end);
+        this.selectionStart = this.selectionEnd = start + cleaned.length;
+    });
     function _fmToggle(type, btn) {
         btn.classList.toggle('on');
         if (type === 'case')  document.getElementById('find-case').checked  = btn.classList.contains('on');
@@ -3482,6 +3491,8 @@
         const isActive = !findModal.classList.contains('active');
         if (isActive) {
             findModal.classList.add('active');
+            // Push editor below find modal so highlights don't cover it
+            document.getElementById('editor').style.zIndex = '1';
             requestAnimationFrame(() => { 
                 const fi = document.getElementById('find-input');
                 fi.focus(); 
@@ -3493,6 +3504,8 @@
             findModal.classList.remove('active');
             findModal.style.top = '';
             findModal.style.bottom = '';
+            // Restore editor z-index
+            document.getElementById('editor').style.zIndex = '10';
         }
     }
     function findText(showErrorAlert = true) { 
