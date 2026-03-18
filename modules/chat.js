@@ -3,7 +3,6 @@
     let _chatSessionName = 'New Chat';
     let _chatMsgCounter = 0;
     let _chatPendingEditsMap = {};  // msgId → edits array (for per-message apply)
-
     // ── Chat History Sessions (localStorage) ──
     const _CH_KEY = 'codx_chat_sessions';
     let _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -18,12 +17,7 @@
         if (!_chatHistory.length) return;
         const sessions = _chLoadAll();
         const idx = sessions.findIndex(s => s.id === _chatSessionId);
-        const session = {
-            id: _chatSessionId,
-            name: _chatSessionName,
-            date: new Date().toISOString(),
-            messages: _chatHistory.slice()
-        };
+        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice() };
         if (idx !== -1) sessions[idx] = session;
         else sessions.push(session);
         _chSaveAll(sessions);
@@ -34,11 +28,8 @@
     }
     function _chNewSession() {
         _chSaveCurrentSession();
-        _chatSessionId   = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-        _chatSessionName = 'New Chat';
-        _chatHistory     = [];
-        _chatMsgCounter  = 0;
-        _chatPendingEditsMap = {};
+        _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        _chatSessionName = 'New Chat'; _chatHistory = []; _chatMsgCounter = 0; _chatPendingEditsMap = {};
     }
 
     // ── Auto-generate session name from first user message ──
@@ -154,6 +145,99 @@
         box.appendChild(wrap);
         _chatScrollBottom();
         return bubble;
+    }
+
+    // ── Start editing a message ──
+    function _startEditMsg(wrap, bubble, originalText, msgIdx) {
+        // Already editing?
+        if (wrap.querySelector('.chat-edit-wrap')) return;
+        bubble.style.display = 'none';
+
+        const editWrap = document.createElement('div');
+        editWrap.className = 'chat-edit-wrap';
+
+        const ta = document.createElement('textarea');
+        ta.className = 'chat-edit-textarea';
+        ta.value = originalText;
+        ta.rows = 3;
+        setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 50);
+        ta.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'chat-edit-actions';
+
+        const sendBtn = document.createElement('button');
+        sendBtn.className = 'chat-edit-send';
+        sendBtn.innerHTML = '<span class="material-icons-round" style="font-size:13px;pointer-events:none;">send</span> Resend';
+        sendBtn.onclick = () => {
+            const newText = ta.value.trim();
+            if (!newText) return;
+            _submitEditMsg(wrap, bubble, originalText, newText, msgIdx);
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'chat-edit-cancel';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.onclick = () => {
+            editWrap.remove();
+            bubble.style.display = '';
+        };
+
+        // Send on Enter (not Shift+Enter)
+        ta.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
+
+        actions.appendChild(sendBtn);
+        actions.appendChild(cancelBtn);
+        editWrap.appendChild(ta);
+        editWrap.appendChild(actions);
+        wrap.insertBefore(editWrap, wrap.querySelector('.chat-msg-footer'));
+    }
+
+    // ── Submit edited message — remove subsequent messages and resend ──
+    async function _submitEditMsg(wrap, bubble, originalText, newText, msgIdx) {
+        // Remove all messages after this one from DOM
+        const box = document.getElementById('agent-chat-messages');
+        const allMsgs = Array.from(box.children);
+        const wrapIdx = allMsgs.indexOf(wrap);
+        for (let i = allMsgs.length - 1; i > wrapIdx; i--) {
+            allMsgs[i].remove();
+        }
+
+        // Truncate _chatHistory to this message (exclusive)
+        _chatHistory = _chatHistory.slice(0, msgIdx);
+
+        // Remove edit UI, restore bubble with new text
+        const editWrap = wrap.querySelector('.chat-edit-wrap');
+        if (editWrap) editWrap.remove();
+
+        // Update bubble text
+        const _svgFrags = [];
+        const _safeText = newText
+            .replace(/<svg[\s\S]*?<\/svg>/g, (m) => { _svgFrags.push(m); return '\x00SVG' + (_svgFrags.length - 1) + '\x00'; })
+            .replace(/\n/g, '<br>')
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/&lt;br&gt;/g,'<br>')
+            .replace(/\x00SVG(\d+)\x00/g, (_, i) => _svgFrags[+i] || '');
+        bubble.innerHTML = _safeText;
+        bubble.style.display = '';
+
+        // Update history with new text
+        _chatHistory.push({ role: 'user', text: newText, time: _chatTime() });
+        wrap.dataset.msgIdx = _chatHistory.length - 1;
+
+        // Now send as new message
+        const textarea = document.getElementById('agent-chat-textarea');
+        if (textarea) textarea.value = newText;
+        sendChatMessage();
+        if (textarea) textarea.value = '';
     }
 
     // ── Start editing a message ──
@@ -676,7 +760,6 @@ No markdown, no backticks, no explanation outside the array.`;
             sendBtn.disabled = false;
         }
     }
-
 
     // ══════════════════════════════════════════
     // ── CHAT HISTORY PANEL ──
@@ -1246,7 +1329,7 @@ No markdown, no backticks, no explanation outside the array.`;
         if (!ta) return;
         const currentCode = editor.getValue();
         const numbered = currentCode.split('\n').map((l,i) => `${i+1}| ${l}`).join('\n');
-        ta.value = `The OLD BLOCK you gave me doesn't match anything in my current code.\n\nOLD BLOCK you sent:\n```\n${oldCode}\n```\n\nMy CURRENT CODE (with line numbers):\n```\n${numbered}\n```\n\nPlease find the correct matching block in my current code and send the correct OLD BLOCK and NEW BLOCK again.`;
+        ta.value = `The OLD BLOCK you gave me doesn't match anything in my current code.\n\nOLD BLOCK you sent:\n\`\`\`\n${oldCode}\n\`\`\`\n\nMy CURRENT CODE (with line numbers):\n\`\`\`\n${numbered}\n\`\`\`\n\nPlease find the correct matching block in my current code and send the correct OLD BLOCK and NEW BLOCK again.`;
         sendInlineChat();
     }
 
@@ -1611,10 +1694,8 @@ STRICT FORMAT RULES:
 
         // ── Code with line numbers (no truncation — all providers support large context) ──
         const _provider = _activeAgent()?.provider || '';
-        // Escape backticks in code so they don't break the prompt template
-        const _safeCode = code ? code.replace(/`/g, '\u0060') : '';
-        let numberedCode = _safeCode ? _safeCode.split('\n').map((l,i) => (i+1) + '| ' + l).join('\n') : '';
-        _inlineLogActivity('Code: ' + (numberedCode.length/1024).toFixed(1) + 'k (' + (code ? code.split('\n').length : 0) + ' lines)');
+        let numberedCode = code ? code.split('\n').map((l,i) => `${i+1}| ${l}`).join('\n') : '';
+        _inlineLogActivity('Code: ' + (numberedCode.length/1024).toFixed(1) + 'k (' + code.split('\n').length + ' lines)');
 
         // ── Context files (user explicitly ticked) ──
         let otherFilesCtx = '';
@@ -2311,9 +2392,9 @@ Original intent: "${e.find ? e.find.slice(0,80) : `lines ${e.line_start}-${e.lin
 Replacement needed: "${(e.replace||'').slice(0,80)}"
 
 Surrounding code context (line numbers shown):
-```
+\`\`\`
 ${contextLines}
-````;
+\`\`\``;
             }).join('\n\n---\n\n');
 
             const retrySystemPrompt = `You are a code edit assistant. The following edits FAILED because the target location could not be found.
@@ -2488,7 +2569,7 @@ Use only line numbers visible in the context. Be precise.`;
         const sessionSummaryBlock2 = sessionEvents2 ? `\n\n── SESSION EVENTS ──\n${sessionEvents2}` : '';
 
         // Build re-analysis message — full current code + all context
-        const reAnalyseMsg = `── CURRENT FILE: ${filename} ──${sessionSummaryBlock2}\n\n── FULL CODE (current state, after previous fix was applied) ──\n```\n${numberedCode}\n```\n\n── USER REPORT ──\nThe previous fix was applied but the issue is STILL present. Analyse the current code above carefully — it already includes the previous changes. Identify what is still wrong and provide a corrected fix.`;
+        const reAnalyseMsg = `── CURRENT FILE: ${filename} ──${sessionSummaryBlock2}\n\n── FULL CODE (current state, after previous fix was applied) ──\n\`\`\`\n${numberedCode}\n\`\`\`\n\n── USER REPORT ──\nThe previous fix was applied but the issue is STILL present. Analyse the current code above carefully — it already includes the previous changes. Identify what is still wrong and provide a corrected fix.`;
 
         // Include full chat history so AI sees the full conversation context
         const historyForAPI = _buildHistoryForAPI();
