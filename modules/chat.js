@@ -2309,11 +2309,13 @@ Use only line numbers visible in the context. Be precise.`;
     let _inlineContextTabIds = new Set();
 
     function _inlineRenderFileDropdown() {
-        const dd = document.getElementById('inline-file-dropdown');
-        const label = document.getElementById('inline-file-label');
-        if (!dd) return;
-        dd.innerHTML = '';
-
+            const dd = document.getElementById('inline-file-dropdown');
+            const label = document.getElementById('inline-file-label');
+            if (!dd) return;
+            dd.innerHTML = '';
+            dd.style.maxHeight = '250px';
+            dd.style.overflowY = 'auto';
+    
         // ── Section header ──
         const header = document.createElement('div');
         header.style.cssText = 'padding:6px 12px 4px;font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--glass-border);';
