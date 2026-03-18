@@ -2704,13 +2704,11 @@ Use only line numbers visible in the context. Be precise.`;
         if (isOpen) {
             _inlineCloseModelDropdown();
         } else {
+            _inlineCloseFileDropdown();  // close file dropdown if open
             _inlineRenderModelDropdown();
             dd.style.display = 'block';
             if(chevron) chevron.style.transform = 'rotate(180deg)';
-            // Remove any orphan listener before adding new one
-            if(_modelDropdownCloseHandler) {
-                document.removeEventListener('click', _modelDropdownCloseHandler);
-            }
+            if(_modelDropdownCloseHandler) document.removeEventListener('click', _modelDropdownCloseHandler);
             _modelDropdownCloseHandler = () => _inlineCloseModelDropdown();
             setTimeout(() => document.addEventListener('click', _modelDropdownCloseHandler, { once: true }), 50);
         }
@@ -2768,27 +2766,26 @@ Use only line numbers visible in the context. Be precise.`;
 // Models in this category
         groups[cat].forEach(({ ag, i }) => {
             const row = document.createElement('div');
-            row.className = 'am-model-row';
+            row.className = 'am-model-row'; row.style.cssText = (row.style.cssText||'') + '-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;';
             row.style.animationDelay = (i * 35) + 'ms';
             row.innerHTML = `
                 <div class="am-model-dot"></div>
                 <span class="am-model-name">${ag.providerName}</span>
                 <span class="am-model-tag" style="color:${ag.tagColor};background:${ag.tagColor}22;">${ag.tag||''}</span>
             `;
-            row.ontouchstart = (e) => {
-                e.stopPropagation();
-                row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, scrolled: false };
-            };
-            row.ontouchmove = (e) => {
+            row.addEventListener('touchstart', (e) => {
+                row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+            }, { passive: true });
+            row.addEventListener('touchmove', (e) => {
                 if (row._ts) {
-                    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
                     const dy = Math.abs(e.touches[0].clientY - row._ts.y);
-                    if (dx > 5 || dy > 5) row._ts.scrolled = true;
+                    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
+                    if (dy > 8 || dx > 8) row._ts.moved = true;
                 }
-            };
+            }, { passive: true });
             row.ontouchend = (e) => {
-                if (!row._ts || row._ts.scrolled) { row._ts = null; return; }
-                row._ts = null;
+                const ts = row._ts; row._ts = null;
+                if (!ts || ts.moved) return;
                 e.stopPropagation();
                 e.preventDefault();
                 _inlineSwitchModel(i);
@@ -2848,11 +2845,11 @@ Use only line numbers visible in the context. Be precise.`;
             if(chevron) chevron.style.transform = 'rotate(0deg)';
             if(trigger) { trigger.style.borderColor = 'var(--glass-border)'; trigger.style.background = 'rgba(128,128,128,0.1)'; }
         } else {
+            _inlineCloseModelDropdown();  // close model dropdown if open
             _inlineRenderFileDropdown();
             dd.style.display = 'block';
             if(chevron) chevron.style.transform = 'rotate(180deg)';
             if(trigger) { trigger.style.borderColor = 'var(--accent)'; trigger.style.background = 'var(--accent-dim)'; }
-            // Close on outside tap
             setTimeout(() => {
                 document.addEventListener('click', _inlineCloseFileDropdown, { once: true });
             }, 50);
@@ -2911,7 +2908,7 @@ Use only line numbers visible in the context. Be precise.`;
             const isTarget = t.id === _inlineSelectedTabId;
             const isCtx = _inlineContextTabIds.has(t.id) && !isTarget;
             const row = document.createElement('div');
-            row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent'};`;
+            row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent'};-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;`;
             row.innerHTML = `
                 <span class="material-icons-round" style="font-size:14px;color:${isTarget ? 'var(--accent)' : 'var(--text-color)'};opacity:${isTarget ? '1' : '0.45'};pointer-events:none;">insert_drive_file</span>
                 <span style="flex:1;font-size:11px;font-weight:600;color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${t.name}</span>
@@ -2921,20 +2918,19 @@ Use only line numbers visible in the context. Be precise.`;
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
 
             // Tap row = set as target file
-row.ontouchstart = (e) => {
-  e.stopPropagation();
-  row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, scrolled: false };
-};
-row.ontouchmove = (e) => {
+row.addEventListener('touchstart', (e) => {
+  row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+}, { passive: true });
+row.addEventListener('touchmove', (e) => {
   if (row._ts) {
-    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
     const dy = Math.abs(e.touches[0].clientY - row._ts.y);
-    if (dx > 5 || dy > 5) row._ts.scrolled = true;
+    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
+    if (dy > 8 || dx > 8) row._ts.moved = true;
   }
-};
+}, { passive: true });
 row.ontouchend = (e) => {
-  if (!row._ts || row._ts.scrolled) { row._ts = null; return; }
-  row._ts = null;
+  const ts = row._ts; row._ts = null;
+  if (!ts || ts.moved) return;
   e.stopPropagation();
   e.preventDefault();
   if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
