@@ -1638,6 +1638,56 @@
 
 
         
+
+        /* ──────────────────────── Chat History Panel ──────────────────────── */
+
+        #chat-history-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.22s ease;
+        }
+        #chat-history-overlay.active { opacity: 1; pointer-events: auto; }
+        #chat-history-panel {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            max-height: 80vh;
+            background: var(--glass-bg);
+            border-radius: 22px 22px 0 0;
+            border-top: 2px solid var(--accent);
+            z-index: 10000;
+            display: flex; flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.34,1.2,0.64,1);
+            overflow: hidden;
+        }
+        #chat-history-panel.active { transform: translateY(0); }
+        .chp-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--glass-border); flex-shrink: 0; }
+        .chp-title { flex: 1; font-size: 13px; font-weight: 700; color: var(--text-color); font-family: 'Poppins', sans-serif; }
+        .chp-close-btn { background: rgba(128,128,128,0.1); border: none; border-radius: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-color); opacity: 0.6; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+        .chp-close-btn:active { opacity: 1; }
+        .chp-body { flex: 1; overflow-y: auto; padding: 8px 12px 32px; -webkit-overflow-scrolling: touch; }
+        .chp-body::-webkit-scrollbar { display: none; }
+        .chp-date-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-color); opacity: 0.35; padding: 10px 4px 4px; font-family: 'Poppins', sans-serif; }
+        .chp-session-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 6px; cursor: pointer; background: rgba(128,128,128,0.04); transition: background 0.15s; animation: chpFadeIn 0.2s ease both; -webkit-tap-highlight-color: transparent; position: relative; }
+        @keyframes chpFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .chp-session-row:active { background: var(--accent-dim); }
+        .chp-session-icon { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-dim); border: 1px solid rgba(16,185,129,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .chp-session-info { flex: 1; min-width: 0; }
+        .chp-session-name { font-size: 12px; font-weight: 600; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Poppins', sans-serif; }
+        .chp-session-meta { font-size: 10px; color: var(--text-color); opacity: 0.45; display: flex; gap: 5px; align-items: center; font-family: 'Poppins', sans-serif; margin-top: 2px; }
+        .chp-del-btn { background: none; border: none; padding: 5px; cursor: pointer; color: var(--text-color); opacity: 0.25; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; }
+        .chp-del-btn:active { opacity: 1; color: #ef4444; }
+        .chp-del-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+        .chp-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 20px; gap: 12px; text-align: center; }
+        .chp-empty .material-icons-round { font-size: 40px; color: var(--accent); opacity: 0.5; }
+        .chp-empty p { font-size: 12px; color: var(--text-color); opacity: 0.5; font-family: 'Poppins', sans-serif; line-height: 1.6; }
+        .chp-confirm-del { display: flex; align-items: center; gap: 7px; padding: 7px 13px 9px; border-top: 1px solid rgba(239,68,68,0.2); }
+        #inline-chat-header { pointer-events: auto !important; }
+        @media (min-width: 768px) {
+            #chat-history-panel { left: auto; right: 24px; bottom: 24px; width: 340px; max-height: 70vh; border-radius: 18px; border: 1px solid var(--glass-border); transform: scale(0.92) translateY(10px); opacity: 0; transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1), opacity 0.2s ease; }
+            #chat-history-panel.active { transform: scale(1) translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body class="dark-theme no-select">
@@ -5983,33 +6033,6 @@ Rules:
     let _chatSessionName = 'New Chat';
     let _chatMsgCounter = 0;
     let _chatPendingEditsMap = {};  // msgId → edits array (for per-message apply)
-    const _CH_KEY = 'codx_chat_sessions';
-    let _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-
-    function _chLoadAll() {
-        try { return JSON.parse(localStorage.getItem(_CH_KEY) || '[]'); } catch(e) { return []; }
-    }
-    function _chSaveAll(sessions) {
-        try { localStorage.setItem(_CH_KEY, JSON.stringify(sessions.slice(-80))); } catch(e) {}
-    }
-    function _chSaveCurrentSession() {
-        if (!_chatHistory.length) return;
-        const sessions = _chLoadAll();
-        const idx = sessions.findIndex(s => s.id === _chatSessionId);
-        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice() };
-        if (idx !== -1) sessions[idx] = session;
-        else sessions.push(session);
-        _chSaveAll(sessions);
-    }
-    function _chDeleteSession(id) {
-        const sessions = _chLoadAll().filter(s => s.id !== id);
-        _chSaveAll(sessions);
-    }
-    function _chNewSession() {
-        _chSaveCurrentSession();
-        _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-        _chatSessionName = 'New Chat'; _chatHistory = []; _chatMsgCounter = 0; _chatPendingEditsMap = {};
-    }
 
     // ── Auto-generate session name from first user message ──
     function _autoChatName(text) {
@@ -6233,10 +6256,8 @@ Rules:
         let applied = 0;
         const targetId = _agentTargetTabId || activeTabId;
         edits.forEach(edit => {
-            const searchTabs = [fileTabs.find(t => t.id === targetId), ...fileTabs.filter(t => t.id !== targetId)].filter(Boolean);
-            for (const tab of searchTabs) {
-                if (tab.content && tab.content.includes(edit.find)) { tab.content = tab.content.split(edit.find).join(edit.replace); applied++; break; }
-            }
+            const sTabs = [fileTabs.find(t => t.id === targetId), ...fileTabs.filter(t => t.id !== targetId)].filter(Boolean);
+            for (const tab of sTabs) { if (tab.content && tab.content.includes(edit.find)) { tab.content = tab.content.split(edit.find).join(edit.replace); applied++; break; } }
         });
         const cur = fileTabs.find(t => t.id === activeTabId);
         if (cur) _setEditorValueFast(cur.content);
@@ -6539,32 +6560,56 @@ No markdown, no backticks, no explanation outside the array.`;
         }
     }
 
-    // ══════════════════════════════════════════
-    // ── CHAT HISTORY PANEL ──
-    // ══════════════════════════════════════════
 
+    // ══ CHAT HISTORY — Session Management ══
+    const _CH_KEY = 'codx_chat_sessions';
+    let _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+    function _chLoadAll() {
+        try { return JSON.parse(localStorage.getItem(_CH_KEY) || '[]'); } catch(e) { return []; }
+    }
+    function _chSaveAll(sessions) {
+        try { localStorage.setItem(_CH_KEY, JSON.stringify(sessions.slice(-80))); } catch(e) {}
+    }
+    function _chSaveCurrentSession() {
+        if (!_chatHistory.length) return;
+        const sessions = _chLoadAll();
+        const sidx = sessions.findIndex(s => s.id === _chatSessionId);
+        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice() };
+        if (sidx !== -1) sessions[sidx] = session;
+        else sessions.push(session);
+        _chSaveAll(sessions);
+    }
+    function _chDeleteSession(id) {
+        _chSaveAll(_chLoadAll().filter(s => s.id !== id));
+    }
+    function _chNewSession() {
+        _chSaveCurrentSession();
+        _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        _chatSessionName = 'New Chat'; _chatHistory = []; _chatMsgCounter = 0; _chatPendingEditsMap = {};
+    }
+
+    // ══ CHAT HISTORY PANEL ══
     function openChatHistoryPanel() {
         _chSaveCurrentSession();
         if (!document.getElementById('chat-history-panel')) {
-            const overlay = document.createElement('div');
-            overlay.id = 'chat-history-overlay';
-            overlay.onclick = (e) => { if (e.target === overlay) closeChatHistoryPanel(); };
-            document.body.appendChild(overlay);
-            const panel = document.createElement('div');
-            panel.id = 'chat-history-panel';
-            panel.innerHTML = `
-                <div class="chp-header">
-                    <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <span class="material-icons-round" style="color:var(--accent);font-size:16px;pointer-events:none;">history</span>
-                    </div>
-                    <div class="chp-title">Chat History</div>
-                    <button class="chp-close-btn" onclick="closeChatHistoryPanel()">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
+            const ov = document.createElement('div');
+            ov.id = 'chat-history-overlay';
+            ov.onclick = (e) => { if (e.target === ov) closeChatHistoryPanel(); };
+            document.body.appendChild(ov);
+            const pn = document.createElement('div');
+            pn.id = 'chat-history-panel';
+            pn.innerHTML = `<div class="chp-header">
+                <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span class="material-icons-round" style="color:var(--accent);font-size:16px;pointer-events:none;">history</span>
                 </div>
-                <div class="chp-body" id="chp-body"></div>
-            `;
-            document.body.appendChild(panel);
+                <div class="chp-title">Chat History</div>
+                <button class="chp-close-btn" onclick="closeChatHistoryPanel()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="chp-body" id="chp-body"></div>`;
+            document.body.appendChild(pn);
         }
         _chRenderHistory();
         requestAnimationFrame(() => {
@@ -6574,10 +6619,10 @@ No markdown, no backticks, no explanation outside the array.`;
     }
 
     function closeChatHistoryPanel() {
-        const overlay = document.getElementById('chat-history-overlay');
-        const panel   = document.getElementById('chat-history-panel');
-        if (overlay) overlay.classList.remove('active');
-        if (panel)   panel.classList.remove('active');
+        const ov = document.getElementById('chat-history-overlay');
+        const pn = document.getElementById('chat-history-panel');
+        if (ov) ov.classList.remove('active');
+        if (pn) pn.classList.remove('active');
     }
 
     function _chRenderHistory() {
@@ -6592,67 +6637,60 @@ No markdown, no backticks, no explanation outside the array.`;
         const groups = {};
         sessions.forEach(s => {
             const d = new Date(s.date), now = new Date();
-            const diffDays = Math.floor((now - d) / 86400000);
-            let label = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Yesterday' : diffDays < 7 ? d.toLocaleDateString([], { weekday: 'long' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+            const dd = Math.floor((now - d) / 86400000);
+            const label = dd === 0 ? 'Today' : dd === 1 ? 'Yesterday' : dd < 7 ? d.toLocaleDateString([], {weekday:'long'}) : d.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'});
             if (!groups[label]) groups[label] = [];
             groups[label].push(s);
         });
-        let animDelay = 0;
-        Object.entries(groups).forEach(([label, groupSessions]) => {
-            const dateLabel = document.createElement('div');
-            dateLabel.className = 'chp-date-label';
-            dateLabel.textContent = label;
-            body.appendChild(dateLabel);
-            groupSessions.forEach(session => {
+        let delay = 0;
+        Object.entries(groups).forEach(([label, list]) => {
+            const dl = document.createElement('div');
+            dl.className = 'chp-date-label'; dl.textContent = label;
+            body.appendChild(dl);
+            list.forEach(session => {
                 const row = document.createElement('div');
                 row.className = 'chp-session-row';
-                row.style.animationDelay = (animDelay * 40) + 'ms'; animDelay++;
+                row.style.animationDelay = (delay * 40) + 'ms'; delay++;
                 const userMsgs = session.messages ? session.messages.filter(m => m.role === 'user').length : 0;
-                const timeStr = new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const t = new Date(session.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
                 row.innerHTML = '<div class="chp-session-icon"><span class="material-icons-round" style="color:var(--accent);font-size:15px;pointer-events:none;">chat</span></div>' +
-                    '<div class="chp-session-info">' +
-                    '<div class="chp-session-name">' + (session.name || 'Unnamed Chat') + '</div>' +
-                    '<div class="chp-session-meta"><span>' + timeStr + '</span><span style="opacity:0.4;">·</span><span>' + userMsgs + ' message' + (userMsgs !== 1 ? 's' : '') + '</span></div>' +
-                    '</div>';
+                    '<div class="chp-session-info"><div class="chp-session-name">' + (session.name || 'Unnamed Chat') + '</div>' +
+                    '<div class="chp-session-meta"><span>' + t + '</span><span style="opacity:0.4">·</span><span>' + userMsgs + ' msg' + (userMsgs !== 1 ? 's' : '') + '</span></div></div>';
                 row.onclick = (e) => { if (e.target.closest('.chp-del-btn')) return; _chRestoreSession(session); closeChatHistoryPanel(); };
-                const delBtn = document.createElement('button');
-                delBtn.className = 'chp-del-btn';
-                delBtn.innerHTML = '<span class="material-icons-round">delete_outline</span>';
-                delBtn.onclick = (e) => { e.stopPropagation(); _chConfirmDelete(session.id, row); };
-                row.appendChild(delBtn);
+                const db = document.createElement('button');
+                db.className = 'chp-del-btn';
+                db.innerHTML = '<span class="material-icons-round">delete_outline</span>';
+                db.onclick = (e) => { e.stopPropagation(); _chConfirmDelete(session.id, row); };
+                row.appendChild(db);
                 body.appendChild(row);
             });
         });
     }
 
     function _chConfirmDelete(sessionId, rowEl) {
-        rowEl.style.background = 'rgba(239,68,68,0.1)';
-        rowEl.style.borderColor = 'rgba(239,68,68,0.4)';
-        const existing = rowEl.querySelector('.chp-confirm-del');
-        if (existing) { existing.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; return; }
-        const confirmBar = document.createElement('div');
-        confirmBar.className = 'chp-confirm-del';
-        const delBtn2 = document.createElement('button');
-        delBtn2.textContent = 'Delete';
-        delBtn2.style.cssText = 'padding:5px 11px;border-radius:7px;border:none;background:#ef4444;color:white;font-family:Poppins,sans-serif;font-size:10px;font-weight:700;cursor:pointer;';
-        delBtn2.onclick = (e) => { e.stopPropagation(); _chDoDelete(sessionId, rowEl); };
-        const cancelBtn2 = document.createElement('button');
-        cancelBtn2.textContent = 'Cancel';
-        cancelBtn2.style.cssText = 'padding:5px 10px;border-radius:7px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:Poppins,sans-serif;font-size:10px;font-weight:600;cursor:pointer;opacity:0.6;';
-        cancelBtn2.onclick = (e) => { e.stopPropagation(); confirmBar.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; };
-        const label2 = document.createElement('span');
-        label2.textContent = 'Delete this chat?';
-        label2.style.cssText = 'font-size:10px;font-weight:600;color:#ef4444;font-family:Poppins,sans-serif;flex:1;';
-        confirmBar.appendChild(label2);
-        confirmBar.appendChild(delBtn2);
-        confirmBar.appendChild(cancelBtn2);
-        rowEl.appendChild(confirmBar);
+        rowEl.style.background = 'rgba(239,68,68,0.1)'; rowEl.style.borderColor = 'rgba(239,68,68,0.4)';
+        const ex = rowEl.querySelector('.chp-confirm-del');
+        if (ex) { ex.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; return; }
+        const bar = document.createElement('div');
+        bar.className = 'chp-confirm-del';
+        const lbl = document.createElement('span');
+        lbl.textContent = 'Delete this chat?';
+        lbl.style.cssText = 'font-size:10px;font-weight:600;color:#ef4444;font-family:Poppins,sans-serif;flex:1;';
+        const yesBtn = document.createElement('button');
+        yesBtn.textContent = 'Delete';
+        yesBtn.style.cssText = 'padding:5px 11px;border-radius:7px;border:none;background:#ef4444;color:white;font-family:Poppins,sans-serif;font-size:10px;font-weight:700;cursor:pointer;';
+        yesBtn.onclick = (e) => { e.stopPropagation(); _chDoDelete(sessionId, rowEl); };
+        const noBtn = document.createElement('button');
+        noBtn.textContent = 'Cancel';
+        noBtn.style.cssText = 'padding:5px 10px;border-radius:7px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:Poppins,sans-serif;font-size:10px;cursor:pointer;opacity:0.6;';
+        noBtn.onclick = (e) => { e.stopPropagation(); bar.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; };
+        bar.appendChild(lbl); bar.appendChild(yesBtn); bar.appendChild(noBtn);
+        rowEl.appendChild(bar);
     }
 
     function _chDoDelete(sessionId, rowEl) {
         _chDeleteSession(sessionId);
-        rowEl.style.transition = 'all 0.25s';
-        rowEl.style.opacity = '0'; rowEl.style.transform = 'translateX(20px)';
+        rowEl.style.transition = 'all 0.25s'; rowEl.style.opacity = '0'; rowEl.style.transform = 'translateX(20px)';
         setTimeout(() => {
             rowEl.remove();
             const body = document.getElementById('chp-body');
@@ -8514,15 +8552,14 @@ Use only line numbers visible in the context. Be precise.`;
             // Tap row = set as target file
             const _rowBg = isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent';
             row.addEventListener('touchstart', (e) => {
-                row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+                row._ts = {x:e.touches[0].clientX,y:e.touches[0].clientY,moved:false};
                 if (!e.target.closest('[id="ctx-btn-' + t.id + '"]')) row.style.background = 'rgba(16,185,129,0.12)';
             }, { passive: true });
             row.addEventListener('touchmove', (e) => {
-                if (row._ts) { const dy = Math.abs(e.touches[0].clientY - row._ts.y), dx = Math.abs(e.touches[0].clientX - row._ts.x);
-                if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; } }
+                if (row._ts) { const dy=Math.abs(e.touches[0].clientY-row._ts.y),dx=Math.abs(e.touches[0].clientX-row._ts.x); if(dy>8||dx>8){row._ts.moved=true;row.style.background=_rowBg;} }
             }, { passive: true });
-            row.addEventListener('touchend', () => { row._ts = null; setTimeout(() => { row.style.background = _rowBg; }, 150); }, { passive: true });
-            row.addEventListener('touchcancel', () => { row._ts = null; row.style.background = _rowBg; }, { passive: true });
+            row.addEventListener('touchend', () => { row._ts=null; setTimeout(()=>{row.style.background=_rowBg;},150); }, { passive: true });
+            row.addEventListener('touchcancel', () => { row._ts=null; row.style.background=_rowBg; }, { passive: true });
             row.onclick = (e) => {
                 e.stopPropagation();
                 if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
