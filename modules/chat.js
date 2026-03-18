@@ -1059,7 +1059,7 @@ No markdown, no backticks, no explanation outside the array.`;
                 // Strip line numbers from canvas content
                 const strippedContent = p.content.replace(/^\d+\| ?/gm, '');
                 const escaped = strippedContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                const b64 = btoa(unescape(encodeURIComponent(strippedContent)));
+                const b64 = _b64Encode(strippedContent);
 
                 // Detect OLD/NEW + extract optional filename from lang tag
                 // Formats: "old", "new", "old:filename.ext", "new:filename.ext"
@@ -1083,7 +1083,7 @@ No markdown, no backticks, no explanation outside the array.`;
 
                 const applyBtn = (isNew && prevIsOld)
                     ? '<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)"'
-                      + ' data-old="' + btoa(unescape(encodeURIComponent(prevCodePart.content.replace(/^\d+\| ?/gm,'')))) + '"'
+                      + ' data-old="' + _b64Encode(prevCodePart.content.replace(/^\d+\| ?/gm,'')) + '"'
                       + ' data-new="' + b64 + '"'
                       + (blockFile || prevBlockFile ? ' data-file="' + (blockFile || prevBlockFile) + '"' : '')
                       + ' data-b64="1" style="background:var(--accent);color:white;">'
@@ -1133,8 +1133,8 @@ No markdown, no backticks, no explanation outside the array.`;
 
     // ── Apply old→new block replacement ──
     function _canvasApplyReplace(btn) {
-        let oldCode = decodeURIComponent(escape(atob(btn.dataset.old || '')));
-        let newCode = decodeURIComponent(escape(atob(btn.dataset.new || '')));
+        let oldCode = _b64Decode(btn.dataset.old || '');
+        let newCode = _b64Decode(btn.dataset.new || '');
         // Support data-file for multi-file apply
         const targetFile = btn.dataset.file || null;
         const targetFileTab = targetFile
@@ -1155,20 +1155,48 @@ No markdown, no backticks, no explanation outside the array.`;
             }
         }
 
-        // Strategy 3: normalize indentation — find block ignoring leading spaces per line
+        // Strategy 3: normalize indentation
         if (!matched) {
             const oldLines = oldCode.split('\n');
-            // Find minimum indent of old block
             const minIndent = oldLines
                 .filter(l => l.trim().length > 0)
                 .reduce((min, l) => Math.min(min, l.match(/^(\s*)/)[1].length), Infinity);
             if (minIndent > 0 && isFinite(minIndent)) {
-                const stripped = oldLines.map(l => l.slice(minIndent)).join('\n').replace(/^\s*\n/, '').replace(/\n\s*$/, '');
-                // Search current for same block with any indent
-                const escapedStripped = stripped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const flexRx = new RegExp('[ \\t]*' + escapedStripped.replace(/\n/g, '\\n[ \\t]*'), '');
-                const m = current.match(flexRx);
-                if (m) { matched = true; matchedOld = m[0]; }
+                const stripped = oldLines.map(l => l.slice(minIndent)).join('\n').trim();
+                if (current.includes(stripped)) { matched = true; matchedOld = stripped; }
+            }
+        }
+
+        // Strategy 4: trim all lines + collapse whitespace per line (handles AI adding/removing trailing spaces)
+        if (!matched) {
+            const normalizeWS = s => s.split('\n').map(l => l.trimEnd()).join('\n').trim();
+            const normOld = normalizeWS(oldCode);
+            const normCurrent = normalizeWS(current);
+            if (normCurrent.includes(normOld)) {
+                // Find original position in current
+                const normIdx = normCurrent.indexOf(normOld);
+                // Count newlines before match to find line number
+                const linesBefore = normCurrent.slice(0, normIdx).split('\n').length - 1;
+                const linesInBlock = normOld.split('\n').length;
+                const currentLines = current.split('\n');
+                matchedOld = currentLines.slice(linesBefore, linesBefore + linesInBlock).join('\n');
+                if (current.includes(matchedOld)) matched = true;
+            }
+        }
+
+        // Strategy 5: fuzzy first+last line match — find block by matching first and last significant lines
+        if (!matched) {
+            const oldTrimLines = oldCode.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+            if (oldTrimLines.length >= 2) {
+                const firstLine = oldTrimLines[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const lastLine  = oldTrimLines[oldTrimLines.length-1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                try {
+                    const fuzzyRx = new RegExp('[^\\n]*' + firstLine + '[\\s\\S]*?' + lastLine + '[^\\n]*');
+                    const fm = current.match(fuzzyRx);
+                    if (fm && fm[0].split('\n').length <= oldCode.split('\n').length + 5) {
+                        matched = true; matchedOld = fm[0];
+                    }
+                } catch(e) {}
             }
         }
 
@@ -1222,8 +1250,32 @@ No markdown, no backticks, no explanation outside the array.`;
         sendInlineChat();
     }
 
+    // ── Safe base64 decode — handles Unicode properly ──
+    function _b64Decode(str) {
+        try {
+            // Modern approach: binary -> Uint8Array -> TextDecoder
+            const bin = atob(str);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return new TextDecoder('utf-8').decode(bytes);
+        } catch(e) {
+            // Fallback
+            try { return decodeURIComponent(escape(atob(str))); } catch(e2) { return atob(str); }
+        }
+    }
+    // ── Safe base64 encode — handles Unicode properly ──
+    function _b64Encode(str) {
+        try {
+            const bytes = new TextEncoder().encode(str);
+            let bin = '';
+            bytes.forEach(b => bin += String.fromCharCode(b));
+            return btoa(bin);
+        } catch(e) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+    }
     function _canvasDecodeCode(btn) {
-        if (btn.dataset.b64) return decodeURIComponent(escape(atob(btn.dataset.code || '')));
+        if (btn.dataset.b64) return _b64Decode(btn.dataset.code || '');
         return decodeURIComponent(btn.dataset.code || '');
     }
 
