@@ -10,7 +10,6 @@
         return words.length > 32 ? words.slice(0, 32) + '…' : words;
     }
 
-
     // ── Close the chat panel ──
     function closeChatPanel() {
         document.getElementById('agent-chat-overlay').classList.remove('active');
@@ -1386,7 +1385,6 @@ Rules:
         }
     }
 
-
     // ── Gemini rate limit warning — shown in chat as compact bar ──
     function _geminiWarnInChat(model, type, used, limit) {
         const warnId = 'gemini-warn-' + model.replace(/\./g,'_') + '-' + type;
@@ -1456,7 +1454,6 @@ Rules:
         const box = document.getElementById('inline-chat-messages');
         if (box) { box.appendChild(wrap); _inlineChatScroll(); }
     }
-
 
     // ── Build Reorganize card with full file diff ──
     function _buildInlineReorganizeCard(newContent, targetTab) {
@@ -1728,7 +1725,7 @@ Rules:
                     failReasons.push(`Line ${edit.line_start} is out of range (file has ${lines.length} lines)`);
                     return;
                 }
-                const newLines = (edit.replace || '').split('\n').map(l => 
+                const newLines = (edit.replace || '').split('\n').map(l =>
                     l.replace(/\t/g, '  ')      // all tabs → 2 spaces
                      .replace(/\s+$/, '')        // trailing whitespace per line
                 );
@@ -2066,7 +2063,6 @@ Use only line numbers visible in the context. Be precise.`;
         showToast('Fix confirmed!', 'verified');
     }
 
-
     function _applyInlineSplit(btn, files) {
         if (!files || !files.length) return;
         files.forEach(f => openFileInTab(f.filename, f.content, true));
@@ -2076,7 +2072,6 @@ Use only line numbers visible in the context. Be precise.`;
         </div>`;
         showToast(`${files.length} files created`, 'call_split');
     }
-
 
     function _applyInlineNewFile(btn, filename, content) {
         openFileInTab(filename, content, true);
@@ -2220,22 +2215,29 @@ Use only line numbers visible in the context. Be precise.`;
             hdr.innerHTML = `<span style="color:${color};display:flex;align-items:center;">${iconSvg.replace('stroke="currentColor"','stroke="'+color+'"')}</span><span style="font-size:9px;font-weight:700;color:${color};font-family:Poppins,sans-serif;letter-spacing:0.05em;text-transform:uppercase;">${cat}</span>`;
             dd.appendChild(hdr);
             // Models in this category
-            groups[cat].forEach(({ ag, i }) => {
-                const isSelected = i === activeAgentIdx;
-                const row = document.createElement('div');
-                row.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px 8px 24px;cursor:pointer;border-bottom:1px solid var(--glass-border);background:${isSelected ? 'var(--accent-dim)' : 'transparent'};transition:background 0.15s;`;
-                row.innerHTML = `
-                    <span style="flex:1;font-size:12px;font-weight:600;color:${isSelected ? 'var(--accent)' : 'var(--text-color)'};font-family:'Poppins',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${ag.providerName}</span>
-                    ${ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor||'var(--accent)'};background:${ag.tagColor||'var(--accent)'}22;pointer-events:none;">${ag.tag}</span>` : ''}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;opacity:${isSelected ? '1' : '0'};flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`;
-                row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
-                row.onclick = (e) => {
-                    e.stopPropagation();
-                    _inlineSwitchModel(i);
-                    _inlineCloseModelDropdown();
-                };
-                dd.appendChild(row);
-            });
+row.ontouchstart = (e) => {
+  e.stopPropagation();
+  e.target._touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  row.style.background = 'var(--accent-dim)';
+};
+row.ontouchend = (e) => {
+  const touchEnd = e.changedTouches[0];
+  const dx = Math.abs(touchEnd.clientX - e.target._touchStart.x);
+  const dy = Math.abs(touchEnd.clientY - e.target._touchStart.y);
+  if (dx > 10 || dy > 10) {
+    row.style.background = '';
+    return;
+  }
+  e.stopPropagation();
+  e.preventDefault();
+  _inlineSwitchModel(i);
+  _inlineCloseModelDropdown();
+};
+row.onclick = (e) => {
+  e.stopPropagation();
+  _inlineSwitchModel(i);
+  _inlineCloseModelDropdown();
+};
         });
         // Divider + Settings
         const divider = document.createElement('div');
@@ -2315,7 +2317,7 @@ Use only line numbers visible in the context. Be precise.`;
             dd.innerHTML = '';
             dd.style.maxHeight = '250px';
             dd.style.overflowY = 'auto';
-    
+
         // ── Section header ──
         const header = document.createElement('div');
         header.style.cssText = 'padding:6px 12px 4px;font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--glass-border);';
@@ -2356,24 +2358,53 @@ Use only line numbers visible in the context. Be precise.`;
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
 
             // Tap row = set as target file
-            row.ontouchstart = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) row.style.background = 'var(--accent-dim)'; };
-            row.onclick = (e) => {
-                e.stopPropagation();
-                if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
-                    // Toggle context
-                    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
-                    else _inlineContextTabIds.add(t.id);
-                    _inlineRenderFileDropdown();
-                    return;
-                }
-                // Set as target
-                _inlineSelectedTabId = t.id;
-                _agentTargetTabId = t.id;
-                _inlineContextTabIds.delete(t.id); // target can't also be context
-                if(label) label.textContent = t.name;
-                _inlineCloseFileDropdown();
-                _inlineRenderFileDropdown();
-            };
+row.ontouchstart = (e) => {
+  e.stopPropagation();
+  e.target._touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if(!e.target.closest('[id^="ctx-btn"]')) {
+    row.style.background = 'var(--accent-dim)';
+  }
+};
+row.ontouchend = (e) => {
+  const touchEnd = e.changedTouches[0];
+  const dx = Math.abs(touchEnd.clientX - e.target._touchStart.x);
+  const dy = Math.abs(touchEnd.clientY - e.target._touchStart.y);
+  if (dx > 10 || dy > 10) {
+    if(!e.target.closest('[id^="ctx-btn"]')) {
+      row.style.background = '';
+    }
+    return;
+  }
+  e.stopPropagation();
+  e.preventDefault();
+  if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
+    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
+    else _inlineContextTabIds.add(t.id);
+    _inlineRenderFileDropdown();
+    return;
+  }
+  _inlineSelectedTabId = t.id;
+  _agentTargetTabId = t.id;
+  _inlineContextTabIds.delete(t.id);
+  if(label) label.textContent = t.name;
+  _inlineCloseFileDropdown();
+  _inlineRenderFileDropdown();
+};
+row.onclick = (e) => {
+  e.stopPropagation();
+  if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
+    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
+    else _inlineContextTabIds.add(t.id);
+    _inlineRenderFileDropdown();
+    return;
+  }
+  _inlineSelectedTabId = t.id;
+  _agentTargetTabId = t.id;
+  _inlineContextTabIds.delete(t.id);
+  if(label) label.textContent = t.name;
+  _inlineCloseFileDropdown();
+  _inlineRenderFileDropdown();
+};
             dd.appendChild(row);
         });
 
@@ -2449,8 +2480,6 @@ Use only line numbers visible in the context. Be precise.`;
     // When Chat Mode is ON, user can additionally grant AI read-access to target file code.
     // Default OFF — AI gets empty code in chat mode unless user explicitly enables this.
     // _chatCodeAccessOn declared early at top (default: false)
-
-
 
     // Chat mode switch toast — centered, animated icon swap
     function _showChatModeToast(isChatMode) {
@@ -2667,7 +2696,6 @@ Use only line numbers visible in the context. Be precise.`;
             localStorage.setItem('codx_plain_text', '0'); // user explicitly disabled
         }
     }
-
 
     // ══════════════════════════════════════════════════════
     //  PYTHON MODE — Pyodide-powered in-browser Python runner
