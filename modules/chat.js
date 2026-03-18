@@ -1082,7 +1082,7 @@ No markdown, no backticks, no explanation outside the array.`;
         showToast('New chat started', 'add_comment');
     }
 
-    // ── Save on page refresh/close ──
+    // ── Save on refresh/close ──
     window.addEventListener('beforeunload', () => { _chSaveCurrentSession(); });
 
     function closeInlineChat() {
@@ -1787,7 +1787,7 @@ PYODIDE RULES — follow strictly or code will break:
             // Save to history
             _inlineChatHistory.push({ role: 'user', content: userMsg });
             _inlineChatHistory.push({ role: 'assistant', content: raw });
-            // ── Sync agent reply to _chatHistory + save ──
+            // ── Sync agent reply + save ──
             _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
             _chSaveCurrentSession();
 
