@@ -2228,14 +2228,12 @@ Use only line numbers visible in the context. Be precise.`;
                     <span style="flex:1;font-size:12px;font-weight:600;color:${isSelected ? 'var(--accent)' : 'var(--text-color)'};font-family:'Poppins',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${ag.providerName}</span>
                     ${ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor||'var(--accent)'};background:${ag.tagColor||'var(--accent)'}22;pointer-events:none;">${ag.tag}</span>` : ''}
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;opacity:${isSelected ? '1' : '0'};flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`;
-    row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
-                    row.ontouchend = () => { if (!isSelected) row.style.background = 'transparent'; };
-                    row.onclick = (e) => {
-                        e.stopPropagation();
-                        _inlineSwitchModel(i);
-                        _inlineCloseModelDropdown();
-                    };
-                
+                row.ontouchstart = () => { row.style.background = 'var(--accent-dim)'; };
+                row.onclick = (e) => {
+                    e.stopPropagation();
+                    _inlineSwitchModel(i);
+                    _inlineCloseModelDropdown();
+                };
                 dd.appendChild(row);
             });
         });
@@ -2357,26 +2355,25 @@ Use only line numbers visible in the context. Be precise.`;
                 </span>
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
 
-    // Tap row = set as target file
-                row.ontouchstart = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) row.style.background = 'var(--accent-dim)'; };
-                row.ontouchend = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) { if (!isTarget && !isCtx) row.style.background = 'transparent'; } };
-                row.onclick = (e) => {
-                    e.stopPropagation();
-                    if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
-                        // Toggle context            if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
-                        else _inlineContextTabIds.add(t.id);
-                        _inlineRenderFileDropdown();
-                        return;
-                    }
-                    // Set as target
-                    _inlineSelectedTabId = t.id;
-                    _agentTargetTabId = t.id;
-                    _inlineContextTabIds.delete(t.id); // target can't also be context
-                    if(label) label.textContent = t.name;
-                    _inlineCloseFileDropdown();
+            // Tap row = set as target file
+            row.ontouchstart = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) row.style.background = 'var(--accent-dim)'; };
+            row.onclick = (e) => {
+                e.stopPropagation();
+                if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
+                    // Toggle context
+                    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
+                    else _inlineContextTabIds.add(t.id);
                     _inlineRenderFileDropdown();
-                };
-            
+                    return;
+                }
+                // Set as target
+                _inlineSelectedTabId = t.id;
+                _agentTargetTabId = t.id;
+                _inlineContextTabIds.delete(t.id); // target can't also be context
+                if(label) label.textContent = t.name;
+                _inlineCloseFileDropdown();
+                _inlineRenderFileDropdown();
+            };
             dd.appendChild(row);
         });
 
