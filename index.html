@@ -6085,6 +6085,8 @@ Rules:
         wrap.appendChild(footer);
         box.appendChild(wrap);
         _chatScrollBottom();
+        // ── Auto-save on every message ──
+        if (typeof _chSaveCurrentSession === 'function' && typeof _chatHistory !== 'undefined' && _chatHistory.length > 0) _chSaveCurrentSession();
         return bubble;
     }
 
@@ -7143,13 +7145,13 @@ STRICT FORMAT RULES:
         _inlineAppendMsg('user', userRequest);
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
 
-        // ── Sync to _chatHistory so history panel can see this session ──
+        // ── Sync to _chatHistory + instant save ──
         if (typeof _chSaveCurrentSession === 'function') {
-            if (typeof _chatSessionName !== 'undefined' && _chatSessionName === 'New Chat') {
-                if (typeof _autoChatName === 'function') _chatSessionName = _autoChatName(userRequest);
-            }
-            if (typeof _chatHistory !== 'undefined') {
-                _chatHistory.push({ role: 'user', text: userRequest, time: (typeof _chatTime === 'function' ? _chatTime() : new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})) });
+            if (typeof _chatSessionName !== 'undefined' && _chatSessionName === 'New Chat' && typeof _autoChatName === 'function')
+                _chatSessionName = _autoChatName(userRequest);
+            if (typeof _chatHistory !== 'undefined' && typeof _chatTime === 'function') {
+                _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
+                _chSaveCurrentSession();
             }
         }
 
@@ -7265,7 +7267,7 @@ Rules:
             _inlineChatHistory.push({ role: 'user', content: userMsg });
             _inlineChatHistory.push({ role: 'assistant', content: raw });
 
-            // ── Sync agent reply to _chatHistory for history panel ──
+            // ── Sync agent reply + save ──
             if (typeof _chSaveCurrentSession === 'function' && typeof _chatHistory !== 'undefined') {
                 _chatHistory.push({ role: 'agent', text: raw.trim(), time: (typeof _chatTime === 'function' ? _chatTime() : '') });
                 _chSaveCurrentSession();
