@@ -2215,29 +2215,41 @@ Use only line numbers visible in the context. Be precise.`;
             hdr.innerHTML = `<span style="color:${color};display:flex;align-items:center;">${iconSvg.replace('stroke="currentColor"','stroke="'+color+'"')}</span><span style="font-size:9px;font-weight:700;color:${color};font-family:Poppins,sans-serif;letter-spacing:0.05em;text-transform:uppercase;">${cat}</span>`;
             dd.appendChild(hdr);
             // Models in this category
-row.ontouchstart = (e) => {
-  e.stopPropagation();
-  e.target._touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  row.style.background = 'var(--accent-dim)';
-};
-row.ontouchend = (e) => {
-  const touchEnd = e.changedTouches[0];
-  const dx = Math.abs(touchEnd.clientX - e.target._touchStart.x);
-  const dy = Math.abs(touchEnd.clientY - e.target._touchStart.y);
-  if (dx > 10 || dy > 10) {
-    row.style.background = '';
-    return;
-  }
-  e.stopPropagation();
-  e.preventDefault();
-  _inlineSwitchModel(i);
-  _inlineCloseModelDropdown();
-};
-row.onclick = (e) => {
-  e.stopPropagation();
-  _inlineSwitchModel(i);
-  _inlineCloseModelDropdown();
-};
+// Models in this category
+        groups[cat].forEach(({ ag, i }) => {
+            const row = document.createElement('div');
+            row.className = 'am-model-row';
+            row.style.animationDelay = (i * 35) + 'ms';
+            row.innerHTML = `
+                <div class="am-model-dot"></div>
+                <span class="am-model-name">${ag.providerName}</span>
+                <span class="am-model-tag" style="color:${ag.tagColor};background:${ag.tagColor}22;">${ag.tag||''}</span>
+            `;
+            row.ontouchstart = (e) => {
+                e.stopPropagation();
+                e.target._touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                row.style.background = 'var(--accent-dim)';
+            };
+            row.ontouchend = (e) => {
+                const touchEnd = e.changedTouches[0];
+                const dx = Math.abs(touchEnd.clientX - e.target._touchStart.x);
+                const dy = Math.abs(touchEnd.clientY - e.target._touchStart.y);
+                if (dx > 10 || dy > 10) {
+                    row.style.background = '';
+                    return;
+                }
+                e.stopPropagation();
+                e.preventDefault();
+                _inlineSwitchModel(i);
+                _inlineCloseModelDropdown();
+            };
+            row.onclick = (e) => {
+                e.stopPropagation();
+                _inlineSwitchModel(i);
+                _inlineCloseModelDropdown();
+            };
+            dd.appendChild(row);
+        });
         });
         // Divider + Settings
         const divider = document.createElement('div');
