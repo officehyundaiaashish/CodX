@@ -8506,6 +8506,7 @@ Use only line numbers visible in the context. Be precise.`;
         if (isOpen) {
             _inlineCloseModelDropdown();
         } else {
+            _inlineCloseFileDropdown(); // file dropdown band karo
             _inlineRenderModelDropdown();
             dd.style.display = 'block';
             if(chevron) chevron.style.transform = 'rotate(180deg)';
@@ -8634,6 +8635,7 @@ Use only line numbers visible in the context. Be precise.`;
             if(chevron) chevron.style.transform = 'rotate(0deg)';
             if(trigger) { trigger.style.borderColor = 'var(--glass-border)'; trigger.style.background = 'rgba(128,128,128,0.1)'; }
         } else {
+            _inlineCloseModelDropdown(); // model dropdown band karo
             _inlineRenderFileDropdown();
             dd.style.display = 'block';
             if(chevron) chevron.style.transform = 'rotate(180deg)';
