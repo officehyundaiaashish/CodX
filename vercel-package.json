@@ -1,0 +1,10 @@
+{
+  "name": "aimail-backend",
+  "version": "1.0.0",
+  "description": "CodX AI Mail — Vercel serverless backend",
+  "dependencies": {
+    "imap": "^0.8.19",
+    "mailparser": "^3.6.9",
+    "nodemailer": "^6.9.13"
+  }
+}
