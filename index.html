@@ -7378,6 +7378,8 @@ No markdown, no backticks, no explanation outside the array.`;
             if (freshFooter) freshFooter.style.display = '';
 
             // Textarea mein text set karo aur send karo
+            // Flag set karo — sendInlineChat user message dobara append na kare
+            window._inlineEditMode = true;
             const mainTa = document.getElementById('inline-chat-textarea');
             if (mainTa) {
                 mainTa.value = newText;
@@ -7825,12 +7827,16 @@ STRICT FORMAT RULES:
         const userRequest = ta.value.trim();
         if (!userRequest) return;
 
-        _inlineAppendMsg('user', userRequest);
+        // ── Edit mode mein user message already DOM mein hai — append mat karo ──
+        if (!window._inlineEditMode) {
+            _inlineAppendMsg('user', userRequest);
+            if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
+            _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
+            _chSaveCurrentSession();
+            if (typeof _codxSaveConv === 'function') _codxSaveConv('user', userRequest);
+        }
+        window._inlineEditMode = false; // reset
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
-        if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
-        _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
-        _chSaveCurrentSession();
-        if (typeof _codxSaveConv === 'function') _codxSaveConv('user', userRequest);
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
