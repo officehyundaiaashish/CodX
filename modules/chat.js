@@ -446,20 +446,30 @@
         _agentUndoStack.push(editor.getValue());
         if (_agentUndoStack.length > 5) _agentUndoStack.shift();
 
-        const targetId  = _agentTargetTabId || activeTabId;
-        const targetTab = fileTabs.find(t => t.id === targetId);
-        let code = targetTab ? targetTab.content : editor.getValue();
+        // Save current editor content before applying
+        const curTabBefore = fileTabs.find(t => t.id === activeTabId);
+        if (curTabBefore) curTabBefore.content = editor.getValue();
+
         let applied = 0;
+        // Search across ALL tabs so multi-file edits apply to the correct file each
+        const targetId = _agentTargetTabId || activeTabId;
         edits.forEach(edit => {
-            if (code.includes(edit.find)) { code = code.split(edit.find).join(edit.replace); applied++; }
+            const searchTabs = [
+                fileTabs.find(t => t.id === targetId),
+                ...fileTabs.filter(t => t.id !== targetId)
+            ].filter(Boolean);
+            for (const tab of searchTabs) {
+                if (tab.content && tab.content.includes(edit.find)) {
+                    tab.content = tab.content.split(edit.find).join(edit.replace);
+                    applied++;
+                    break;
+                }
+            }
         });
-        if (targetTab) {
-            targetTab.content = code;
-            if (targetId !== activeTabId) switchFileTab(targetId);
-        }
-        _setEditorValueFast(code);
+
+        // Sync active editor
         const cur = fileTabs.find(t => t.id === activeTabId);
-        if (cur) cur.content = code;
+        if (cur) _setEditorValueFast(cur.content);
 
         // Mark button as applied
         btn.className = 'chat-apply-btn applied';
@@ -754,7 +764,7 @@ No markdown, no backticks, no explanation outside the array.`;
             const wrap = document.createElement('div');
             wrap.className = 'chat-msg agent';
             wrap.appendChild(errEl);
-            const box = document.getElementById('chat-messages');
+            const box = document.getElementById('agent-chat-messages');
             if (box) { box.appendChild(wrap); box.scrollTop = box.scrollHeight; }
         } finally {
             sendBtn.disabled = false;
@@ -1712,7 +1722,6 @@ STRICT FORMAT RULES:
                 contextFileNames.push(t.name);
             });
         }
-        }
 
         // ── Attachment ──
         const attachCtx = _inlineAttachment ? `\n\n── ATTACHED FILE (${_inlineAttachment.name}) ──\n${_inlineAttachment.content.slice(0,2000)}` : '';
@@ -1778,30 +1787,38 @@ PYODIDE RULES — follow strictly or code will break:
 
             const parsed = _tryParseJSON(raw);
 
-            // ── CHAT MODE: parse JSON first — if edit/multi_edit show apply cards, else show text ──
-            if (_inlineChatModeOn) {
-                if (parsed && (parsed.type === 'edit' || parsed.type === 'multi_edit')) {
-                    // AI returned edits even in chat mode — show them properly
-                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                    if (parsed.type === 'edit') {
-                        if (Array.isArray(parsed.edits) && parsed.edits.length) {
-                            _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
-                        }
-                    } else if (parsed.type === 'multi_edit') {
-                        (parsed.files || []).forEach(mf => {
-                            const mTab = fileTabs.find(t => t.name === mf.filename)
-                                      || fileTabs.find(t => t.name.toLowerCase() === (mf.filename||'').toLowerCase());
-                            if (!mTab) { _inlineAppendMsg('agent', '⚠ File not found: ' + mf.filename); return; }
-                            if (Array.isArray(mf.edits) && mf.edits.length) {
-                                _inlineAppendMsg('agent', mf.filename + ':', null);
-                                _inlineAppendMsg('agent', '', _buildInlineEditCard(mf.edits, mTab));
-                            }
-                        });
+            // ── Detect truncated JSON — warn user ──
+            const looksLikeJSON = raw.trimStart().startsWith('{') && raw.includes('"type"');
+            const isTruncated = looksLikeJSON && !parsed;
+            if (isTruncated) {
+                _inlineAppendMsg('agent', '⚠ Response was cut off (too long). Try switching to a model with larger output limit, or break your request into smaller parts.');
+                return;
+            }
+
+            // ── BOTH modes: if AI returned JSON edit/multi_edit, always show apply cards ──
+            if (parsed && (parsed.type === 'edit' || parsed.type === 'multi_edit')) {
+                if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
+                if (parsed.type === 'edit') {
+                    if (Array.isArray(parsed.edits) && parsed.edits.length) {
+                        _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
                     }
-                } else {
-                    // Plain text / canvas response
-                    _inlineAppendMsg('agent', raw.trim());
+                } else if (parsed.type === 'multi_edit') {
+                    (parsed.files || []).forEach(mf => {
+                        const mTab = fileTabs.find(t => t.name === mf.filename)
+                                  || fileTabs.find(t => t.name.toLowerCase() === (mf.filename||'').toLowerCase());
+                        if (!mTab) { _inlineAppendMsg('agent', '⚠ File not found: ' + mf.filename); return; }
+                        if (Array.isArray(mf.edits) && mf.edits.length) {
+                            _inlineAppendMsg('agent', mf.filename + ':', null);
+                            _inlineAppendMsg('agent', '', _buildInlineEditCard(mf.edits, mTab));
+                        }
+                    });
                 }
+                return;
+            }
+
+            // ── Chat mode — plain text only ──
+            if (_inlineChatModeOn) {
+                _inlineAppendMsg('agent', raw.trim());
                 return;
             }
 
@@ -2795,16 +2812,18 @@ Use only line numbers visible in the context. Be precise.`;
             `;
             row.addEventListener('touchstart', (e) => {
                 row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+                row.style.background = 'rgba(128,128,128,0.12)';
             }, { passive: true });
             row.addEventListener('touchmove', (e) => {
                 if (row._ts) {
                     const dy = Math.abs(e.touches[0].clientY - row._ts.y);
                     const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-                    if (dy > 8 || dx > 8) row._ts.moved = true;
+                    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = ''; }
                 }
             }, { passive: true });
             row.ontouchend = (e) => {
                 const ts = row._ts; row._ts = null;
+                row.style.background = '';
                 if (!ts || ts.moved) return;
                 e.stopPropagation();
                 e.preventDefault();
@@ -2828,7 +2847,9 @@ Use only line numbers visible in the context. Be precise.`;
         settings.innerHTML = `
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-color)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;pointer-events:none;opacity:0.5;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             <span style="font-size:12px;font-weight:600;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;pointer-events:none;">Agent Settings</span>`;
-        settings.ontouchstart = () => { settings.style.background = 'rgba(128,128,128,0.08)'; };
+        settings.addEventListener('touchstart', () => { settings.style.background = 'rgba(128,128,128,0.08)'; }, { passive: true });
+        settings.addEventListener('touchend', () => { setTimeout(() => { settings.style.background = ''; }, 150); }, { passive: true });
+        settings.addEventListener('touchcancel', () => { settings.style.background = ''; }, { passive: true });
         settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); openAgentModal(); };
         dd.appendChild(settings);
     }
@@ -2909,7 +2930,10 @@ Use only line numbers visible in the context. Be precise.`;
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;">add_circle</span>
             <span style="flex:1;font-size:11px;font-weight:700;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File</span>
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isNewSelected ? '1' : '0'};">radio_button_checked</span>`;
-        newRow.ontouchstart = () => newRow.style.background = 'rgba(16,185,129,0.12)';
+        newRow.addEventListener('touchstart', () => { newRow.style.background = 'rgba(16,185,129,0.12)'; }, { passive: true });
+        newRow.addEventListener('touchmove', () => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, { passive: true });
+        newRow.addEventListener('touchend', () => { setTimeout(() => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, 150); }, { passive: true });
+        newRow.addEventListener('touchcancel', () => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, { passive: true });
         newRow.onclick = (e) => {
             e.stopPropagation();
             _inlineSelectedTabId = 'new';
@@ -2925,7 +2949,7 @@ Use only line numbers visible in the context. Be precise.`;
             const isTarget = t.id === _inlineSelectedTabId;
             const isCtx = _inlineContextTabIds.has(t.id) && !isTarget;
             const row = document.createElement('div');
-            row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent'};-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;`;
+            row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);background:${isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent'};-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;`;
             row.innerHTML = `
                 <span class="material-icons-round" style="font-size:14px;color:${isTarget ? 'var(--accent)' : 'var(--text-color)'};opacity:${isTarget ? '1' : '0.45'};pointer-events:none;">insert_drive_file</span>
                 <span style="flex:1;font-size:11px;font-weight:600;color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${t.name}</span>
@@ -2935,18 +2959,21 @@ Use only line numbers visible in the context. Be precise.`;
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
 
             // Tap row = set as target file
+            const _rowBg = isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent';
 row.addEventListener('touchstart', (e) => {
   row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+  row.style.background = 'rgba(16,185,129,0.12)';
 }, { passive: true });
 row.addEventListener('touchmove', (e) => {
   if (row._ts) {
     const dy = Math.abs(e.touches[0].clientY - row._ts.y);
     const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-    if (dy > 8 || dx > 8) row._ts.moved = true;
+    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; }
   }
 }, { passive: true });
 row.ontouchend = (e) => {
   const ts = row._ts; row._ts = null;
+  row.style.background = _rowBg;
   if (!ts || ts.moved) return;
   e.stopPropagation();
   e.preventDefault();
