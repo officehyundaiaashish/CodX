@@ -6205,7 +6205,6 @@ Rules:
 
         const curTabBefore = fileTabs.find(t => t.id === activeTabId);
         if (curTabBefore) curTabBefore.content = editor.getValue();
-
         let applied = 0;
         const targetId = _agentTargetTabId || activeTabId;
         edits.forEach(edit => {
@@ -6221,7 +6220,6 @@ Rules:
                 }
             }
         });
-
         const cur = fileTabs.find(t => t.id === activeTabId);
         if (cur) _setEditorValueFast(cur.content);
 
@@ -7144,7 +7142,6 @@ STRICT FORMAT RULES:
 
         _inlineAppendMsg('user', userRequest);
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
-
         // ── Sync to _chatHistory + instant save ──
         if (typeof _chSaveCurrentSession === 'function') {
             if (typeof _chatSessionName !== 'undefined' && _chatSessionName === 'New Chat' && typeof _autoChatName === 'function')
@@ -7266,8 +7263,7 @@ Rules:
             // Save to history
             _inlineChatHistory.push({ role: 'user', content: userMsg });
             _inlineChatHistory.push({ role: 'assistant', content: raw });
-
-            // ── Sync agent reply + save ──
+            // ── Sync agent reply to _chatHistory + save ──
             if (typeof _chSaveCurrentSession === 'function' && typeof _chatHistory !== 'undefined') {
                 _chatHistory.push({ role: 'agent', text: raw.trim(), time: (typeof _chatTime === 'function' ? _chatTime() : '') });
                 _chSaveCurrentSession();
