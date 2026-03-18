@@ -1,3570 +1,1748 @@
-    // ── Chat state ──
-    let _chatHistory = [];          // { role, text, time, edits, files, msgId }
-    let _chatSessionName = 'New Chat';
-    let _chatMsgCounter = 0;
-    let _chatPendingEditsMap = {};  // msgId → edits array (for per-message apply)
-    // ── Chat History Sessions (localStorage) ──
-    const _CH_KEY = 'codx_chat_sessions';
-    let _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
-    function _chLoadAll() {
-        try { return JSON.parse(localStorage.getItem(_CH_KEY) || '[]'); } catch(e) { return []; }
-    }
-    function _chSaveAll(sessions) {
-        try { localStorage.setItem(_CH_KEY, JSON.stringify(sessions.slice(-80))); } catch(e) {}
-    }
-    function _chSaveCurrentSession() {
-        if (!_chatHistory.length) return;
-        const sessions = _chLoadAll();
-        const idx = sessions.findIndex(s => s.id === _chatSessionId);
-        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice() };
-        if (idx !== -1) sessions[idx] = session;
-        else sessions.push(session);
-        _chSaveAll(sessions);
-    }
-    function _chDeleteSession(id) {
-        const sessions = _chLoadAll().filter(s => s.id !== id);
-        _chSaveAll(sessions);
-    }
-    function _chNewSession() {
-        _chSaveCurrentSession();
-        _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-        _chatSessionName = 'New Chat'; _chatHistory = []; _chatMsgCounter = 0; _chatPendingEditsMap = {};
-    }
 
-    // ── Auto-generate session name from first user message ──
-    function _autoChatName(text) {
-        const words = text.trim().split(/\s+/).slice(0, 5).join(' ');
-        return words.length > 32 ? words.slice(0, 32) + '…' : words;
-    }
+        /* ──────────────────────── Variables & Themes ──────────────────────── */
 
-    // ── Close the chat panel ──
-    function closeChatPanel() {
-        document.getElementById('agent-chat-overlay').classList.remove('active');
-        document.getElementById('agent-chat-panel').classList.remove('active');
-    }
-
-    // ── Rename the session ──
-    function renameChatSession() {
-        cdPrompt('Rename Chat', 'Give this chat a name:', _chatSessionName, (name) => {
-            if (!name) return;
-            _chatSessionName = name.trim();
-            document.getElementById('chat-session-label').textContent = _chatSessionName;
-        });
-    }
-
-    // ── Update file selector inside chat panel ──
-    function _updateChatFileSelector() {
-        const wrap = document.getElementById('agent-chat-file-selector');
-        const sel  = document.getElementById('agent-chat-file-select');
-        if (!wrap || !sel) return;
-        if (fileTabs.length <= 1) { wrap.style.display = 'none'; return; }
-        wrap.style.display = 'block';
-        sel.innerHTML = '';
-        fileTabs.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t.id; opt.textContent = t.name;
-            if (t.id === activeTabId) opt.selected = true;
-            sel.appendChild(opt);
-        });
-        _agentTargetTabId = activeTabId;
-    }
-
-    // ── Format timestamp ──
-    function _chatTime() {
-        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    // ── Scroll messages to bottom ──
-    function _chatScrollBottom() {
-        const box = document.getElementById('agent-chat-messages');
-        if (box) requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
-    }
-
-    // ── Append a message bubble ──
-    function _appendChatMsg(role, text, time, extraEl, msgIdx) {
-        const box = document.getElementById('agent-chat-messages');
-        const empty = document.getElementById('chat-empty-state');
-        if (empty) empty.remove();
-
-        const wrap = document.createElement('div');
-        wrap.className = 'chat-msg ' + role;
-        if (msgIdx !== undefined) wrap.dataset.msgIdx = msgIdx;
-
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble';
-        // Preserve embedded SVG icons while escaping other HTML
-        const _svgFrags = [];
-        const _safeText = text
-            .replace(/<svg[\s\S]*?<\/svg>/g, (m) => { _svgFrags.push(m); return '\x00SVG' + (_svgFrags.length - 1) + '\x00'; })
-            .replace(/\n/g, '<br>')
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/&lt;br&gt;/g,'<br>')
-            .replace(/\x00SVG(\d+)\x00/g, (_, i) => _svgFrags[+i] || '');
-        bubble.innerHTML = _safeText;
-
-        // Footer: timestamp + copy + edit (for user messages)
-        const footer = document.createElement('div');
-        footer.className = 'chat-msg-footer';
-
-        const ts = document.createElement('div');
-        ts.className = 'chat-time';
-        ts.textContent = time || _chatTime();
-
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'chat-copy-btn';
-        copyBtn.innerHTML = '<span class="material-icons-round">content_copy</span>';
-        copyBtn.title = 'Copy';
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(text).then(() => {
-                copyBtn.classList.add('copied');
-                copyBtn.innerHTML = '<span class="material-icons-round">check</span>';
-                setTimeout(() => {
-                    copyBtn.classList.remove('copied');
-                    copyBtn.innerHTML = '<span class="material-icons-round">content_copy</span>';
-                }, 1500);
-            });
-        };
-
-        footer.appendChild(ts);
-        footer.appendChild(copyBtn);
-
-        // Edit button — only for user messages
-        if (role === 'user' && msgIdx !== undefined) {
-            const editBtn = document.createElement('button');
-            editBtn.className = 'chat-edit-btn';
-            editBtn.innerHTML = '<span class="material-icons-round">edit</span>';
-            editBtn.title = 'Edit message';
-            editBtn.onclick = () => _startEditMsg(wrap, bubble, text, msgIdx);
-            footer.appendChild(editBtn);
+        :root {
+            --bg-color: #0a0a0c;
+            --editor-bg: #141417;
+            --text-color: #e0e0e0;
+            --glass-bg: #141419;
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent: #10b981; 
+            --accent-dim: rgba(16, 185, 129, 0.15);
+            --panel-round: 24px;
+            --transition: opacity 0.15s;
         }
 
-        wrap.appendChild(bubble);
-        if (extraEl) bubble.appendChild(extraEl);
-        wrap.appendChild(footer);
-        box.appendChild(wrap);
-        _chatScrollBottom();
-        return bubble;
-    }
-
-    // ── Start editing a message ──
-    function _startEditMsg(wrap, bubble, originalText, msgIdx) {
-        // Already editing?
-        if (wrap.querySelector('.chat-edit-wrap')) return;
-        bubble.style.display = 'none';
-
-        const editWrap = document.createElement('div');
-        editWrap.className = 'chat-edit-wrap';
-
-        const ta = document.createElement('textarea');
-        ta.className = 'chat-edit-textarea';
-        ta.value = originalText;
-        ta.rows = 3;
-        setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 50);
-        ta.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        const actions = document.createElement('div');
-        actions.className = 'chat-edit-actions';
-
-        const sendBtn = document.createElement('button');
-        sendBtn.className = 'chat-edit-send';
-        sendBtn.innerHTML = '<span class="material-icons-round" style="font-size:13px;pointer-events:none;">send</span> Resend';
-        sendBtn.onclick = () => {
-            const newText = ta.value.trim();
-            if (!newText) return;
-            _submitEditMsg(wrap, bubble, originalText, newText, msgIdx);
-        };
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'chat-edit-cancel';
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.onclick = () => {
-            editWrap.remove();
-            bubble.style.display = '';
-        };
-
-        // Send on Enter (not Shift+Enter)
-        ta.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendBtn.click();
-            }
-        });
-
-        actions.appendChild(sendBtn);
-        actions.appendChild(cancelBtn);
-        editWrap.appendChild(ta);
-        editWrap.appendChild(actions);
-        wrap.insertBefore(editWrap, wrap.querySelector('.chat-msg-footer'));
-    }
-
-    // ── Submit edited message — remove subsequent messages and resend ──
-    async function _submitEditMsg(wrap, bubble, originalText, newText, msgIdx) {
-        // Remove all messages after this one from DOM
-        const box = document.getElementById('agent-chat-messages');
-        const allMsgs = Array.from(box.children);
-        const wrapIdx = allMsgs.indexOf(wrap);
-        for (let i = allMsgs.length - 1; i > wrapIdx; i--) {
-            allMsgs[i].remove();
+        body.light-theme {
+            --bg-color: #f0f2f5;
+            --editor-bg: #ffffff;
+            --text-color: #1c1e21;
+            --glass-bg: #f8f9fb;
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --accent: #059669;
+            --accent-dim: rgba(5, 150, 105, 0.1);
         }
 
-        // Truncate _chatHistory to this message (exclusive)
-        _chatHistory = _chatHistory.slice(0, msgIdx);
+        /* Anti-Google Search & Global UI Font */
 
-        // Remove edit UI, restore bubble with new text
-        const editWrap = wrap.querySelector('.chat-edit-wrap');
-        if (editWrap) editWrap.remove();
-
-        // Update bubble text
-        const _svgFrags = [];
-        const _safeText = newText
-            .replace(/<svg[\s\S]*?<\/svg>/g, (m) => { _svgFrags.push(m); return '\x00SVG' + (_svgFrags.length - 1) + '\x00'; })
-            .replace(/\n/g, '<br>')
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/&lt;br&gt;/g,'<br>')
-            .replace(/\x00SVG(\d+)\x00/g, (_, i) => _svgFrags[+i] || '');
-        bubble.innerHTML = _safeText;
-        bubble.style.display = '';
-
-        // Update history with new text
-        _chatHistory.push({ role: 'user', text: newText, time: _chatTime() });
-        wrap.dataset.msgIdx = _chatHistory.length - 1;
-
-        // Now send as new message
-        const textarea = document.getElementById('agent-chat-textarea');
-        if (textarea) textarea.value = newText;
-        sendChatMessage();
-        if (textarea) textarea.value = '';
-    }
-
-    // ── Start editing a message ──
-    function _startEditMsg(wrap, bubble, originalText, msgIdx) {
-        // Already editing?
-        if (wrap.querySelector('.chat-edit-wrap')) return;
-        bubble.style.display = 'none';
-
-        const editWrap = document.createElement('div');
-        editWrap.className = 'chat-edit-wrap';
-
-        const ta = document.createElement('textarea');
-        ta.className = 'chat-edit-textarea';
-        ta.value = originalText;
-        ta.rows = 3;
-        setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 50);
-        ta.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        const actions = document.createElement('div');
-        actions.className = 'chat-edit-actions';
-
-        const sendBtn = document.createElement('button');
-        sendBtn.className = 'chat-edit-send';
-        sendBtn.innerHTML = '<span class="material-icons-round" style="font-size:13px;pointer-events:none;">send</span> Resend';
-        sendBtn.onclick = () => {
-            const newText = ta.value.trim();
-            if (!newText) return;
-            _submitEditMsg(wrap, bubble, originalText, newText, msgIdx);
-        };
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'chat-edit-cancel';
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.onclick = () => {
-            editWrap.remove();
-            bubble.style.display = '';
-        };
-
-        // Send on Enter (not Shift+Enter)
-        ta.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendBtn.click();
-            }
-        });
-
-        actions.appendChild(sendBtn);
-        actions.appendChild(cancelBtn);
-        editWrap.appendChild(ta);
-        editWrap.appendChild(actions);
-        wrap.insertBefore(editWrap, wrap.querySelector('.chat-msg-footer'));
-    }
-
-    // ── Submit edited message — remove subsequent messages and resend ──
-    async function _submitEditMsg(wrap, bubble, originalText, newText, msgIdx) {
-        // Remove all messages after this one from DOM
-        const box = document.getElementById('agent-chat-messages');
-        const allMsgs = Array.from(box.children);
-        const wrapIdx = allMsgs.indexOf(wrap);
-        for (let i = allMsgs.length - 1; i > wrapIdx; i--) {
-            allMsgs[i].remove();
+        
+/* ── PERF: GPU compositing hints for scroll containers ── */
+        #editor, #preview {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: none;
         }
-
-        // Truncate _chatHistory to this message (exclusive)
-        _chatHistory = _chatHistory.slice(0, msgIdx);
-
-        // Remove edit UI, restore bubble with new text
-        const editWrap = wrap.querySelector('.chat-edit-wrap');
-        if (editWrap) editWrap.remove();
-
-        // Update bubble text
-        const _svgFrags = [];
-        const _safeText = newText
-            .replace(/<svg[\s\S]*?<\/svg>/g, (m) => { _svgFrags.push(m); return '\x00SVG' + (_svgFrags.length - 1) + '\x00'; })
-            .replace(/\n/g, '<br>')
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/&lt;br&gt;/g,'<br>')
-            .replace(/\x00SVG(\d+)\x00/g, (_, i) => _svgFrags[+i] || '');
-        bubble.innerHTML = _safeText;
-        bubble.style.display = '';
-
-        // Update history with new text
-        _chatHistory.push({ role: 'user', text: newText, time: _chatTime() });
-        wrap.dataset.msgIdx = _chatHistory.length - 1;
-
-        // Now send as new message
-        const textarea = document.getElementById('agent-chat-textarea');
-        if (textarea) textarea.value = newText;
-        sendChatMessage();
-        if (textarea) textarea.value = '';
-    }
-
-    // ── Show typing indicator ──
-    function _showChatTyping() {
-        const box = document.getElementById('agent-chat-messages');
-        const empty = document.getElementById('chat-empty-state');
-        if (empty) empty.remove();
-        const wrap = document.createElement('div');
-        wrap.className = 'chat-msg agent';
-        wrap.id = 'chat-typing-indicator';
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-typing-bubble';
-        bubble.innerHTML = '<span></span><span></span><span></span>';
-        wrap.appendChild(bubble);
-        box.appendChild(wrap);
-        _chatScrollBottom();
-    }
-    function _hideChatTyping() {
-        const t = document.getElementById('chat-typing-indicator');
-        if (t) t.remove();
-    }
-
-    // ── Build fix card (one edit) with Apply button ──
-    function _buildFixCard(edits, msgId) {
-        const card = document.createElement('div');
-        card.className = 'chat-fix-card';
-
-        const title = document.createElement('div');
-        title.className = 'chat-fix-title';
-        title.textContent = edits.length + ' fix' + (edits.length > 1 ? 'es' : '') + ' ready';
-        card.appendChild(title);
-
-        edits.forEach((edit, i) => {
-            const reason = document.createElement('div');
-            reason.className = 'chat-fix-reason';
-            reason.textContent = edit.reason || 'Code edit';
-            card.appendChild(reason);
-
-            if (i < 3) { // Show max 3 previews to keep it compact
-                const preview = document.createElement('div');
-                preview.className = 'chat-fix-preview';
-                const fp = edit.find.slice(0, 50).replace(/\n/g, '↵') + (edit.find.length > 50 ? '…' : '');
-                const rp = edit.replace.slice(0, 50).replace(/\n/g, '↵') + (edit.replace.length > 50 ? '…' : '');
-                preview.innerHTML = `
-                    <div class="chat-fix-side remove">
-                        <div class="chat-fix-side-label">REMOVE</div>
-                        <div class="chat-fix-code">${fp}</div>
-                    </div>
-                    <div class="chat-fix-side insert">
-                        <div class="chat-fix-side-label">INSERT</div>
-                        <div class="chat-fix-code">${rp}</div>
-                    </div>`;
-                card.appendChild(preview);
-            }
-        });
-
-        // Apply button
-        const applyBtn = document.createElement('button');
-        applyBtn.className = 'chat-apply-btn';
-        applyBtn.id = 'chat-apply-' + msgId;
-        applyBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Apply Fix';
-        applyBtn.onclick = () => _applyChatFix(msgId, applyBtn);
-        card.appendChild(applyBtn);
-        return card;
-    }
-
-    // ── Build split files card ──
-    function _buildSplitCard(files, msgId) {
-        const card = document.createElement('div');
-        card.className = 'chat-split-card';
-        const title = document.createElement('div');
-        title.className = 'chat-fix-title';
-        title.textContent = files.length + ' files ready';
-        card.appendChild(title);
-
-        files.forEach(f => {
-            const row = document.createElement('div');
-            row.className = 'chat-split-file-row';
-            const name = document.createElement('div');
-            name.className = 'chat-split-file-name';
-            name.textContent = f.filename;
-            const openBtn = document.createElement('button');
-            openBtn.className = 'chat-split-mini-btn';
-            openBtn.textContent = 'Open';
-            openBtn.onclick = () => {
-                openFileInTab(f.filename, f.content, true);
-                openBtn.innerHTML = '&#10003;';
-                openBtn.style.background = 'var(--accent)';
-                openBtn.style.color = 'white';
-            };
-            row.appendChild(name); row.appendChild(openBtn);
-            card.appendChild(row);
-        });
-
-        const openAllBtn = document.createElement('button');
-        openAllBtn.className = 'chat-apply-btn';
-        openAllBtn.style.marginTop = '8px';
-        openAllBtn.innerHTML = '<span class="material-icons-round">tab</span> Open All Tabs';
-        openAllBtn.onclick = () => {
-            files.forEach(f => openFileInTab(f.filename, f.content, true));
-            openAllBtn.className = 'chat-apply-btn applied';
-            openAllBtn.innerHTML = '<span class="material-icons-round">check</span> All Opened';
-        };
-        card.appendChild(openAllBtn);
-        return card;
-    }
-
-    // ── Apply fix for a specific message ──
-    function _applyChatFix(msgId, btn) {
-        const edits = _chatPendingEditsMap[msgId];
-        if (!edits || edits.length === 0) return;
-
-        _agentUndoStack.push(editor.getValue());
-        if (_agentUndoStack.length > 5) _agentUndoStack.shift();
-
-        const curTabBefore = fileTabs.find(t => t.id === activeTabId);
-        if (curTabBefore) curTabBefore.content = editor.getValue();
-        let applied = 0;
-        const targetId = _agentTargetTabId || activeTabId;
-        edits.forEach(edit => {
-            const searchTabs = [
-                fileTabs.find(t => t.id === targetId),
-                ...fileTabs.filter(t => t.id !== targetId)
-            ].filter(Boolean);
-            for (const tab of searchTabs) {
-                if (tab.content && tab.content.includes(edit.find)) {
-                    tab.content = tab.content.split(edit.find).join(edit.replace);
-                    applied++;
-                    break;
-                }
-            }
-        });
-        const cur = fileTabs.find(t => t.id === activeTabId);
-        if (cur) _setEditorValueFast(cur.content);
-
-        // Mark button as applied
-        btn.className = 'chat-apply-btn applied';
-        btn.innerHTML = '<span class="material-icons-round">check</span> Applied (' + applied + ' edit' + (applied > 1 ? 's' : '') + ')';
-
-        // Remove from pending map so it can't be applied twice
-        delete _chatPendingEditsMap[msgId];
-
-        // Add undo toast in chat
-        const undoWrap = document.createElement('div');
-        undoWrap.style.cssText = 'margin-top:6px;display:flex;gap:6px;align-items:center;';
-        undoWrap.innerHTML = '<span style="font-size:10px;color:var(--accent);font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg> Applied to editor</span>';
-        const undoSpan = document.createElement('span');
-        undoSpan.textContent = 'Undo';
-        undoSpan.style.cssText = 'font-size:10px;color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline;';
-        undoSpan.onclick = () => { _agentUndo(); undoWrap.remove(); };
-        undoWrap.appendChild(undoSpan);
-        btn.parentElement.appendChild(undoWrap);
-        _chatScrollBottom();
-    }
-
-    // ── Auto resize textarea + Enter key — wrapped in setTimeout(0) ──
-    // agent-chat-textarea is injected after this script tag, so we defer by one tick
-    setTimeout(function() {
-        const chatTA = document.getElementById('agent-chat-textarea');
-        if (!chatTA) return;
-        chatTA.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-        });
-        chatTA.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) { e.stopPropagation(); }
-            if (e.key === 'Enter' && window.innerWidth >= 768) {
-                if (e.shiftKey) { return; }
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
-    }, 0);
-
-    // ── STEP 1: SEARCH — scan code for relevant sections (like grep) ──
-    // Splits code into numbered lines, extracts sections matching user keywords,
-    // returns a short summary shown as first agent bubble before analyse/edit.
-    async function _searchCodeSections(code, userRequest, filename) {
-        const lines = code.split('\n');
-        const totalLines = lines.length;
-
-        // Extract keywords from user request — same way grep keywords work
-        const stopWords = new Set(['the','and','for','are','was','but','not','you',
-            'all','can','has','him','his','how','its','may','new','now','see','too',
-            'use','karo','karna','mein','hai','hain','yeh','voh','aur','iska','uska',
-            'kuch','mere','teri','mera','kar','kya','bhi','woh','isko','usse','isse']);
-        const words = userRequest
-            .toLowerCase()
-            .replace(/[^a-z0-9\s]/g, ' ')
-            .split(/\s+/)
-            .filter(w => w.length > 2 && !stopWords.has(w));
-
-        // Scan every line — collect line numbers that match any keyword (like grep -n)
-        const matchedLineNums = [];
-        lines.forEach((line, idx) => {
-            const lower = line.toLowerCase();
-            if (words.some(w => lower.includes(w))) {
-                matchedLineNums.push(idx + 1);
-            }
-        });
-
-        // Group consecutive matches into sections (like grep context -A2 -B2)
-        const sections = [];
-        let i = 0;
-        while (i < matchedLineNums.length) {
-            const startLine = matchedLineNums[i];
-            let endLine = startLine;
-            // Merge lines within 4 of each other into one section
-            while (i + 1 < matchedLineNums.length && matchedLineNums[i+1] - matchedLineNums[i] <= 4) {
-                i++;
-                endLine = matchedLineNums[i];
-            }
-            // Add ±2 lines of context around the match
-            const fromIdx = Math.max(0, startLine - 3);
-            const toIdx   = Math.min(totalLines - 1, endLine + 1);
-            const snippet = lines
-                .slice(fromIdx, toIdx + 1)
-                .map((l, si) => `L${fromIdx + si + 1}: ${l.trim().slice(0, 72)}`)
-                .join('\n');
-            sections.push({ from: fromIdx + 1, to: toIdx + 1, snippet });
-            i++;
+        .cursor-nav, .toolbar-rows, .file-tabs-bar, .gh-custom-list, .agent-provider-grid {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
         }
+        /* Touch-action: tells browser which touches to handle natively — zero delay */
+        .bottom-area, .toolbar-rows, .cursor-nav { touch-action: pan-x pan-y; }
+        #editor { touch-action: pan-x pan-y pinch-zoom; }
+        /* Promote scrollable layers to own GPU composite layer */
+        .file-tabs-bar { transform: translateZ(0); }
+        /* Prevent text selection flicker during touch */
+        .toolbar-btn, .icon-btn, .tab, .file-tab { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        /* Remove 300ms tap delay on all interactive elements */
+        button, a, [onclick] { touch-action: manipulation; }
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        .no-select { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 
-        // Build summary bubble text
-        let summary = '';
-        if (sections.length === 0) {
-            summary = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Searched "${filename}" (${totalLines} lines) — no direct matches for your keywords.\nWill analyse the full file now.`;
-        } else {
-            const label = sections.length === 1 ? 'section' : 'sections';
-            summary = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Searched "${filename}" (${totalLines} lines) — found ${sections.length} relevant ${label}:\n`;
-            sections.slice(0, 3).forEach((s, idx) => {
-                const previewLines = s.snippet.split('\n').slice(0, 3).map(l => '  ' + l).join('\n');
-                const hasMore = s.snippet.split('\n').length > 3 ? '\n  ...' : '';
-                summary += `\n<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> Lines ${s.from}–${s.to}:\n${previewLines}${hasMore}\n`;
-            });
-            if (sections.length > 3) {
-                summary += `\n...and ${sections.length - 3} more section(s) found.`;
-            }
+        body, html { width: 100vw; position: fixed; overflow: hidden; font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color); height: 100%; overscroll-behavior: none; -webkit-text-size-adjust: none; }
+        .app-layout { display: flex; flex-direction: column; height: 100%; width: 100%; }
+
+        /* ── GPU PERF: Reduce backdrop-filter cost on mobile ── */
+        
+        /* ──────────────────────── Header & Tabs ──────────────────────── */
+
+        .app-header { flex-shrink: 0; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 4px 10px; display: flex; align-items: center; justify-content: space-between; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
+        /* Tabs pill with snake border animation */
+        .tabs {
+            display: flex;
+            padding: 2px;
+            border-radius: 20px;
+            background: rgba(0,0,0,0.2);
+            position: relative;
         }
-
-        // Return summary + raw sections (sections passed into agent context for better accuracy)
-        return { summary, sections };
-    }
-
-    // ── Main send function ──
-    // ── Main send function ──
-    async function sendChatMessage() {
-        if (!_activeAgent()) { openAgentModal(); return; }
-        const textarea   = document.getElementById('agent-chat-textarea');
-        const userRequest = textarea.value.trim();
-        if (!userRequest) return;
-
-        // Auto-name session from first message
-        if (_chatSessionName === 'New Chat') {
-            _chatSessionName = _autoChatName(userRequest);
-            document.getElementById('chat-session-label').textContent = _chatSessionName;
-        }
-
-        // Append user bubble
-        const userTime = _chatTime();
-        const userMsgIdx = _chatHistory.length;
-        _appendChatMsg('user', userRequest, userTime, null, userMsgIdx);
-        _chatHistory.push({ role: 'user', text: userRequest, time: userTime });
-
-        // Clear input
-        textarea.value = '';
-        textarea.style.height = 'auto';
-
-        // Disable send
-        const sendBtn = document.getElementById('agent-chat-send-btn');
-        sendBtn.disabled = true;
-
-        // Show typing
-        _showChatTyping();
-
-        // Get current code
-        let _agentWorkTab = null;
-        const chatFileSel = document.getElementById('agent-chat-file-select');
-        if (chatFileSel && chatFileSel.value) _agentTargetTabId = parseInt(chatFileSel.value) || activeTabId;
-        if (_agentTargetTabId) _agentWorkTab = fileTabs.find(t => t.id === _agentTargetTabId);
-        if (!_agentWorkTab) _agentWorkTab = fileTabs.find(t => t.id === activeTabId);
-        const curTab = fileTabs.find(t => t.id === activeTabId);
-        if (curTab) curTab.content = editor.getValue();
-        const code = _agentWorkTab ? _agentWorkTab.content : editor.getValue();
-
-        // Detect intents
-        const splitKeywords = /\b(split|divide|separate|extract|break\s*up|break\s*into|multiple\s*files?|alag|vibhajit|tod|tod\s*do|file\s*mein|files\s*mein|parts?)\b/i;
-        const chatKeywords  = /\b(explain|what|why|how|problem|issue|error|bug|help|bata|kya|kyon|samjhao|dekho|check|analyse|analyze|review|tell me|isko|isme|kaise|kyun|kab|kuch|sahi|galat|thik|dik|dikkat|problem|solution|suggest|better|improve|optimise|optimize)\b/i;
-        const isSplitIntent = splitKeywords.test(userRequest);
-        const isChatIntent  = chatKeywords.test(userRequest) && !isSplitIntent;
-
-        // Build context from other tabs
-        let contextFiles = '';
-        fileTabs.forEach(t => {
-            if (t.id !== (_agentWorkTab ? _agentWorkTab.id : activeTabId)) {
-                contextFiles += `\n--- Context File: ${t.name} ---\n\`\`\`\n${t.content.slice(0,3000)}\n\`\`\`\n`;
-            }
-        });
-        let attachCtx = agentAttachment ? `\n\nAttached file (${agentAttachment.name}):\n${agentAttachment.content.slice(0,2000)}` : '';
-        attachCtx = contextFiles + attachCtx;
-        // searchSections populated after STEP 1 — used to focus agent on right parts
-        let _searchSections = [];
-
-        // Clear attachment after use
-        agentAttachment = null;
-        document.getElementById('agent-chat-attach-btn').style.background = '';
-
-        try {
-            let agentText = '';
-            let extraEl   = null;
-            const msgId   = ++_chatMsgCounter;
-
-            // ── STEP 1: SEARCH ──
-            // Exactly like grep — scan code, find line numbers + relevant sections
-            // Show searching bubble first, then replace with found sections summary
-            const searchResult = await _searchCodeSections(code, userRequest, _agentWorkTab ? _agentWorkTab.name : 'untitled');
-            _searchSections = searchResult.sections;
-            _hideChatTyping();
-            _appendChatMsg('agent', searchResult.summary, _chatTime());
-            _chatScrollBottom();
-            // Brief pause so user sees search result before analyse step
-            await new Promise(r => setTimeout(r, 320));
-            _showChatTyping();
-
-            if (isChatIntent) {
-                // ── CHAT MODE: explain / diagnose ──
-                const systemPrompt = `You are a professional software engineering agent designed to analyse and edit code with precision.
-
-GENERAL RULES:
-1. The COMPLETE code is always provided to you. Read and analyse every line before making any change. Never assume — the answer is always in the code.
-2. Never guess — identify the root cause first.
-3. Only perform the task requested. Do not add extra features.
-4. Avoid silly mistakes. Maintain professional coding standards.
-5. Keep code clean, organised, and readable.
-6. Preserve original structure unless modification is required.
-7. Ensure changes do not break other parts. If they do, fix those impacts too.
-8. Keep modifications minimal, maximum stability, lowest complexity.
-
-PROCESS:
-STEP 1 – Understand the request: what, which file/section, bug fix or improvement.
-STEP 2 – Load and analyse full code: structure, related components, problem areas.
-STEP 3 – Find root cause: never modify without identifying the exact reason.
-STEP 4 – Plan minimal fix: decide which block to change, avoid touching unrelated code.
-STEP 5 – Apply edit: precise corrected code, no full rewrites.
-STEP 6 – Verify: no syntax errors, no broken structure, change fully implemented.
-
-You are talking to the developer directly in a chat interface.
-Keep responses SHORT, clear, and conversational. Match the user's language (English or Hindi/Hinglish).
-Diagnose problems clearly — explain root cause and exact fix in 2-3 sentences max.
-Do NOT return JSON. Just talk naturally.`;
-                const foundCtx = _searchSections.length > 0
-                    ? '\n\nRELEVANT SECTIONS FOUND BY SEARCH:\n' + _searchSections.slice(0,5).map(s => s.snippet).join('\n---\n')
-                    : '';
-                const userMsg = `My code (${_agentWorkTab ? _agentWorkTab.name : 'untitled'}):\n\`\`\`\n${code}\n\`\`\`${attachCtx}${foundCtx}\n\nUser says: ${userRequest}\n\nRules: Analyse full code before changing. Senior-level quality. Only do what's requested. Don't touch unrelated code. Respect existing UI/structure/animations. Ensure no other part breaks. Minimal change, max stability, lowest complexity. No comments in code.`;
-                agentText = await _callAgentAPI(systemPrompt, userMsg);
-
-            } else if (isSplitIntent) {
-                // ── SPLIT MODE ──
-                const splitSystemPrompt = `You are CodX AI Agent. The user wants to split their code into multiple separate files.
-Analyse the code and split it logically. Return ONLY a JSON array:
-[{"filename":"name.ext","content":"full content","reason":"brief reason"}]
-Only perform what the user requested. No silly mistakes. Minimal output, maximum quality.
-No markdown, no backticks, no explanation outside the array.`;
-                const userMsg = `Code to split:\n\`\`\`\n${code}\n\`\`\`${attachCtx}\n\nRequest: ${userRequest}\n\nRules: Only do what's requested. Senior-level quality. Minimal output, max stability. No comments in code.`;
-                let raw = await _callAgentAPI(splitSystemPrompt, userMsg);
-                const files = _safeExtractJSON(raw);
-                if (!files || !files.length) throw new Error('Agent could not split the code. Try again.');
-                agentText = `I've split your code into ${files.length} files. Open each one below:`;
-                extraEl = _buildSplitCard(files, msgId);
-
-            } else {
-                // ── EDIT MODE: 3-step Analyse → Plan → Execute ──
-                _hideChatTyping();
-
-                await _runThreeStepAgent({
-                    code, userRequest,
-                    attachCtx: attachCtx || '',
-                    appendMsg: (role, text, card) => {
-                        const bubble = _appendChatMsg(role, text || '', _chatTime(), card || null);
-                    },
-                    showTyping: (msg) => {
-                        _hideChatTyping();
-                        const box = document.getElementById('agent-chat-messages');
-                        const wrap = document.createElement('div');
-                        wrap.className = 'chat-msg agent';
-                        wrap.id = 'chat-step-typing';
-                        wrap.innerHTML = `<div class="chat-bubble" style="font-size:11px;opacity:0.7;">${msg}</div>`;
-                        box.appendChild(wrap);
-                        _chatScrollBottom();
-                    },
-                    hideTyping: () => {
-                        const t = document.getElementById('chat-step-typing');
-                        if (t) t.remove();
-                    },
-                    scrollBottom: _chatScrollBottom,
-                    onApply: (valid) => {
-                        const msgIdLocal = ++_chatMsgCounter;
-                        _chatPendingEditsMap[msgIdLocal] = valid;
-                        const card = _buildFixCard(valid, msgIdLocal);
-                        _appendChatMsg('agent', `Ready to apply ${valid.length} change${valid.length>1?'s':''}.`, _chatTime(), card);
-                        _chatScrollBottom();
-                    }
-                }).catch(e => {
-                    const t = document.getElementById('chat-step-typing');
-                    if (t) t.remove();
-                    if (e.message !== '__REJECTED__') {
-                        _appendChatMsg('agent', '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> ' + (e.message || 'Something went wrong.'), _chatTime());
-                    }
-                });
-
-                _chatHistory.push({ role: 'agent', text: agentText || '', time: _chatTime(), msgId });
-                sendBtn.disabled = false;
-                return;
-            }
-
-            _hideChatTyping();
-            const agentTime = _chatTime();
-            _appendChatMsg('agent', agentText, agentTime, extraEl);
-            _chatHistory.push({ role: 'agent', text: agentText, time: agentTime, msgId });
-            _chSaveCurrentSession();
-
-        } catch (err) {
-            _hideChatTyping();
-            const raw = err.message || 'Something went wrong.';
-            const errEl = _buildErrorCard(raw);
-            const wrap = document.createElement('div');
-            wrap.className = 'chat-msg agent';
-            wrap.appendChild(errEl);
-            const box = document.getElementById('agent-chat-messages');
-            if (box) { box.appendChild(wrap); box.scrollTop = box.scrollHeight; }
-        } finally {
-            sendBtn.disabled = false;
-        }
-    }
-
-    // ══════════════════════════════════════════
-    // ── CHAT HISTORY PANEL ──
-    // ══════════════════════════════════════════
-
-    function openChatHistoryPanel() {
-        _chSaveCurrentSession();
-        // Inject panel HTML if not exists
-        if (!document.getElementById('chat-history-panel')) {
-            const overlay = document.createElement('div');
-            overlay.id = 'chat-history-overlay';
-            overlay.onclick = (e) => { if (e.target === overlay) closeChatHistoryPanel(); };
-            document.body.appendChild(overlay);
-
-            const panel = document.createElement('div');
-            panel.id = 'chat-history-panel';
-            panel.innerHTML = `
-                <div class="chp-header">
-                    <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <span class="material-icons-round" style="color:var(--accent);font-size:16px;pointer-events:none;">history</span>
-                    </div>
-                    <div class="chp-title">Chat History</div>
-                    <button class="chp-close-btn" onclick="closeChatHistoryPanel()">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                </div>
-                <div class="chp-body" id="chp-body"></div>
-            `;
-            document.body.appendChild(panel);
-        }
-
-        _chRenderHistory();
-
-        requestAnimationFrame(() => {
-            document.getElementById('chat-history-overlay').classList.add('active');
-            document.getElementById('chat-history-panel').classList.add('active');
-        });
-    }
-
-    function closeChatHistoryPanel() {
-        const overlay = document.getElementById('chat-history-overlay');
-        const panel   = document.getElementById('chat-history-panel');
-        if (overlay) overlay.classList.remove('active');
-        if (panel)   panel.classList.remove('active');
-    }
-
-    function _chRenderHistory() {
-        const body = document.getElementById('chp-body');
-        if (!body) return;
-        body.innerHTML = '';
-
-        const sessions = _chLoadAll().slice().reverse(); // newest first
-
-        if (!sessions.length) {
-            body.innerHTML = `<div class="chp-empty">
-                <span class="material-icons-round">chat_bubble_outline</span>
-                <p>No saved chats yet.<br>Start chatting — sessions auto-save!</p>
-            </div>`;
-            return;
-        }
-
-        // Group by date
-        const groups = {};
-        sessions.forEach(s => {
-            const d   = new Date(s.date);
-            const now = new Date();
-            let label;
-            const diffDays = Math.floor((now - d) / 86400000);
-            if (diffDays === 0) label = 'Today';
-            else if (diffDays === 1) label = 'Yesterday';
-            else if (diffDays < 7) label = d.toLocaleDateString([], { weekday: 'long' });
-            else label = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-            if (!groups[label]) groups[label] = [];
-            groups[label].push(s);
-        });
-
-        let animDelay = 0;
-        Object.entries(groups).forEach(([label, groupSessions]) => {
-            const dateLabel = document.createElement('div');
-            dateLabel.className = 'chp-date-label';
-            dateLabel.textContent = label;
-            body.appendChild(dateLabel);
-
-            groupSessions.forEach((session, i) => {
-                const row = document.createElement('div');
-                row.className = 'chp-session-row';
-                row.style.animationDelay = (animDelay * 40) + 'ms';
-                animDelay++;
-
-                const msgCount = session.messages ? session.messages.length : 0;
-                const userMsgs = session.messages ? session.messages.filter(m => m.role === 'user').length : 0;
-                const timeStr  = new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                row.innerHTML = `
-                    <div class="chp-session-icon">
-                        <span class="material-icons-round" style="color:var(--accent);font-size:15px;pointer-events:none;">chat</span>
-                    </div>
-                    <div class="chp-session-info">
-                        <div class="chp-session-name">\${session.name || 'Unnamed Chat'}</div>
-                        <div class="chp-session-meta">
-                            <span>\${timeStr}</span>
-                            <span style="opacity:0.4;">·</span>
-                            <span>\${userMsgs} message\${userMsgs !== 1 ? 's' : ''}</span>
-                        </div>
-                    </div>
-                `;
-
-                // Click to restore session
-                row.onclick = (e) => {
-                    if (e.target.closest('.chp-del-btn')) return;
-                    _chRestoreSession(session);
-                    closeChatHistoryPanel();
-                };
-
-                // Delete button
-                const delBtn = document.createElement('button');
-                delBtn.className = 'chp-del-btn';
-                delBtn.innerHTML = '<span class="material-icons-round">delete_outline</span>';
-                delBtn.title = 'Delete';
-                delBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    _chConfirmDelete(session.id, row);
-                };
-                row.appendChild(delBtn);
-                body.appendChild(row);
-            });
-        });
-    }
-
-    function _chConfirmDelete(sessionId, rowEl) {
-        // Inline confirm — no browser dialogs
-        rowEl.style.transition = 'all 0.2s';
-        rowEl.style.background = 'rgba(239,68,68,0.1)';
-        rowEl.style.borderColor = 'rgba(239,68,68,0.4)';
-
-        const existing = rowEl.querySelector('.chp-confirm-del');
-        if (existing) { existing.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; return; }
-
-        const confirmBar = document.createElement('div');
-        confirmBar.className = 'chp-confirm-del';
-        confirmBar.style.cssText = 'display:flex;align-items:center;gap:7px;padding:7px 13px 9px;border-top:1px solid rgba(239,68,68,0.2);';
-        confirmBar.innerHTML = `
-            <span style="font-size:10px;font-weight:600;color:#ef4444;font-family:Poppins,sans-serif;flex:1;">Delete this chat?</span>
-            <button onclick="event.stopPropagation();_chDoDelete('\${sessionId}', this.closest('.chp-session-row'))" style="padding:5px 11px;border-radius:7px;border:none;background:#ef4444;color:white;font-family:Poppins,sans-serif;font-size:10px;font-weight:700;cursor:pointer;">Delete</button>
-            <button onclick="event.stopPropagation();this.closest('.chp-confirm-del').remove();this.closest('.chp-session-row').style.background='';this.closest('.chp-session-row').style.borderColor='';" style="padding:5px 10px;border-radius:7px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:Poppins,sans-serif;font-size:10px;font-weight:600;cursor:pointer;opacity:0.6;">Cancel</button>
-        `;
-        rowEl.appendChild(confirmBar);
-    }
-
-    function _chDoDelete(sessionId, rowEl) {
-        _chDeleteSession(sessionId);
-        rowEl.style.transition = 'all 0.25s';
-        rowEl.style.opacity = '0';
-        rowEl.style.transform = 'translateX(20px)';
-        setTimeout(() => {
-            rowEl.remove();
-            // If no more rows, show empty state
-            const body = document.getElementById('chp-body');
-            if (body && !body.querySelector('.chp-session-row')) {
-                body.innerHTML = `<div class="chp-empty">
-                    <span class="material-icons-round">chat_bubble_outline</span>
-                    <p>No saved chats yet.</p>
-                </div>`;
-            }
-        }, 280);
-    }
-
-    function _chRestoreSession(session) {
-        // Save current session first
-        _chSaveCurrentSession();
-        // Load selected session
-        _chatSessionId   = session.id;
-        _chatSessionName = session.name || 'New Chat';
-        _chatHistory     = session.messages ? session.messages.slice() : [];
-        _chatMsgCounter  = 0;
-        _chatPendingEditsMap = {};
-
-        // Clear and re-render messages
-        const box = document.getElementById('agent-chat-messages');
-        if (box) {
-            box.innerHTML = '';
-            _chatHistory.forEach((msg, idx) => {
-                if (msg.role === 'user') {
-                    _appendChatMsg('user', msg.text, msg.time, null, idx);
-                } else {
-                    _appendChatMsg('agent', msg.text, msg.time, null);
-                }
-            });
-        }
-
-        // Update session label
-        const lbl = document.getElementById('chat-session-label');
-        if (lbl) lbl.textContent = _chatSessionName;
-
-        showToast('Chat restored', 'history');
-    }
-    // ── Override openAgentBar to open inline chat instead ──
-    openAgentBar = function() {
-        openInlineChat();
-    };
-
-    // ── Keep openAgentModal working (for settings) ──
-    // No change needed — openAgentModal still opens the agent config modal
-
-    // ── Sync agent name whenever agent changes ──
-    const _origUpdateAgentBarLabel = _updateAgentBarLabel;
-    _updateAgentBarLabel = function() {
-        _origUpdateAgentBarLabel();
-        const ag = _activeAgent();
-        if (ag) {
-            const nameEl = document.getElementById('chat-agent-name');
-            if (nameEl) nameEl.textContent = ag.providerName;
-        }
-    };
-
-    // Editor upar (50%), chat neeche (50%) — seedha split screen
-
-    // _inlineChatOpen declared at script top (var) to avoid TDZ in visualViewport handler
-
-    // ── Conversation history for inline chat ──
-    // Each entry: {role: 'user'|'assistant', content: string}
-    // Special entries use role 'user' with content starting with [APPLIED] or [CONFIRMED] or [REJECTED]
-    let _inlineChatHistory = [];
-    const _HISTORY_MAX_TURNS = 6; // keep last 6 exchanges (12 messages) — less quota pressure
-
-    // ── Build history for API call ──
-    // Strips old code blocks from older turns but keeps ALL events: applied changes, feedback, rejections
-    function _buildHistoryForAPI() {
-        if (!_inlineChatHistory.length) return [];
-
-        // Keep last N turns
-        const history = _inlineChatHistory.slice(-(_HISTORY_MAX_TURNS * 2));
-
-        // Strip ALL code blocks from history — current message already has fresh code
-        // Only keep: user requests, AI explanations, applied/created/rejected summaries
-        const codeBlockRx = /```[\s\S]{100,}```/g;
-        return history.map(msg => {
-            if (msg.role === 'user') {
-                return { ...msg, content: msg.content.replace(codeBlockRx, '[code — see current message]').replace(/── FULL CODE[\s\S]*?```\n```/g, '').replace(/── CONTEXT ──[\s\S]*?── USER REQUEST ──\n/, '') };
-            }
-            return msg;
-        });
-    }
-
-    // Clear history when chat is closed
-    function _inlineClearHistory() { _inlineChatHistory = []; }
-
-    // ── Open / close toggle ──
-    function toggleInlineChat() {
-        if (_inlineChatOpen) {
-            closeInlineChat();
-        } else {
-            openInlineChat();
-        }
-    }
-
-    function openInlineChat() {
-        if (!_activeAgent()) { openAgentModal(); return; }
-        _inlineChatOpen = true;
-
-        const chatPanel = document.getElementById('inline-chat-panel');
-        const aiBtn     = document.getElementById('ai-agent-btn');
-
-        // Reset any stale inline styles
-        chatPanel.style.bottom = '';
-        chatPanel.style.height = '';
-        chatPanel.style.top = '';
-        chatPanel.style.transform = '';
-
-        chatPanel.classList.add('chat-open');
-        if (aiBtn) aiBtn.classList.add('chat-active');
-
-        const inner = document.getElementById('bottom-panel');
-        if(inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
-
-        const ag = _activeAgent();
-        if (ag) document.getElementById('inline-chat-name').textContent = ag.providerName;
-
-        // Sync chat mode button to current state (default ON)
-        const modeBtn  = document.getElementById('inline-chat-mode-btn');
-        const modeIcon = document.getElementById('chat-mode-icon');
-        const ta2      = document.getElementById('inline-chat-textarea');
-        if (_inlineChatModeOn) {
-            if (modeBtn)  { modeBtn.classList.add('mode-on'); modeBtn.style.background = ''; modeBtn.style.color = ''; }
-            if (modeIcon) { modeIcon.setAttribute('stroke', 'white'); modeIcon.setAttribute('fill', 'rgba(255,255,255,0.15)'); }
-            if (ta2)      ta2.placeholder = 'Chat only — no edits...';
-            const accessBtn = document.getElementById('chat-code-access-btn');
-            if (accessBtn) accessBtn.style.display = 'flex';
-        }
-
-        _inlinePopulateModels();
-        _inlinePopulateTabs();
-
-        setTimeout(() => {
-            const ta = document.getElementById('inline-chat-textarea');
-            if (ta) ta.focus();
-        }, 150);
-    }
-
-    // ── Clear conversation UI + memory (starts new session) ──
-    function _inlineClearChatUI() {
-        _chSaveCurrentSession();
-        _chNewSession();
-        _inlineClearHistory();
-        const box = document.getElementById('inline-chat-messages');
-        if (!box) return;
-        box.innerHTML = '<div id="inline-chat-empty">' +
-            '<span class="material-icons-round">chat</span>' +
-            '<p>Ask me about your code.<br>I can explain, fix &amp; apply changes.</p>' +
-            '<p style="font-size:9px;opacity:0.55;margin-top:6px;line-height:1.7;">' +
-            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' +
-            ' Chat mode &nbsp;·&nbsp; ' +
-            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
-            ' Edit mode — toggle via buttons below</p></div>';
-        showToast('New chat started', 'add_comment');
-    }
-
-    // ── Save on refresh/close ──
-    window.addEventListener('beforeunload', () => { _chSaveCurrentSession(); });
-
-    function closeInlineChat() {
-        _inlineChatOpen = false;
-        _inlineClearHistory();
-        const chatPanel = document.getElementById('inline-chat-panel');
-        const aiBtn     = document.getElementById('ai-agent-btn');
-        chatPanel.classList.remove('chat-open');
-        // Reset panel position completely
-        chatPanel.style.bottom = '0';
-        chatPanel.style.height = '';
-        chatPanel.style.transform = '';
-        if (aiBtn) aiBtn.classList.remove('chat-active');
-        // Restore body height + main-container
-        document.body.classList.remove('chat-kb-open');
-        const _mc = document.getElementById('editor-wrapper');
-        if (_mc) _mc.style.maxHeight = '';
-        _setBodyHeight();
-        const inner = document.getElementById('bottom-panel');
-        if(inner && !_navHidden && !_inPreview) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
-    }
-
-    // ── Auto resize textarea ──
-    setTimeout(function() {
-        const ta = document.getElementById('inline-chat-textarea');
-        if (!ta) return;
-        ta.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 80) + 'px';
-        });
-        ta.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) { e.stopPropagation(); }
-            if (e.key === 'Enter' && window.innerWidth >= 768) {
-                if (e.shiftKey) { return; }
-                e.preventDefault();
-                sendInlineChat();
-            }
-        });
-    }, 0);
-
-    // ── Scroll messages to bottom ──
-    function _inlineChatScroll() {
-        const box = document.getElementById('inline-chat-messages');
-        if (box) requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
-    }
-
-    // ── Append message bubble ──
-    // ── Markdown → HTML renderer with code canvas ──
-    function _renderMsgHTML(text) {
-        if (!text) return '';
-        const parts = [];
-        // Split on fenced code blocks ```lang\n...\n```
-        const codeRx = /```([^\n`]*)\n([\s\S]*?)```/g;
-        let last = 0, m;
-        while ((m = codeRx.exec(text)) !== null) {
-            if (m.index > last) parts.push({ type: 'text', content: text.slice(last, m.index) });
-            parts.push({ type: 'code', lang: (m[1] || '').trim() || 'code', content: m[2] });
-            last = m.index + m[0].length;
-        }
-        if (last < text.length) parts.push({ type: 'text', content: text.slice(last) });
-
-        return parts.map((p, idx) => {
-            if (p.type === 'code') {
-                const id = 'cc_' + Math.random().toString(36).slice(2, 8);
-
-                // Strip line numbers from canvas content
-                const strippedContent = p.content.replace(/^\d+\| ?/gm, '');
-                const escaped = strippedContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                const b64 = _b64Encode(strippedContent);
-
-                // Detect OLD/NEW + extract optional filename from lang tag
-                // Formats: "old", "new", "old:filename.ext", "new:filename.ext"
-                const langLower = p.lang.toLowerCase();
-                const isOld = /^old[:\s]|^original|^before|^current/.test(langLower);
-                const isNew = /^new[:\s]|^updated|^after|^replace/.test(langLower);
-                // Extract filename from "old:filename.ext" or "new:filename.ext"
-                const fileMatch = p.lang.match(/^(?:old|new)[:\s]+(.+)$/i);
-                const blockFile = fileMatch ? fileMatch[1].trim() : null;
-
-                // Find previous CODE part for Apply button pairing
-                let prevCodePart = null;
-                for (let i = idx - 1; i >= 0; i--) {
-                    if (parts[i].type === 'code') { prevCodePart = parts[i]; break; }
-                    if (parts[i].type === 'text' && parts[i].content.trim().length > 30) break;
-                }
-                const prevIsOld = prevCodePart && /^old[:\s]?|^original|^before|^current/.test(prevCodePart.lang.toLowerCase());
-                // Get filename from prev old block if available
-                const prevFileMatch = prevCodePart ? prevCodePart.lang.match(/^(?:old|new)[:\s]+(.+)$/i) : null;
-                const prevBlockFile = prevFileMatch ? prevFileMatch[1].trim() : null;
-
-                const applyBtn = (isNew && prevIsOld)
-                    ? '<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)"'
-                      + ' data-old="' + _b64Encode(prevCodePart.content.replace(/^\d+\| ?/gm,'')) + '"'
-                      + ' data-new="' + b64 + '"'
-                      + (blockFile || prevBlockFile ? ' data-file="' + (blockFile || prevBlockFile) + '"' : '')
-                      + ' data-b64="1" style="background:var(--accent);color:white;">'
-                      + '<span class="material-icons-round">auto_fix_high</span>Apply'
-                      + (blockFile || prevBlockFile ? ' to ' + (blockFile || prevBlockFile) : '')
-                      + '</button>'
-                    : '';
-
-                // Label: show file info if present
-                const blockLabel = blockFile
-                    ? (isOld ? '— ' : '+ ') + blockFile
-                    : p.lang;
-                const labelStyle = isOld ? 'color:#f87171;' : isNew ? 'color:#4ade80;' : '';
-
-                return '<div class="code-canvas">'
-                    + '<div class="code-canvas-header">'
-                    + '<span class="code-canvas-lang" style="' + labelStyle + '">' + blockLabel + '</span>'
-                    + '<button class="code-canvas-btn" onclick="_canvasOpenInEditor(this)" data-code="' + b64 + '" data-lang="' + p.lang + '" data-b64="1">'
-                    + '<span class="material-icons-round">open_in_new</span>Open</button>'
-                    + '<button class="code-canvas-btn" id="' + id + '" onclick="_canvasCopy(this)" data-code="' + b64 + '" data-b64="1">'
-                    + '<span class="material-icons-round">content_copy</span>Copy</button>'
-                    + applyBtn
-                    + '</div>'
-                    + '<div class="code-canvas-body">' + escaped + '</div>'
-                    + '</div>';
-            }
-            // Text: render inline markdown — preserve embedded SVGs, escape everything else
-            // Step 1: extract SVG fragments, replace with placeholders
-            const svgFragments = [];
-            let raw = p.content.replace(/<svg[\s\S]*?<\/svg>/g, (match) => {
-                svgFragments.push(match);
-                return '\x00SVG' + (svgFragments.length - 1) + '\x00';
-            });
-            // Step 2: HTML-escape the non-SVG text
-            let html = raw
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                .replace(/\*\*(.+?)\*\*/g, '<span class="chat-md-bold">$1</span>')
-                .replace(/`([^`]+)`/g, '<span class="chat-inline-code">$1</span>')
-                .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="chat-md-li" style="padding-left:18px;"><span style="position:absolute;left:0;color:var(--accent);font-weight:700;">$1.</span>$2</div>')
-                .replace(/^[-*]\s+(.+)$/gm, '<div class="chat-md-li">$1</div>')
-                .replace(/\n/g, '<br>');
-            // Step 3: restore SVG fragments
-            html = html.replace(/\x00SVG(\d+)\x00/g, (_, i) => svgFragments[+i] || '');
-            return html;
-        }).join('');
-    }
-
-    // ── Apply old→new block replacement ──
-    function _canvasApplyReplace(btn) {
-        let oldCode = _b64Decode(btn.dataset.old || '');
-        let newCode = _b64Decode(btn.dataset.new || '');
-        // Support data-file for multi-file apply
-        const targetFile = btn.dataset.file || null;
-        const targetFileTab = targetFile
-            ? (fileTabs.find(t => t.name === targetFile) || fileTabs.find(t => t.name.toLowerCase() === targetFile.toLowerCase()))
-            : null;
-        const current = targetFileTab ? targetFileTab.content : editor.getValue();
-
-        // Strategy 1: exact match
-        let matched = current.includes(oldCode);
-        let matchedOld = oldCode;
-
-        // Strategy 2: trim leading/trailing blank lines from old block
-        if (!matched) {
-            const trimmed = oldCode.replace(/^\s*\n/, '').replace(/\n\s*$/, '');
-            if (trimmed !== oldCode && current.includes(trimmed)) {
-                matched = true;
-                matchedOld = trimmed;
-            }
-        }
-
-        // Strategy 3: normalize indentation
-        if (!matched) {
-            const oldLines = oldCode.split('\n');
-            const minIndent = oldLines
-                .filter(l => l.trim().length > 0)
-                .reduce((min, l) => Math.min(min, l.match(/^(\s*)/)[1].length), Infinity);
-            if (minIndent > 0 && isFinite(minIndent)) {
-                const stripped = oldLines.map(l => l.slice(minIndent)).join('\n').trim();
-                if (current.includes(stripped)) { matched = true; matchedOld = stripped; }
-            }
-        }
-
-        // Strategy 4: trim all lines + collapse whitespace per line (handles AI adding/removing trailing spaces)
-        if (!matched) {
-            const normalizeWS = s => s.split('\n').map(l => l.trimEnd()).join('\n').trim();
-            const normOld = normalizeWS(oldCode);
-            const normCurrent = normalizeWS(current);
-            if (normCurrent.includes(normOld)) {
-                // Find original position in current
-                const normIdx = normCurrent.indexOf(normOld);
-                // Count newlines before match to find line number
-                const linesBefore = normCurrent.slice(0, normIdx).split('\n').length - 1;
-                const linesInBlock = normOld.split('\n').length;
-                const currentLines = current.split('\n');
-                matchedOld = currentLines.slice(linesBefore, linesBefore + linesInBlock).join('\n');
-                if (current.includes(matchedOld)) matched = true;
-            }
-        }
-
-        // Strategy 5: fuzzy first+last line match — find block by matching first and last significant lines
-        if (!matched) {
-            const oldTrimLines = oldCode.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-            if (oldTrimLines.length >= 2) {
-                const firstLine = oldTrimLines[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const lastLine  = oldTrimLines[oldTrimLines.length-1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                try {
-                    const fuzzyRx = new RegExp('[^\\n]*' + firstLine + '[\\s\\S]*?' + lastLine + '[^\\n]*');
-                    const fm = current.match(fuzzyRx);
-                    if (fm && fm[0].split('\n').length <= oldCode.split('\n').length + 5) {
-                        matched = true; matchedOld = fm[0];
-                    }
-                } catch(e) {}
-            }
-        }
-
-        if (matched) {
-            // Preserve indentation: detect leading indent of matched block and apply to newCode
-            const leadingIndent = (matchedOld.match(/^([ \t]*)/) || ['', ''])[1];
-            const indentedNew = leadingIndent
-                ? newCode.split('\n').map((l, i) => i === 0 ? l : leadingIndent + l).join('\n')
-                : newCode;
-
-            const updated = current.replace(matchedOld, indentedNew);
-            if (targetFileTab) {
-                targetFileTab.content = updated;
-                if (targetFileTab.id !== activeTabId) {
-                    switchFileTab(targetFileTab.id);
-                } else {
-                    editor.setValue(updated, -1);
-                }
-                if (targetFileTab.id === activeTabId) editor.setValue(updated, -1);
-            } else {
-                const curTab = fileTabs.find(t => t.id === activeTabId);
-                if (curTab) curTab.content = updated;
-                editor.setValue(updated, -1);
-            }
-            showToast('Applied ✓' + (targetFile ? ' to ' + targetFile : ''), 'auto_fix_high');
-            btn.innerHTML = '<span class="material-icons-round">check</span>Applied';
-            btn.style.background = '#16a34a';
-            btn.onclick = null;
-        } else {
-            btn.innerHTML = '<span class="material-icons-round">search_off</span>No Match';
-            btn.style.background = '#dc2626';
-            btn.onclick = null;
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'code-canvas-btn';
-            retryBtn.style.cssText = 'background:rgba(245,158,11,0.2);color:#f59e0b;margin-left:4px;';
-            retryBtn.innerHTML = '<span class="material-icons-round">replay</span>Retry AI';
-            retryBtn.onclick = () => _canvasRetryMatch(oldCode, newCode, retryBtn);
-            btn.parentNode.insertBefore(retryBtn, btn.nextSibling);
-        }
-    }
-
-    // ── Retry: send old block back to AI asking for correction ──
-    function _canvasRetryMatch(oldCode, newCode, btn) {
-        btn.innerHTML = '<span class="material-icons-round">hourglass_empty</span>Asking AI...';
-        btn.onclick = null;
-        const ta = document.getElementById('inline-chat-textarea');
-        if (!ta) return;
-        const currentCode = editor.getValue();
-        const numbered = currentCode.split('\n').map((l,i) => `${i+1}| ${l}`).join('\n');
-        ta.value = `The OLD BLOCK you gave me doesn't match anything in my current code.\n\nOLD BLOCK you sent:\n\`\`\`\n${oldCode}\n\`\`\`\n\nMy CURRENT CODE (with line numbers):\n\`\`\`\n${numbered}\n\`\`\`\n\nPlease find the correct matching block in my current code and send the correct OLD BLOCK and NEW BLOCK again.`;
-        sendInlineChat();
-    }
-
-    // ── Safe base64 decode — handles Unicode properly ──
-    function _b64Decode(str) {
-        try {
-            // Modern approach: binary -> Uint8Array -> TextDecoder
-            const bin = atob(str);
-            const bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            return new TextDecoder('utf-8').decode(bytes);
-        } catch(e) {
-            // Fallback
-            try { return decodeURIComponent(escape(atob(str))); } catch(e2) { return atob(str); }
-        }
-    }
-    // ── Safe base64 encode — handles Unicode properly ──
-    function _b64Encode(str) {
-        try {
-            const bytes = new TextEncoder().encode(str);
-            let bin = '';
-            bytes.forEach(b => bin += String.fromCharCode(b));
-            return btoa(bin);
-        } catch(e) {
-            return btoa(unescape(encodeURIComponent(str)));
-        }
-    }
-    function _canvasDecodeCode(btn) {
-        if (btn.dataset.b64) return _b64Decode(btn.dataset.code || '');
-        return decodeURIComponent(btn.dataset.code || '');
-    }
-
-    function _canvasCopy(btn) {
-        const code = _canvasDecodeCode(btn);
-        navigator.clipboard.writeText(code).then(() => {
-            btn.classList.add('copied');
-            btn.innerHTML = '<span class="material-icons-round">check</span>Copied';
-            setTimeout(() => {
-                btn.classList.remove('copied');
-                btn.innerHTML = '<span class="material-icons-round">content_copy</span>Copy';
-            }, 1800);
-        });
-    }
-
-    function _canvasOpenInEditor(btn) {
-        const code = _canvasDecodeCode(btn);
-        const lang = btn.dataset.lang || '';
-        const ext = { javascript:'js', js:'js', typescript:'ts', python:'py', html:'html', css:'css', json:'json', bash:'sh', shell:'sh' }[lang.toLowerCase()] || 'txt';
-        openFileInTab('snippet.' + ext, code, true);
-        showToast('Opened in editor', 'open_in_new');
-    }
-
-    function _inlineAppendMsg(role, text, extraEl) {
-        const box = document.getElementById('inline-chat-messages');
-        const empty = document.getElementById('inline-chat-empty');
-        if (empty) empty.remove();
-
-        const wrap = document.createElement('div');
-        wrap.className = 'chat-msg ' + role;
-
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble';
-
-        if (role === 'agent' && text) {
-            bubble.innerHTML = _renderMsgHTML(text);
-        } else if (text) {
-            bubble.innerHTML = text
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                .replace(/\n/g, '<br>');
-        }
-
-        // Footer: timestamp + copy button
-        const footer = document.createElement('div');
-        footer.className = 'chat-msg-footer';
-
-        const ts = document.createElement('div');
-        ts.className = 'chat-time';
-        ts.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-
-        // Model badge — only for agent messages when meta is available
-        if (role === 'agent' && window._lastCallMeta?.model) {
-            const meta = window._lastCallMeta;
-            const shortModel = meta.model.split('/').pop(); // e.g. "qwen3-235b-a22b"
-            const isThinking = meta.reasoning_tokens > 0;
-            const badge = document.createElement('div');
-            badge.style.cssText = 'font-size:9px;font-weight:600;color:var(--accent);opacity:0.75;font-family:Poppins,sans-serif;display:flex;align-items:center;gap:3px;';
-            badge.innerHTML = (isThinking ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="14" x2="22" y2="14"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="14" x2="4" y2="14"/></svg> ' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ') + shortModel + (isThinking ? ' · ' + meta.reasoning_tokens + ' think tokens' : '');
-            footer.appendChild(badge);
-        }
-
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'chat-copy-btn';
-        copyBtn.innerHTML = '<span class="material-icons-round">content_copy</span>';
-        copyBtn.title = 'Copy';
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(text).then(() => {
-                copyBtn.classList.add('copied');
-                copyBtn.innerHTML = '<span class="material-icons-round">check</span>';
-                setTimeout(() => {
-                    copyBtn.classList.remove('copied');
-                    copyBtn.innerHTML = '<span class="material-icons-round">content_copy</span>';
-                }, 1500);
-            });
-        };
-
-        footer.appendChild(ts);
-        footer.appendChild(copyBtn);
-        wrap.appendChild(bubble);
-        if (extraEl) bubble.appendChild(extraEl);
-        wrap.appendChild(footer);
-        box.appendChild(wrap);
-        _inlineChatScroll();
-        return bubble;
-    }
-
-    // ── Typing indicator + live activity log ──
-    let _statusTimer = null;
-
-    function _inlineShowTyping() {
-        const box = document.getElementById('inline-chat-messages');
-        const empty = document.getElementById('inline-chat-empty');
-        if (empty) empty.remove();
-        const existing = document.getElementById('inline-typing');
-        if (existing) existing.remove();
-
-        const wrap = document.createElement('div');
-        wrap.className = 'chat-msg agent';
-        wrap.id = 'inline-typing';
-
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble';
-        bubble.style.cssText = 'padding:0;overflow:hidden;min-width:220px;max-width:100%;';
-
-        // Header: icon + status text + dots
-        const hdr = document.createElement('div');
-        hdr.id = 'ipt-header';
-        hdr.style.cssText = 'display:flex;align-items:center;gap:7px;padding:8px 11px;';
-
-        const icon = document.createElement('span');
-        icon.id = 'inline-status-icon';
-        icon.style.cssText = 'font-size:13px;flex-shrink:0;';
-        icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
-
-        const txt = document.createElement('span');
-        txt.id = 'inline-status-text';
-        txt.style.cssText = 'font-size:10px;font-weight:700;font-family:Poppins,sans-serif;color:var(--accent);flex:1;';
-        txt.textContent = 'Generating...';
-
-        const dots = document.createElement('div');
-        dots.id = 'ipt-dots';
-        dots.style.cssText = 'display:flex;gap:3px;flex-shrink:0;';
-        for (let i = 0; i < 3; i++) {
-            const d = document.createElement('span');
-            d.style.cssText = 'width:4px;height:4px;border-radius:50%;background:var(--accent);animation:agentBounce 0.8s ' + (i*0.2) + 's infinite;display:inline-block;';
-            dots.appendChild(d);
-        }
-
-        hdr.appendChild(icon);
-        hdr.appendChild(txt);
-        hdr.appendChild(dots);
-
-        // Live activity log — always visible, taller
-        const log = document.createElement('div');
-        log.id = 'ipt-log';
-        log.style.cssText = 'border-top:1px solid var(--glass-border);max-height:110px;overflow-y:auto;padding:5px 11px 6px;display:flex;flex-direction:column;gap:2px;';
-
-        bubble.appendChild(hdr);
-        bubble.appendChild(log);
-        wrap.appendChild(bubble);
-        box.appendChild(wrap);
-        // First log line — immediately visible
-        const _initLine = document.createElement('div');
-        _initLine.style.cssText = 'font-size:9px;font-family:"Courier New",monospace;color:var(--accent);opacity:0.55;';
-        _initLine.textContent = '› Building prompt...';
-        log.appendChild(_initLine);
-        _inlineChatScroll();
-    }
-
-    // Push a timestamped line to the live activity log
-    function _inlineLogActivity(text) {
-        const log = document.getElementById('ipt-log');
-        if (!log) return;
-        const now = new Date();
-        const ts = now.getSeconds().toString().padStart(2,'0') + '.' + Math.floor(now.getMilliseconds()/100);
-        const line = document.createElement('div');
-        line.style.cssText = 'font-size:9px;font-family:"Courier New",monospace;color:var(--text-color);opacity:0.75;display:flex;gap:5px;line-height:1.4;';
-        const tsEl = document.createElement('span');
-        tsEl.style.cssText = 'color:var(--accent);opacity:0.45;flex-shrink:0;';
-        tsEl.textContent = ':' + ts;
-        const msgEl = document.createElement('span');
-        msgEl.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-        msgEl.textContent = text;
-        line.appendChild(tsEl);
-        line.appendChild(msgEl);
-        log.appendChild(line);
-        log.scrollTop = log.scrollHeight;
-        _inlineChatScroll();
-    }
-
-    function _inlineUpdateTypingStatus(icon, text, promptChars) {
-        const iconEl = document.getElementById('inline-status-icon');
-        const textEl = document.getElementById('inline-status-text');
-        if (!textEl) return;
-        if (iconEl) iconEl.innerHTML = icon;
-        textEl.textContent = text + (promptChars != null ? '  ' + (promptChars/1024).toFixed(1) + 'k' : '');
-        _inlineLogActivity(text + (promptChars != null ? ' (' + (promptChars/1024).toFixed(1) + 'k)' : ''));
-    }
-
-    function _inlineHideTyping() {
-        clearInterval(_statusTimer);
-        _statusTimer = null;
-        // Fully remove typing indicator — prevents content overlap
-        const wrap = document.getElementById('inline-typing');
-        if (wrap) wrap.remove();
-    }
-
-    //  NEW AGENT WORKFLOW — Single API call, AI decides
-    //  No regex intent detection — AI handles everything
-
-    const _AGENT_SYSTEM_PROMPT = `You are CodX Assistant, an expert AI coding assistant built into the CodX editor. If the user asks your name, you are "CodX Assistant".
-You receive code with LINE NUMBERS like "42| code here".
-Full chat history is included every call — use it to understand context of what has been done before.
-
-YOUR JOB: Fulfil exactly what the user asks. Nothing more, nothing less. The user's request is the source of truth.
-
-QUALITY STANDARD:
-- Every UI you build must be modern, well-designed, and polished — clean layouts, smooth animations, good typography
-- Use SVG icons (inline) — never rely on external icon libraries
-- Code must be clean, well-organised, and professional
-- Fully functional — no placeholders, no "TODO", no incomplete sections
-
-DECIDE THE RESPONSE TYPE YOURSELF based on what the user wants:
-
-─── EXPLAIN (question / review / chat / greetings) ───
-Reply in plain text. Same language as user (English/Hindi/Hinglish).
-
-─── EDIT (fix / change / add / remove / improve in existing code) ───
-If editing ONE file, return ONLY this JSON:
-{"type":"edit","explanation":"what changed","edits":[{"line_start":N,"line_end":N,"replace":"new code here"}]}
-
-If editing MULTIPLE files (when context files are provided and need changes too), return ONLY this JSON:
-{"type":"multi_edit","explanation":"what changed","files":[{"filename":"exact-file-name.ext","edits":[{"line_start":N,"line_end":N,"replace":"new code here"}]}]}
-
-Use exact line numbers shown for each file. replace = complete replacement lines.
-
-─── NEW FILE (create a new file from scratch) ───
-Return ONLY this JSON, nothing else:
-{"type":"new_file","explanation":"what it does","filename":"name.ext","content":"complete file content"}
-
-─── SPLIT (break one file into multiple files) ───
-Return ONLY this JSON, nothing else:
-{"type":"split","explanation":"what was split","files":[{"filename":"name.ext","content":"complete file content","reason":"why"}]}
-
-─── REORGANIZE (restructure / reorder the whole file) ───
-Return ONLY this JSON with COMPLETE file content:
-{"type":"reorganize","explanation":"what changed","content":"entire file content here"}
-
-STRICT FORMAT RULES:
-- Return ONLY JSON for edit/new_file/split/reorganize — no markdown fences, no text outside JSON
-- Never truncate — write every single line completely
-- Never hallucinate line numbers — only use line numbers visible in the provided code
-- In JSON strings: escape " as \\" and newlines as \\n`;
-
-    // ── Robust JSON parser — shared across all agent response handlers ──
-    function _tryParseJSON(str) {
-        if (!str) return null;
-        // Quick guard — if no "type" key, this is not an agent JSON response
-        if (!str.includes('"type"')) return null;
-
-        // Strategy 1: strip markdown fences then parse whole string
-        let clean = str.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-        try { const p = JSON.parse(clean); if (p && p.type) return p; } catch(_) {}
-
-        // Strategy 2: extract outermost { } block using brace matching
-        const start = str.indexOf('{');
-        if (start !== -1) {
-            let depth = 0, end = -1;
-            for (let i = start; i < str.length; i++) {
-                if (str[i] === '{') depth++;
-                else if (str[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
-            }
-            if (end !== -1) {
-                try { const p = JSON.parse(str.slice(start, end + 1)); if (p && p.type) return p; } catch(_) {}
-            }
-        }
-
-        // Strategy 3: only fix trailing commas — no other replacements (they corrupt HTML/CSS content)
-        try {
-            const s3 = str.indexOf('{');
-            if (s3 !== -1) {
-                let d3 = 0, e3 = -1;
-                for (let i = s3; i < str.length; i++) {
-                    if (str[i] === '{') d3++;
-                    else if (str[i] === '}') { d3--; if (d3 === 0) { e3 = i; break; } }
-                }
-                if (e3 !== -1) {
-                    const fixed = str.slice(s3, e3 + 1).replace(/,(\s*[}\]])/g, '$1');
-                    const p = JSON.parse(fixed);
-                    if (p && p.type) return p;
-                }
-            }
-        } catch(_) {}
-
-        return null;
-    }
-
-    async function sendInlineChat() {
-        if (!_activeAgent()) {
-            const box = document.getElementById('inline-chat-messages');
-            if (box && !document.getElementById('inline-no-agent-banner')) {
-                const banner = document.createElement('div');
-                banner.id = 'inline-no-agent-banner';
-                banner.style.cssText = 'margin:12px;padding:14px;border-radius:14px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;';
-                banner.innerHTML = `<span class="material-icons-round" style="font-size:28px;color:var(--accent);">smart_toy</span>
-                    <div style="font-size:12px;font-weight:700;color:var(--text-color);font-family:'Poppins',sans-serif;">No Agent Connected</div>
-                    <div style="font-size:11px;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;line-height:1.5;">Connect a free AI agent to start chatting.<br>Groq is free &amp; super fast.</div>
-                    <button onclick="openAgentModal();document.getElementById('inline-no-agent-banner')?.remove();" style="background:var(--accent);color:white;border:none;border-radius:10px;padding:9px 20px;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;">
-                        <span class="material-icons-round" style="font-size:15px;pointer-events:none;">add_circle</span>Add Agent
-                    </button>`;
-                box.appendChild(banner);
-                _inlineChatScroll();
-            }
-            return;
-        }
-
-        const ta = document.getElementById('inline-chat-textarea');
-        const userRequest = ta.value.trim();
-        if (!userRequest) return;
-
-        _inlineAppendMsg('user', userRequest);
-        requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
-        // ── Sync to _chatHistory + instant save ──
-        if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
-        _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
-        _chSaveCurrentSession();
-
-        const sendBtn = document.getElementById('inline-chat-send-btn');
-
-        // ── Switch to STOP button — batch both changes in one rAF to prevent flicker ──
-        const _inlineAbortCtrl = new AbortController();
-        requestAnimationFrame(() => {
-            sendBtn.innerHTML = '<span class="material-icons-round">stop</span>';
-            sendBtn.style.background = '#ef4444';
-        });
-        sendBtn.onclick = () => {
-            _inlineAbortCtrl.abort();
-            sendBtn.onclick = sendInlineChat; // restore immediately so button is never dead
-            requestAnimationFrame(() => {
-                sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
-                sendBtn.style.background = '';
-            });
-        };
-
-        _inlineShowTyping();
-        // Double rAF: first commits DOM paint, second runs after browser has actually rendered
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        // ── Target file ──
-        const _isNewFileMode = _inlineSelectedTabId === 'new';
-        if (!_isNewFileMode && _inlineSelectedTabId) _agentTargetTabId = _inlineSelectedTabId;
-        const targetTab = _isNewFileMode ? null : (fileTabs.find(t => t.id === (_agentTargetTabId || activeTabId)) || fileTabs.find(t => t.id === activeTabId));
-        const curTab = fileTabs.find(t => t.id === activeTabId);
-        if (curTab) curTab.content = editor.getValue();
-        const code = (!_isNewFileMode && targetTab && (!_inlineChatModeOn || _chatCodeAccessOn)) ? targetTab.content : '';
-        const filename = (!_isNewFileMode && targetTab) ? targetTab.name : '';
-
-        // ── Code with line numbers (no truncation — all providers support large context) ──
-        const _provider = _activeAgent()?.provider || '';
-        let numberedCode = code ? code.split('\n').map((l,i) => `${i+1}| ${l}`).join('\n') : '';
-        _inlineLogActivity('Code: ' + (numberedCode.length/1024).toFixed(1) + 'k (' + code.split('\n').length + ' lines)');
-
-        // ── Context files (user explicitly ticked) ──
-        let otherFilesCtx = '';
-        let contextFileNames = [];
-        if (_inlineContextTabIds && _inlineContextTabIds.size > 0) {
-            _inlineContextTabIds.forEach(tid => {
-                if (tid === (targetTab ? targetTab.id : activeTabId)) return;
-                const t = fileTabs.find(f => f.id === tid);
-                if (!t || !t.content?.trim()) return;
-                const safeContent = t.content.replace(/`/g, '\u0060');
-                // Add line numbers to context files so AI can give correct line numbers for multi_edit
-                const numberedCtx = safeContent.split('\n').map((l, i) => (i+1) + '| ' + l).join('\n');
-                otherFilesCtx += '\n\n── CONTEXT FILE: ' + t.name + ' (editable) ──\n```\n' + numberedCtx + '\n```';
-                contextFileNames.push(t.name);
-            });
-        }
-
-        // ── Attachment ──
-        const attachCtx = _inlineAttachment ? `\n\n── ATTACHED FILE (${_inlineAttachment.name}) ──\n${_inlineAttachment.content.slice(0,2000)}` : '';
-        _inlineClearAttach();
-
-        // ── Session events ──
-        const sessionEvents = _inlineChatHistory
-            .filter(m => m.content.startsWith('[APPLIED') || m.content.startsWith('[CREATED') || m.content.startsWith('[SPLIT') || m.content.startsWith('[REORGANIZED') || m.content.startsWith('[USER CONFIRMED') || m.content.startsWith('[USER DECLINED'))
-            .map(m => m.content).join('\n');
-        const sessionBlock = sessionEvents ? `\n\n── SESSION EVENTS ──\n${sessionEvents}` : '';
-
-        // ── Final message to AI ──
-        const codeBlock = (!_isNewFileMode && numberedCode)
-            ? '\n\n── FULL CODE (with line numbers) ──\n```\n' + numberedCode + '\n```'
-            : '';
-        const contextLabel = contextFileNames.length > 0
-            ? '\n── TARGET: ' + (targetTab ? targetTab.name : 'current') + ' | CONTEXT: ' + contextFileNames.join(', ') + ' ──'
-            : '';
-        const userMsg = '── CONTEXT ──' + contextLabel + sessionBlock + codeBlock + otherFilesCtx + attachCtx + '\n\n── USER REQUEST ──\n' + userRequest;
-
-        // ── Show prompt info in live log ──
-        const historyForAPI = _buildHistoryForAPI();
-        if (!_isNewFileMode && targetTab) _inlineLogActivity('Target: ' + targetTab.name);
-        if (historyForAPI.length > 0)     _inlineLogActivity('History: ' + historyForAPI.length + ' msgs');
-        _inlineLogActivity('Prompt ready: ' + (userMsg.length/1024).toFixed(1) + 'k chars');
-        _inlineUpdateTypingStatus('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>', 'Generating...', userMsg.length);
-
-        try {
-            _inlineLogActivity('Calling ' + (_activeAgent()?.providerName || 'AI') + '...');
-            // ── Mode context prefix ──
-            const _modeCtx = _pythonMode
-                ? `\nCURRENT MODE: Python (Pyodide v0.26.2 — CPython 3.12 in browser via WebAssembly).
-PYODIDE RULES — follow strictly or code will break:
-1. NEVER use input() — no stdin in browser.
-2. NEVER use requests, urllib, httpx — no direct network calls (CORS blocked). Use js.fetch if HTTP needed.
-3. NEVER use tkinter, pygame, wx, PyQt — no GUI libraries.
-4. NEVER write files with open('file','w') to filesystem — browser sandbox, use in-memory only.
-5. NEVER use plt.show() — use plt.savefig(buf, format='png') + base64 to display images.
-6. stdlib is fully available: math, json, re, datetime, random, itertools, collections, functools, os.path etc.
-7. numpy, pandas, scipy ARE available (auto-loaded). Always write pure Pyodide-compatible code.
-8. All code runs in a single execution context — print() output appears in the Preview panel.
-9. Only write .py files. Never generate HTML/CSS/JS.`
-                : `\nCURRENT MODE: HTML/Web. Write HTML, CSS, JavaScript as needed.`;
-            // ── Chat Mode: use a pure-conversation system prompt ──
-            const _multiFileCtx = contextFileNames.length > 0
-                ? '\nMULTI-FILE: Target=' + (targetTab ? targetTab.name : 'current') + ' Context=' + contextFileNames.join(',') + '. Show OLD/NEW blocks per file with filename label.'
-                : '';
-            const activeSystemPrompt = _inlineChatModeOn
-                ? 'You are CodX Assistant, an AI coding assistant built into the CodX editor. If the user asks your name, you are "CodX Assistant".' + _modeCtx + _multiFileCtx + '\nRules:\n1. NEVER return JSON. Only respond in plain text.\n2. Show code in fenced code blocks.\n3. For code changes in ONE file use:\n**filename — Lines X-Y:**\n```old\n<old code no line numbers>\n```\n```new\n<new code no line numbers>\n```\n4. For MULTIPLE files repeat per file with filename in lang tag:\n```old:filename.ext\n<old code>\n```\n```new:filename.ext\n<new code>\n```\n5. Line numbers in bold label ONLY, never inside code blocks.\n6. Be clear and concise. Match user language (English/Hindi/Hinglish).'
-                : _AGENT_SYSTEM_PROMPT + _modeCtx;
-            const raw = await _callAgentAPI(activeSystemPrompt, userMsg, historyForAPI, _inlineAbortCtrl);
-            _inlineLogActivity('Response: ' + (raw.length/1024).toFixed(1) + 'k received');
-            _inlineHideTyping();
-
-            if (!raw?.trim()) {
-                _inlineAppendMsg('agent', '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Empty response. Try again or switch model.');
-                return;
-            }
-
-            // Save to history
-            _inlineChatHistory.push({ role: 'user', content: userMsg });
-            _inlineChatHistory.push({ role: 'assistant', content: raw });
-            // ── Sync agent reply + save ──
-            _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
-            _chSaveCurrentSession();
-
-            const parsed = _tryParseJSON(raw);
-
-            // ── Detect truncated JSON — warn user ──
-            const looksLikeJSON = raw.trimStart().startsWith('{') && raw.includes('"type"');
-            const isTruncated = looksLikeJSON && !parsed;
-            if (isTruncated) {
-                _inlineAppendMsg('agent', '⚠ Response was cut off (too long). Try switching to a model with larger output limit, or break your request into smaller parts.');
-                return;
-            }
-
-            // ── BOTH modes: if AI returned JSON edit/multi_edit, always show apply cards ──
-            if (parsed && (parsed.type === 'edit' || parsed.type === 'multi_edit')) {
-                if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                if (parsed.type === 'edit') {
-                    if (Array.isArray(parsed.edits) && parsed.edits.length) {
-                        _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
-                    }
-                } else if (parsed.type === 'multi_edit') {
-                    (parsed.files || []).forEach(mf => {
-                        const mTab = fileTabs.find(t => t.name === mf.filename)
-                                  || fileTabs.find(t => t.name.toLowerCase() === (mf.filename||'').toLowerCase());
-                        if (!mTab) { _inlineAppendMsg('agent', '⚠ File not found: ' + mf.filename); return; }
-                        if (Array.isArray(mf.edits) && mf.edits.length) {
-                            _inlineAppendMsg('agent', mf.filename + ':', null);
-                            _inlineAppendMsg('agent', '', _buildInlineEditCard(mf.edits, mTab));
-                        }
-                    });
-                }
-                return;
-            }
-
-            // ── Chat mode — plain text only ──
-            if (_inlineChatModeOn) {
-                _inlineAppendMsg('agent', raw.trim());
-                return;
-            }
-
-            // ── Plain text / explanation ──
-            if (!parsed || !parsed.type) {
-                _inlineAppendMsg('agent', raw.trim());
-
-            // ── Edit ──
-            } else if (parsed.type === 'edit') {
-                if (!Array.isArray(parsed.edits) || parsed.edits.length === 0) {
-                    _inlineAppendMsg('agent', parsed.explanation || 'No changes needed.');
-                } else {
-                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                    _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
-                }
-
-            // ── Multi-file Edit ──
-            } else if (parsed.type === 'multi_edit') {
-                const mfiles = parsed.files || [];
-                if (!mfiles.length) {
-                    _inlineAppendMsg('agent', parsed.explanation || 'No changes needed.');
-                } else {
-                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                    mfiles.forEach(mf => {
-                        // Find the tab by filename
-                        const mTab = fileTabs.find(t => t.name === mf.filename)
-                                  || fileTabs.find(t => t.name.toLowerCase() === (mf.filename || '').toLowerCase());
-                        if (!mTab) {
-                            _inlineAppendMsg('agent', '⚠ File not found in editor: ' + mf.filename);
-                            return;
-                        }
-                        if (!Array.isArray(mf.edits) || !mf.edits.length) return;
-                        _inlineAppendMsg('agent', '', _buildInlineEditCard(mf.edits, mTab));
-                    });
-                }
-
-            // ── New file ──
-            } else if (parsed.type === 'new_file') {
-                const fname = parsed.filename || 'new-file.html';
-                const content = parsed.content || '';
-                if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                _inlineAppendMsg('agent', '', _buildConfirmCard({
-                    type: 'new_file', icon: 'add_circle',
-                    title: `New file: ${fname}`,
-                    lines: [content.split('\n').length + ' lines'],
-                    onApply: () => {
-                        _agentUndoStack.push({ type: 'new_file', filename: fname });
-                        if (_agentUndoStack.length > 5) _agentUndoStack.shift();
-                        openFileInTab(fname, content, true);
-                        _inlineChatHistory.push({ role: 'assistant', content: `[CREATED FILE: ${fname}]` });
-                        _inlineSelectedTabId = activeTabId; _agentTargetTabId = activeTabId;
-                        _inlineRenderFileDropdown();
-                        showToast(`${fname} created`, 'add_circle');
-                    }
-                }));
-
-            // ── Split ──
-            } else if (parsed.type === 'split') {
-                const files = parsed.files || [];
-                if (!files.length) {
-                    _inlineAppendMsg('agent', '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> AI returned no files. Try again.');
-                } else {
-                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                    _inlineAppendMsg('agent', '', _buildConfirmCard({
-                        type: 'split', icon: 'call_split',
-                        title: `Split into ${files.length} file${files.length>1?'s':''}`,
-                        lines: files.map(f => f.filename + (f.reason ? ' — ' + f.reason : '')),
-                        onApply: () => {
-                            files.forEach(f => openFileInTab(f.filename, f.content || '', true));
-                            _inlineChatHistory.push({ role: 'assistant', content: `[SPLIT INTO ${files.length} FILES: ${files.map(f=>f.filename).join(', ')}]` });
-                            showToast(`${files.length} files created`, 'call_split');
-                        }
-                    }));
-                }
-
-            // ── Reorganize ──
-            } else if (parsed.type === 'reorganize') {
-                if (!parsed.content) {
-                    _inlineAppendMsg('agent', '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> AI returned empty content. Try again.');
-                } else {
-                    const rTab = targetTab;
-                    const oldContent = rTab ? rTab.content : editor.getValue();
-                    const newContent = parsed.content;
-                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                    _inlineAppendMsg('agent', '', _buildConfirmCard({
-                        type: 'reorganize', icon: 'reorder',
-                        title: `Reorganized — ${newContent.split('\n').length} lines`,
-                        lines: [`${oldContent.split('\n').length} → ${newContent.split('\n').length} lines`],
-                        onApply: () => {
-                            const cleaned = newContent.split('\n').map(l=>l.replace(/\s+$/,'')).join('\n').replace(/\n{3,}/g,'\n\n').trimEnd();
-                            _agentUndoStack.push({ type: 'edit_content', tab: rTab, content: oldContent });
-                            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
-                            if (rTab) rTab.content = cleaned;
-                            if (!rTab || rTab.id === activeTabId) editor.setValue(cleaned, -1);
-                            else { switchFileTab(rTab.id); editor.setValue(cleaned, -1); }
-                            _inlineChatHistory.push({ role: 'assistant', content: `[REORGANIZED FILE — ${cleaned.split('\n').length} lines]` });
-                            showToast('File reorganized', 'reorder');
-                        }
-                    }));
-                }
-
-            // ── Unknown type — show as text ──
-            } else {
-                _inlineAppendMsg('agent', parsed.explanation || raw.trim());
-            }
-
-        } catch(err) {
-            _inlineHideTyping();
-            const msg = err.message || '';
-            if (msg === '__RATE_LIMIT_SHOWN__') return;
-            if (msg === '__USER_ABORTED__') {
-                _inlineAppendMsg('agent', '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline;vertical-align:middle;pointer-events:none;"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Stopped.');
-                return;
-            }
-            const errEl = _buildErrorCard(msg);
-            const wrap = document.createElement('div');
-            wrap.className = 'chat-msg agent';
-            wrap.appendChild(errEl);
-            const box = document.getElementById('inline-chat-messages');
-            if (box) { box.appendChild(wrap); _inlineChatScroll(); }
-        } finally {
-            // Restore onclick immediately — never leave button dead
-            sendBtn.disabled = false;
-            sendBtn.onclick = sendInlineChat;
-            // Visuals batched in rAF to prevent flash
-            requestAnimationFrame(() => {
-                sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
-                sendBtn.style.background = '';
-            });
-            _inlineChatScroll();
-        }
-    }
-
-    // ── Gemini rate limit warning — shown in chat as compact bar ──
-    function _geminiWarnInChat(model, type, used, limit) {
-        const warnId = 'gemini-warn-' + model.replace(/\./g,'_') + '-' + type;
-        if (document.getElementById(warnId)) return; // already shown
-        const shortModel = model.replace('gemini-2.5-','').replace('flash-lite','Lite').replace('flash','Flash').replace('pro','Pro');
-        const label = type === 'rpm' ? `${used}/${limit} req/min` : `${used}/${limit} req/day`;
-        const pct = Math.round(used/limit*100);
-        const warn = document.createElement('div');
-        warn.id = warnId;
-        warn.className = 'chat-msg agent';
-        warn.innerHTML = `<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:7px 11px;display:flex;align-items:center;gap:8px;max-width:100%;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:10px;font-weight:700;color:#f59e0b;font-family:Poppins,sans-serif;">${shortModel} — ${pct}% ${type === 'rpm' ? 'minute' : 'daily'} quota used</div>
-                <div style="height:3px;background:rgba(245,158,11,0.15);border-radius:2px;margin-top:4px;"><div style="height:100%;width:${pct}%;background:#f59e0b;border-radius:2px;transition:width 0.3s;"></div></div>
-                <div style="font-size:9px;color:var(--text-color);opacity:0.5;margin-top:3px;font-family:Poppins,sans-serif;">${label} — consider switching model soon</div>
-            </div>
-        </div>`;
-        const box = document.getElementById('inline-chat-messages');
-        if (box) { box.appendChild(warn); _inlineChatScroll(); }
-    }
-
-    // ── Gemini hard limit hit — countdown timer in chat ──
-    function _geminiShowCountdown(model, type, waitSec, limit) {
-        _inlineHideTyping();
-        const shortModel = model.replace('gemini-2.5-','').replace('flash-lite','Flash-Lite').replace('flash','Flash').replace('pro','Pro');
-        const wrap = document.createElement('div');
-        wrap.className = 'chat-msg agent';
-        const bubble = document.createElement('div');
-        bubble.style.cssText = 'background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 13px;max-width:100%;';
-
-        if (type === 'rpd' || waitSec === null) {
-            bubble.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <div>
-                    <div style="font-size:11px;font-weight:700;color:#ef4444;font-family:Poppins,sans-serif;">Gemini ${shortModel} — Daily limit reached (${limit}/day)</div>
-                    <div style="font-size:10px;color:var(--text-color);opacity:0.6;font-family:Poppins,sans-serif;margin-top:2px;">Resets at midnight Pacific time. Switch to another model.</div>
-                </div>
-            </div>`;
-            wrap.appendChild(bubble);
-        } else {
-            // RPM countdown
-            bubble.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <div style="flex:1;">
-                    <div style="font-size:11px;font-weight:700;color:#ef4444;font-family:Poppins,sans-serif;">Gemini ${shortModel} — Rate limit (${limit} req/min)</div>
-                    <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-                        <div style="font-size:10px;color:var(--text-color);opacity:0.6;font-family:Poppins,sans-serif;">Auto-retry in</div>
-                        <div id="gemini-countdown-${Date.now()}" style="font-size:13px;font-weight:700;color:#ef4444;font-family:'Courier New',monospace;min-width:28px;">${waitSec}s</div>
-                    </div>
-                </div>
-            </div>`;
-            wrap.appendChild(bubble);
-            // Start countdown
-            const cdEl = bubble.querySelector('[id^="gemini-countdown"]');
-            let remaining = waitSec;
-            const iv = setInterval(() => {
-                remaining--;
-                if (cdEl) cdEl.textContent = remaining + 's';
-                if (remaining <= 0) {
-                    clearInterval(iv);
-                    if (cdEl) cdEl.closest('.chat-msg')?.remove();
-                }
-            }, 1000);
-        }
-
-        const box = document.getElementById('inline-chat-messages');
-        if (box) { box.appendChild(wrap); _inlineChatScroll(); }
-    }
-
-    // ── Build Reorganize card with full file diff ──
-    function _buildInlineReorganizeCard(newContent, targetTab) {
-        const card = document.createElement('div');
-        card.style.cssText = 'border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;margin-top:4px;max-width:100%;';
-
-        const oldContent = targetTab ? targetTab.content : editor.getValue();
-        const oldLines = oldContent.split('\n');
-        const newLines = (newContent || '').split('\n');
-
-        // Count changed lines for summary
-        const oldSet = new Set(oldLines);
-        const newSet = new Set(newLines);
-        const moved = newLines.filter(l => oldSet.has(l)).length;
-        const added = newLines.filter(l => !oldSet.has(l)).length;
-        const removed = oldLines.filter(l => !newSet.has(l)).length;
-
-        // Build compact diff — show first 40 lines of diff
-        const { html } = _buildDiffHTML(oldLines.slice(0, 60), newLines.slice(0, 60));
-        const tabId = targetTab ? targetTab.id : 'null';
-        const contentJson = JSON.stringify(newContent).replace(/"/g, '&quot;');
-
-        card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
-                <span class="material-icons-round" style="font-size:15px;color:var(--accent);">reorder</span>
-                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Reorganized file — ${newLines.length} lines</span>
-                <span style="font-size:9px;font-weight:600;font-family:'Poppins',sans-serif;color:var(--text-color);opacity:0.45;">
-                    <span style="color:#ef4444;">-${removed}</span> &nbsp;<span style="color:#10b981;">+${added}</span>
-                </span>
-            </div>
-            <div style="max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.15);">${html}<div style="padding:4px 8px;font-size:9px;opacity:0.4;font-family:'Courier New',monospace;">... preview shows first 60 lines</div></div>
-            <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button onclick="_applyInlineReorganize(this, ${contentJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
-                    <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply Reorganize
-                </button>
-                <button onclick="this.closest('div').parentElement.remove()" style="padding:8px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;">Cancel</button>
-            </div>`;
-        return card;
-    }
-
-    function _applyInlineReorganize(btn, newContent, tabId) {
-        if (!newContent) return;
-        const snapTab = fileTabs.find(t => t.id === (tabId || activeTabId)) || fileTabs.find(t => t.id === activeTabId);
-        const original = snapTab ? snapTab.content : editor.getValue();
-        // Clean: trailing whitespace per line, max 2 blank lines, no trailing newlines
-        const cleaned = newContent
-            .split('\n').map(l => l.replace(/\s+$/, '')).join('\n')
-            .replace(/\n{3,}/g, '\n\n').trimEnd();
-        // Save undo snapshot
-        _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
-        if (_agentUndoStack.length > 5) _agentUndoStack.shift();
-        if (snapTab) snapTab.content = cleaned;
-        if (!tabId || tabId === activeTabId) {
-            editor.setValue(cleaned, -1);
-        } else {
-            switchFileTab(tabId);
-            editor.setValue(cleaned, -1);
-        }
-        const undoCount = _agentUndoStack.length;
-        btn.closest('div').parentElement.innerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:8px;background:rgba(16,185,129,0.08);border-radius:12px;">
-            <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
-            <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Reorganized successfully</span>
-            <button onclick="_agentUndoLast(this)" style="background:rgba(128,128,128,0.12);border:1px solid var(--glass-border);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;color:var(--text-color);cursor:pointer;display:flex;align-items:center;gap:4px;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M3 7v6h6"/><path d="M3 13C5.5 6.5 13 4 18 8s5 10 1 14"/></svg>
-                Undo (${undoCount})
-            </button>
-        </div>`;
-        showToast('File reorganized', 'reorder');
-    }
-    function _buildDiffHTML(oldLines, newLines) {
-        // Simple line-level diff using LCS approach
-        const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        let html = '';
-        let i = 0, j = 0;
-        const m = oldLines.length, n = newLines.length;
-
-        // Build LCS table
-        const dp = Array.from({length: m+1}, () => new Array(n+1).fill(0));
-        for (let r = 1; r <= m; r++)
-            for (let c = 1; c <= n; c++)
-                dp[r][c] = oldLines[r-1] === newLines[c-1] ? dp[r-1][c-1]+1 : Math.max(dp[r-1][c], dp[r][c-1]);
-
-        // Trace back
-        const ops = [];
-        let r = m, c = n;
-        while (r > 0 || c > 0) {
-            if (r > 0 && c > 0 && oldLines[r-1] === newLines[c-1]) { ops.unshift({t:'=', l:oldLines[r-1]}); r--; c--; }
-            else if (c > 0 && (r === 0 || dp[r][c-1] >= dp[r-1][c])) { ops.unshift({t:'+', l:newLines[c-1]}); c--; }
-            else { ops.unshift({t:'-', l:oldLines[r-1]}); r--; }
-        }
-
-        let hasChanges = false;
-        ops.forEach(op => {
-            if (op.t === '=') {
-                html += `<div style="padding:1px 8px;font-family:'Courier New',monospace;font-size:10px;color:var(--text-color);opacity:0.45;white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;"> ${escHtml(op.l)}</div>`;
-            } else if (op.t === '-') {
-                hasChanges = true;
-                html += `<div style="padding:1px 8px;font-family:'Courier New',monospace;font-size:10px;color:#ef4444;background:rgba(239,68,68,0.1);white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;">-${escHtml(op.l)}</div>`;
-            } else {
-                hasChanges = true;
-                html += `<div style="padding:1px 8px;font-family:'Courier New',monospace;font-size:10px;color:#10b981;background:rgba(16,185,129,0.1);white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;">+${escHtml(op.l)}</div>`;
-            }
-        });
-        return { html, hasChanges };
-    }
-
-    // ── Editor diff markers — store IDs so we can remove them later ──
-    let _editorDiffMarkers = [];
-
-    function _clearEditorDiffMarkers() {
-        const session = editor.getSession();
-        _editorDiffMarkers.forEach(id => session.removeMarker(id));
-        _editorDiffMarkers = [];
-        // Clear gutter decorations
-        const lines = session.getLength();
-        for (let i = 0; i < lines; i++) {
-            session.removeGutterDecoration(i, 'ace-diff-remove');
-            session.removeGutterDecoration(i, 'ace-diff-add');
-        }
-    }
-
-    function _showEditorDiffMarkers(edits, targetTab) {
-        _clearEditorDiffMarkers();
-        const AceRange = ace.require('ace/range').Range;
-        const session = editor.getSession();
-        const currentCode = (targetTab ? targetTab.content : editor.getValue()).split('\n');
-
-        // If target tab is not active — switch to it so user sees highlights
-        if (targetTab && targetTab.id !== activeTabId) switchFileTab(targetTab.id);
-
-        (edits || []).forEach(edit => {
-            if (edit.line_start != null) {
-                const s = Math.max(0, (edit.line_start || 1) - 1);
-                const e = Math.min(currentCode.length - 1, (edit.line_end || edit.line_start || 1) - 1);
-
-                // Red: lines being removed (old lines)
-                for (let row = s; row <= e; row++) {
-                    const mid = _editorDiffMarkers.push(
-                        session.addMarker(new AceRange(row, 0, row, Infinity), 'ace-diff-remove-line', 'fullLine', false)
-                    );
-                    session.addGutterDecoration(row, 'ace-diff-remove');
-                }
-
-                // Green: show where new lines will land (highlight line after removed block)
-                const insertRow = Math.min(e + 1, currentCode.length - 1);
-                const newLineCount = (edit.replace || '').split('\n').length;
-                // Mark insertion point — one marker at the boundary
-                _editorDiffMarkers.push(
-                    session.addMarker(new AceRange(insertRow, 0, insertRow, Infinity), 'ace-diff-add-line', 'fullLine', false)
-                );
-                session.addGutterDecoration(insertRow, 'ace-diff-add');
-
-            } else if (edit.find) {
-                // find-based: search for the string in code and highlight it red
-                const full = currentCode.join('\n');
-                const idx = full.indexOf(edit.find);
-                if (idx !== -1) {
-                    const before = full.slice(0, idx);
-                    const startRow = before.split('\n').length - 1;
-                    const endRow = startRow + edit.find.split('\n').length - 1;
-                    for (let row = startRow; row <= endRow; row++) {
-                        _editorDiffMarkers.push(
-                            session.addMarker(new AceRange(row, 0, row, Infinity), 'ace-diff-remove-line', 'fullLine', false)
-                        );
-                        session.addGutterDecoration(row, 'ace-diff-remove');
-                    }
-                    _editorDiffMarkers.push(
-                        session.addMarker(new AceRange(endRow + 1, 0, endRow + 1, Infinity), 'ace-diff-add-line', 'fullLine', false)
-                    );
-                    session.addGutterDecoration(endRow + 1, 'ace-diff-add');
-                }
-            }
-        });
-
-        // Scroll editor to first changed line
-        if (edits && edits[0] && edits[0].line_start != null) {
-            editor.scrollToLine(Math.max(0, edits[0].line_start - 3), true, true);
-        }
-    }
-
-    function _buildInlineEditCard(edits, targetTab) {
-        const card = document.createElement('div');
-        card.style.cssText = 'border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;margin-top:4px;max-width:100%;';
-        const count = edits ? edits.length : 0;
-
-        // ── Show live diff highlights in the editor immediately ──
-        _showEditorDiffMarkers(edits, targetTab);
-
-        // Build diff preview for each edit
-        const currentCode = (targetTab ? targetTab.content : editor.getValue()).split('\n');
-        let diffHTML = '';
-
-        (edits || []).forEach((edit, idx) => {
-            let oldLines = [], newLines = [];
-
-            if (edit.line_start != null) {
-                const s = Math.max(0, (edit.line_start || 1) - 1);
-                const e = Math.min(currentCode.length - 1, (edit.line_end || edit.line_start || 1) - 1);
-                const ctxBefore = currentCode.slice(Math.max(0, s-2), s);
-                const ctxAfter  = currentCode.slice(e+1, Math.min(currentCode.length, e+3));
-                oldLines = [...ctxBefore, ...currentCode.slice(s, e+1), ...ctxAfter];
-                newLines = [...ctxBefore, ...(edit.replace || '').split('\n'), ...ctxAfter];
-            } else if (edit.find) {
-                oldLines = edit.find.split('\n');
-                newLines = (edit.replace || '').split('\n');
-            }
-
-            const { html, hasChanges } = _buildDiffHTML(oldLines, newLines);
-            if (hasChanges) {
-                if (count > 1) diffHTML += `<div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;padding:4px 8px 2px;font-family:'Poppins',sans-serif;text-transform:uppercase;letter-spacing:0.4px;">Edit ${idx+1}</div>`;
-                diffHTML += html;
-                if (idx < count - 1) diffHTML += `<div style="height:1px;background:var(--glass-border);margin:2px 0;"></div>`;
-            }
-        });
-
-        const editsJson = JSON.stringify(edits).replace(/"/g,'&quot;');
-        const tabId = targetTab ? targetTab.id : 'null';
-
-        card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
-                <span class="material-icons-round" style="font-size:15px;color:var(--accent);">difference</span>
-                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">${count} edit${count!==1?'s':''} — review changes</span>
-                <span style="font-size:9px;font-weight:600;font-family:'Poppins',sans-serif;color:var(--text-color);opacity:0.45;display:flex;align-items:center;gap:3px;">
-                    <span style="color:#ef4444;">●</span> removed &nbsp;
-                    <span style="color:#10b981;">●</span> added
-                </span>
-            </div>
-            <div style="max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
-            <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button onclick="_clearEditorDiffMarkers();_applyInlineEdits(this, ${editsJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
-                    <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply
-                </button>
-                <button onclick="_clearEditorDiffMarkers();this.closest('div').parentElement.remove()" style="padding:8px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;">
-                    Cancel
-                </button>
-            </div>`;
-        return card;
-    }
-
-    function _applyInlineEdits(btn, edits, tabId) {
-        if (!edits || !edits.length) {
-            _showApplyError(btn, 'No edits provided by AI. Try asking again.');
-            return;
-        }
-
-        const snapTab = fileTabs.find(t => t.id === (tabId || activeTabId)) || fileTabs.find(t => t.id === activeTabId);
-        if (!snapTab && !editor) {
-            _showApplyError(btn, 'Target file not found. Please select the correct file and retry.');
-            return;
-        }
-        const original = snapTab ? snapTab.content : editor.getValue();
-
-        const lines = original.split('\n');
-        let applied = 0;
-        const failedEdits = [];
-        const failReasons = [];
-
-        // Sort edits bottom-to-top so line numbers stay valid after each replacement
-        const sorted = [...edits].sort((a, b) => (b.line_start || 0) - (a.line_start || 0));
-
-        sorted.forEach(edit => {
-            // ── Line-based edit ──
-            if (edit.line_start != null) {
-                const s = Math.max(0, (edit.line_start || 1) - 1);
-                const e = Math.min(lines.length - 1, (edit.line_end || edit.line_start || 1) - 1);
-                // Validate line range
-                if (s > lines.length - 1) {
-                    failedEdits.push(edit);
-                    failReasons.push(`Line ${edit.line_start} is out of range (file has ${lines.length} lines)`);
-                    return;
-                }
-                const newLines = (edit.replace || '').split('\n').map(l =>
-                    l.replace(/\t/g, '  ')      // all tabs → 2 spaces
-                     .replace(/\s+$/, '')        // trailing whitespace per line
-                );
-                lines.splice(s, e - s + 1, ...newLines);
-                applied++;
-
-            } else if (edit.find != null) {
-                // ── Fallback: find-based with whitespace normalization ──
-                const fullContent = lines.join('\n');
-                if (fullContent.includes(edit.find)) {
-                    const updated = fullContent.replace(edit.find, edit.replace || '');
-                    lines.splice(0, lines.length, ...updated.split('\n'));
-                    applied++;
-                } else {
-                    // Whitespace-tolerant regex fallback
-                    const escaped = edit.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-                    try {
-                        const rx = new RegExp(escaped);
-                        if (rx.test(fullContent)) {
-                            const updated = fullContent.replace(rx, edit.replace || '');
-                            lines.splice(0, lines.length, ...updated.split('\n'));
-                            applied++;
-                        } else {
-                            failedEdits.push(edit);
-                            failReasons.push(`Text not found: "${(edit.find||'').slice(0,50)}..."`);
-                        }
-                    } catch(regexErr) {
-                        failedEdits.push(edit);
-                        failReasons.push(`Regex error: ${regexErr.message}`);
-                    }
-                }
-            } else {
-                failedEdits.push(edit);
-                failReasons.push('Edit has no line_start and no find — AI returned incomplete edit');
-            }
-        });
-
-        // ── If NOTHING applied at all — abort, don't touch the file ──
-        if (applied === 0 && failedEdits.length > 0) {
-            _showApplyError(btn,
-                `Nothing could be applied (${failedEdits.length} edit${failedEdits.length!==1?'s':''} failed):\n` +
-                failReasons.map((r,i) => `• Edit ${i+1}: ${r}`).join('\n') +
-                '\n\nTry rephrasing your request or switching to a smarter model.'
+        body.light-theme .tabs { background: rgba(0,0,0,0.05); }
+
+        /* Snake = thin conic border + inner mask to hollow it out */
+        .tabs::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 21px;
+            padding: 1px;
+            background: conic-gradient(
+                from var(--pill-snake, 0deg),
+                transparent 0deg,
+                transparent 300deg,
+                rgba(16,185,129,0.2) 320deg,
+                rgba(16,185,129,0.7) 340deg,
+                #10b981 352deg,
+                rgba(52,211,153,0.3) 357deg,
+                transparent 360deg
             );
-            return;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: pillSnake 3.5s linear infinite;
+            pointer-events: none;
         }
 
-        // Save undo snapshot ONLY if at least something applied
-        _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
-        if (_agentUndoStack.length > 5) _agentUndoStack.shift();
+        @keyframes shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        @keyframes pillSnake {
+            from { --pill-snake: 0deg; }
+            to   { --pill-snake: 360deg; }
+        }
+        @property --pill-snake {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
+        }
+        .tab { padding: 4px 14px; border-radius: 18px; font-weight: 600; font-size: 12px; color: var(--text-color); opacity: 0.7; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+        .tab.active { background: var(--accent); color: white; opacity: 1; }
+        
+        .main-container { flex-grow: 1; position: relative; background-color: var(--editor-bg); overflow: hidden; }
 
-        // Clean up: collapse 3+ blank lines → max 2, remove trailing whitespace per line
-        const cleaned = lines
-            .map(l => l.replace(/\s+$/, ''))
-            .join('\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .trimEnd();
+        /* FASTEST MONOSPACE FOR EDITOR ONLY */
+        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; font-size: 14px; font-family: 'Courier New', Courier, monospace !important; z-index: 10; contain: size layout; }
+        #preview { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: none; background: white; visibility: hidden; opacity: 0; z-index: 20; transform: translateZ(0); }
+        #preview.active-pane { visibility: visible; opacity: 1; }
 
-        // ── Write back to the correct tab ──
-        if (snapTab) snapTab.content = cleaned;
+        .ace_mobile-menu, .ace_tooltip, .ace_callout { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+        .ace_selection { background: rgba(16, 185, 129, 0.35) !important; }
+        .ace_selected-word { background: rgba(16, 185, 129, 0.3) !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; border-radius: 2px; }
 
-        if (!tabId || tabId === activeTabId) {
-            editor.setValue(cleaned, -1);
-        } else {
-            switchFileTab(tabId);
-            editor.setValue(cleaned, -1);
+        .scroll-jumpers { position: absolute; right: 10px; top: 38%; transform: translateY(-50%); display: none; flex-direction: column; gap: 15px; z-index: 35; opacity: 0; transition: opacity 0.3s; }
+        .scroll-jumpers.visible { opacity: 1; }
+        .jumper-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: none; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+        .jumper-btn:active { transform: scale(0.9); opacity: 1; }
+
+        /* will-change: transform → own GPU layer, no repaint on slide */
+        
+
+        /* ──────────────────────── Toolbar & Cursor Nav ──────────────────────── */
+.cursor-nav { touch-action: pan-x pan-y; }
+        #editor { touch-action: pan-x pan-y pinch-zoom; }
+        /* Promote scrollable layers to own GPU composite layer */
+        .file-tabs-bar { transform: translateZ(0); }
+        .main-container { flex-grow: 1; position: relative; background-color: var(--editor-bg); overflow: hidden; }
+
+        /* FASTEST MONOSPACE FOR EDITOR ONLY */
+        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; font-size: 14px; font-family: 'Courier New', Courier, monospace !important; z-index: 10; contain: size layout; }
+        #preview { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: none; background: white; visibility: hidden; opacity: 0; z-index: 20; transform: translateZ(0); }
+        #preview.active-pane { visibility: visible; opacity: 1; }
+
+        .ace_mobile-menu, .ace_tooltip, .ace_callout { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+        .ace_selection { background: rgba(16, 185, 129, 0.35) !important; }
+        .ace_selected-word { background: rgba(16, 185, 129, 0.3) !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; border-radius: 2px; }
+
+        .scroll-jumpers { position: absolute; right: 10px; top: 38%; transform: translateY(-50%); display: none; flex-direction: column; gap: 15px; z-index: 35; opacity: 0; transition: opacity 0.3s; }
+        .scroll-jumpers.visible { opacity: 1; }
+        .jumper-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: none; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+        .jumper-btn:active { transform: scale(0.9); opacity: 1; }
+
+        /* Nav panel */
+        .bottom-wrapper { position: absolute; bottom: 0; left: 0; right: 0; z-index: 40; }
+        .bottom-wrapper.nav-mini #agent-bar { display: none; }
+
+        /* bottom-area — green border stays always */
+        .bottom-area {
+            background: var(--glass-bg);
+            border-top: 2px solid var(--accent);
+            border-radius: var(--panel-round) var(--panel-round) 0 0;
+            padding-top: 10px;
+            padding-bottom: max(env(safe-area-inset-bottom), 12px);
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
         }
 
-        const cardParent = btn.closest('div').parentElement;
+        .drag-handle-area { width: 100%; height: 0; display: flex; justify-content: center; align-items: center; }
+        .drag-pill { width: 30px; height: 4px; background: var(--text-color); opacity: 0.25; border-radius: 10px; }
 
-        if (failedEdits.length > 0) {
-            // Some applied, some failed — show partial result + reasons + retry
-            const reasonHTML = failReasons.map((r,i) =>
-                `<div style="font-size:10px;font-family:'Poppins',sans-serif;color:#f59e0b;padding:2px 0;">• Edit ${i+1}: ${r}</div>`
-            ).join('');
-
-            cardParent.innerHTML = `<div style="border:1px solid rgba(245,158,11,0.3);border-radius:12px;overflow:hidden;">
-                <div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);">
-                    <span class="material-icons-round" style="font-size:15px;color:#f59e0b;animation:commitSpin 1s linear infinite;">refresh</span>
-                    <span style="font-size:11px;font-weight:700;color:#f59e0b;font-family:'Poppins',sans-serif;">${applied} applied · Retrying ${failedEdits.length} failed...</span>
-                </div>
-                <div style="padding:6px 12px 8px;">${reasonHTML}</div>
-            </div>`;
-
-            const allLines = cleaned.split('\n');
-
-            // For each failed edit, extract only ±25 lines context around expected location
-            const targetedContext = failedEdits.map((e, i) => {
-                let contextLines = '';
-                if (e.line_start != null) {
-                    // Line-based: grab ±25 lines around expected location
-                    const center = Math.max(0, (e.line_start || 1) - 1);
-                    const from = Math.max(0, center - 25);
-                    const to   = Math.min(allLines.length - 1, center + 25);
-                    contextLines = allLines.slice(from, to + 1)
-                        .map((l, idx) => `${from + idx + 1}| ${l}`).join('\n');
-                } else if (e.find) {
-                    // String-based: find nearest match by normalized search
-                    const norm = s => s.replace(/\s+/g,' ').trim().slice(0,40);
-                    const needle = norm(e.find);
-                    let bestLine = -1, bestScore = 0;
-                    allLines.forEach((l, idx) => {
-                        const score = norm(l).includes(needle.slice(0,20)) ? 1 : 0;
-                        if (score > bestScore) { bestScore = score; bestLine = idx; }
-                    });
-                    const from = Math.max(0, bestLine - 25);
-                    const to   = Math.min(allLines.length - 1, (bestLine < 0 ? 25 : bestLine) + 25);
-                    contextLines = allLines.slice(from, to + 1)
-                        .map((l, idx) => `${from + idx + 1}| ${l}`).join('\n');
-                }
-
-                return `## Failed Edit ${i+1}
-Original intent: "${e.find ? e.find.slice(0,80) : `lines ${e.line_start}-${e.line_end}`}"
-Replacement needed: "${(e.replace||'').slice(0,80)}"
-
-Surrounding code context (line numbers shown):
-\`\`\`
-${contextLines}
-\`\`\``;
-            }).join('\n\n---\n\n');
-
-            const retrySystemPrompt = `You are a code edit assistant. The following edits FAILED because the target location could not be found.
-
-For each failed edit, the surrounding code context is provided with line numbers.
-Find the CORRECT line range in the provided context and return updated edits.
-
-Return ONLY valid JSON:
-{
-  "type": "edit",
-  "explanation": "Corrected location for failed edits",
-  "edits": [
-    { "line_start": N, "line_end": N, "replace": "exact replacement" }
-  ]
-}
-
-Use only line numbers visible in the context. Be precise.`;
-
-            _callAgentAPI(retrySystemPrompt, targetedContext).then(raw => {
-                try {
-                    const parsed = _tryParseJSON(raw);
-                    if (!parsed) throw new Error('No JSON');
-                    if (parsed.type === 'edit' && parsed.edits?.length) {
-                        cardParent.innerHTML = '';
-                        const retryCard = _buildInlineEditCard(parsed.edits, snapTab);
-                        cardParent.appendChild(retryCard);
-                        _inlineAppendMsg('agent', `↩ ${failedEdits.length} block${failedEdits.length>1?'s':''} relocated — review and apply:`);
-                    } else {
-                        throw new Error('no edits');
-                    }
-                } catch(parseErr) {
-                    cardParent.innerHTML = `<div style="border:1px solid rgba(239,68,68,0.3);border-radius:12px;overflow:hidden;">
-                        <div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(239,68,68,0.08);">
-                            <span class="material-icons-round" style="font-size:15px;color:#ef4444;">error</span>
-                            <span style="font-size:11px;font-weight:700;color:#ef4444;font-family:'Poppins',sans-serif;flex:1;">${applied} applied · ${failedEdits.length} block${failedEdits.length!==1?'s':''} could not be relocated</span>
-                        </div>
-                        <div style="padding:6px 12px 10px;">
-                            <div style="font-size:10px;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;margin-bottom:6px;">Reason: AI retry returned invalid response</div>
-                            ${failReasons.map((r,i) => `<div style="font-size:10px;color:#ef4444;font-family:'Poppins',sans-serif;padding:1px 0;">• ${r}</div>`).join('')}
-                            <div style="font-size:10px;color:var(--text-color);opacity:0.45;font-family:'Poppins',sans-serif;margin-top:6px;">Try rephrasing your request or use a smarter model (Gemini/OpenAI).</div>
-                        </div>
-                    </div>`;
-                }
-            }).catch(netErr => {
-                cardParent.innerHTML = `<div style="border:1px solid rgba(239,68,68,0.3);border-radius:12px;overflow:hidden;">
-                    <div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(239,68,68,0.08);">
-                        <span class="material-icons-round" style="font-size:15px;color:#ef4444;">wifi_off</span>
-                        <span style="font-size:11px;font-weight:700;color:#ef4444;font-family:'Poppins',sans-serif;flex:1;">Retry failed — network error</span>
-                    </div>
-                    <div style="padding:6px 12px 10px;font-size:10px;color:var(--text-color);opacity:0.55;font-family:'Poppins',sans-serif;">
-                        ${(netErr?.message||'Connection issue').slice(0,100)}<br>
-                        Check your internet and try again.
-                    </div>
-                </div>`;
-            });
-
-        } else {
-            // All applied — show success + undo + feedback buttons
-            const undoCount = _agentUndoStack.length;
-
-            // Human-readable summary for history so AI knows what was done
-            const editSummary = (edits||[]).map((e, i) => {
-                const loc = e.line_start != null ? `lines ${e.line_start}-${e.line_end}` : `"${(e.find||'').slice(0,40)}"`;
-                return `Edit ${i+1}: replaced ${loc} with: "${(e.replace||'').slice(0,60).replace(/\n/g,' ')}"`;
-            }).join('\n');
-
-            cardParent.innerHTML = `<div style="border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;">
-                <div style="padding:8px 12px;display:flex;align-items:center;gap:8px;background:rgba(16,185,129,0.08);">
-                    <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
-                    <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">${applied} edit${applied!==1?'s':''} applied <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg></span>
-                    <button onclick="_agentUndoLast(this)" title="Undo" style="background:rgba(128,128,128,0.12);border:1px solid var(--glass-border);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;color:var(--text-color);cursor:pointer;display:flex;align-items:center;gap:4px;">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M3 7v6h6"/><path d="M3 13C5.5 6.5 13 4 18 8s5 10 1 14"/></svg>
-                        Undo (${undoCount})
-                    </button>
-                </div>
-                <div style="padding:8px 12px;border-top:1px solid var(--glass-border);display:flex;gap:7px;">
-                    <button onclick="_inlineReportNotWorking(this)" style="flex:1;padding:7px;border-radius:9px;border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#ef4444;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
-                        <span class="material-icons-round" style="font-size:14px;pointer-events:none;">thumb_down</span>Didn't work
-                    </button>
-                    <button onclick="_inlineConfirmWorking(this)" style="flex:1;padding:7px;border-radius:9px;border:1px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.07);color:var(--accent);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
-                        <span class="material-icons-round" style="font-size:14px;pointer-events:none;">thumb_up</span>Looks good
-                    </button>
-                </div>
-            </div>`;
-
-            // Push applied summary to chat history so AI has full context next turn
-            _inlineChatHistory.push({
-                role: 'assistant',
-                content: `[APPLIED ${applied} edit${applied!==1?'s':''}]\n${editSummary}`
-            });
-
-            showToast(`${applied} edit${applied!==1?'s':''} applied`, 'check_circle');
+        /* Nav toggle pill */
+        #nav-toggle-btn {
+            will-change: transform;
+            transition: transform 0.18s ease;
         }
-    }
+        #nav-toggle-btn:active { transform: scale(0.88); }
 
-    // ── Show apply error in card — clear markers too ──
-    function _showApplyError(btn, message) {
-        _clearEditorDiffMarkers();
-        const cardParent = btn.closest('div').parentElement;
-        const lines = message.split('\n');
-        const title = lines[0];
-        const details = lines.slice(1).filter(Boolean);
-        cardParent.innerHTML = `<div style="border:1px solid rgba(239,68,68,0.3);border-radius:12px;overflow:hidden;">
-            <div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(239,68,68,0.08);">
-                <span class="material-icons-round" style="font-size:15px;color:#ef4444;">error_outline</span>
-                <span style="font-size:11px;font-weight:700;color:#ef4444;font-family:'Poppins',sans-serif;flex:1;">${title}</span>
-            </div>
-            ${details.length ? `<div style="padding:8px 12px 10px;">
-                ${details.map(d => `<div style="font-size:10px;color:var(--text-color);opacity:0.7;font-family:'Poppins',sans-serif;padding:2px 0;line-height:1.5;">${d}</div>`).join('')}
-            </div>` : ''}
-        </div>`;
-        _inlineChatHistory.push({ role: 'assistant', content: `[APPLY FAILED] ${title}` });
-    }
+        /* Cursor nav row */
+        .cursor-nav { display: flex; overflow-x: auto; padding: 4px 8px 6px 8px; gap: 5px; }
+        .cursor-nav::-webkit-scrollbar { display: none; }
+        .icon-btn { background: rgba(128,128,128,0.08); border: none; border-radius: 10px; min-width: 40px; height: 38px; display: flex; align-items: center; justify-content: center; color: var(--text-color); flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .icon-btn:active { background: var(--accent-dim); color: var(--accent); transform: scale(0.9); }
+        .icon-btn .material-icons-round { font-size: 18px; pointer-events: none; }
 
-    // ── Undo last agent edit — restores most recent snapshot ──
-    function _agentUndoLast(btn) {
-        if (_agentUndoStack.length === 0) { showToast('Nothing to undo', 'info'); return; }
-        const prev = _agentUndoStack.pop();
-        // prev can be: string (old content) or { type, tab, content } or { type:'new_file', filename }
-        if (typeof prev === 'string') {
-            const curTab = fileTabs.find(t => t.id === activeTabId);
-            if (curTab) curTab.content = prev;
-            editor.setValue(prev, -1);
-        } else if (prev && prev.type === 'edit_content') {
-            const t = prev.tab || fileTabs.find(t => t.id === activeTabId);
-            if (t) t.content = prev.content;
-            if (!prev.tab || prev.tab.id === activeTabId) editor.setValue(prev.content, -1);
-            else { switchFileTab(prev.tab.id); editor.setValue(prev.content, -1); }
-        } else if (prev && prev.type === 'new_file') {
-            // Undo new_file = close that tab
-            const tabToClose = fileTabs.find(t => t.name === prev.filename);
-            if (tabToClose) closeFileTab(tabToClose.id);
+        /* ── Toolbar animation ── */
+        /* Wrap clips height — separate from animated content to avoid layout recalc */
+        .toolbar-rows-wrap {
+            overflow: hidden;
+            max-height: 220px;
+            transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        if (btn) {
-            const remaining = _agentUndoStack.length;
-            btn.textContent = remaining > 0 ? `Undo (${remaining} left)` : 'Undone';
-            if (remaining === 0) btn.style.opacity = '0.35';
-        }
-        showToast('Undone', 'undo');
-    }
-
-    // ── "Didn't work" — re-send full current code + full history to AI for re-analysis ──
-    function _inlineReportNotWorking(btn) {
-        const card = btn.closest('div').parentElement;
-        card.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border-radius:12px;border:1px solid rgba(245,158,11,0.25);">
-            <span class="material-icons-round" style="font-size:15px;color:#f59e0b;animation:commitSpin 1s linear infinite;">refresh</span>
-            <span style="font-size:11px;font-weight:700;color:#f59e0b;font-family:'Poppins',sans-serif;">Re-analysing with full context...</span>
-        </div>`;
-
-        // Get current (post-apply) code
-        const targetTab = fileTabs.find(t => t.id === ((_agentTargetTabId) || activeTabId)) || fileTabs.find(t => t.id === activeTabId);
-        const curTab = fileTabs.find(t => t.id === activeTabId);
-        if (curTab) curTab.content = editor.getValue();
-        const code = targetTab ? targetTab.content : editor.getValue();
-        const filename = targetTab ? targetTab.name : 'untitled';
-
-        const _provider = _activeAgent()?.provider || '';
-        const _MAX_CHARS = { groq: 60000, gemini: Infinity, openai: Infinity, anthropic: Infinity, openrouter: 80000, deepseek: 80000 }[_provider] ?? 80000;
-        let numberedCode = code.split('\n').map((l, i) => `${i+1}| ${l}`).join('\n');
-        if (numberedCode.length > _MAX_CHARS) {
-            const lines = numberedCode.split('\n');
-            const headLines = Math.floor(_MAX_CHARS * 0.65 / 80);
-            const tailLines = Math.floor(_MAX_CHARS * 0.30 / 80);
-            const skipped = lines.length - headLines - tailLines;
-            numberedCode = lines.slice(0, headLines).join('\n') + `\n\n// <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> [${skipped} lines omitted]\n\n` + lines.slice(-tailLines).join('\n');
+        .bottom-wrapper.nav-mini .toolbar-rows-wrap {
+            max-height: 0;
         }
 
-        // Collect session events for context
-        const sessionEvents2 = _inlineChatHistory
-            .filter(m => m.content.startsWith('[APPLIED') || m.content.startsWith('[CONFIRMED') || m.content.startsWith('[REJECTED') || m.content.startsWith('[USER CONFIRMED'))
-            .map(m => m.content).join('\n');
-        const sessionSummaryBlock2 = sessionEvents2 ? `\n\n── SESSION EVENTS ──\n${sessionEvents2}` : '';
+        /* Content: GPU-only opacity+transform — zero repaint */
+        .toolbar-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 4px 6px 8px 6px;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            will-change: opacity, transform;
+        }
+        .bottom-wrapper.nav-mini .toolbar-rows {
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+        }
 
-        // Build re-analysis message — full current code + all context
-        const reAnalyseMsg = `── CURRENT FILE: ${filename} ──${sessionSummaryBlock2}\n\n── FULL CODE (current state, after previous fix was applied) ──\n\`\`\`\n${numberedCode}\n\`\`\`\n\n── USER REPORT ──\nThe previous fix was applied but the issue is STILL present. Analyse the current code above carefully — it already includes the previous changes. Identify what is still wrong and provide a corrected fix.`;
+        .toolbar-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 100%; }
 
-        // Include full chat history so AI sees the full conversation context
-        const historyForAPI = _buildHistoryForAPI();
+        /* Toolbar buttons */
+        .toolbar-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: none; border: none; color: var(--text-color); opacity: 0.8;
+            font-size: 8px; font-weight: 600; gap: 1px; width: 100%;
+            padding: 6px 0; cursor: pointer; border-radius: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .toolbar-btn .material-icons-round { font-size: 19px; pointer-events: none; }
+        .toolbar-btn:active { background: var(--accent-dim); color: var(--accent); opacity: 1; transform: scale(0.9); }
 
-        _callAgentAPI(_AGENT_SYSTEM_PROMPT, reAnalyseMsg, historyForAPI).then(raw => {
-            // Save to history
-            _inlineChatHistory.push({ role: 'user', content: reAnalyseMsg });
-            _inlineChatHistory.push({ role: 'assistant', content: raw });
+        
+        /* restore-btn removed */
 
-            let parsed = null;
-            const pR = _tryParseJSON(raw); if (pR) parsed = pR;
+        
+/* Shared Modal CSS */
+        .modal { 
+            position: fixed; left: 5%; width: 90%; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--panel-round); padding: 15px; z-index: 100; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10); transition: opacity 0.15s, transform 0.15s;
+            bottom: -150%; opacity: 0; pointer-events: none; transform: scale(0.96);
+        }
+        .modal.active { bottom: 20px; opacity: 1; pointer-events: auto; transform: scale(1); }
+        /* Find modal — redesigned card */
+        #find-modal {
+            left: 50% !important;
+            width: 92%;
+            max-width: 420px;
+            bottom: auto !important;
+            transform: translateX(-50%) translateY(12px) scale(0.96);
+            border-radius: 20px;
+            padding: 0;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+            transition: opacity 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+        }
+        #find-modal.active {
+            opacity: 1; pointer-events: auto;
+            transform: translateX(-50%) translateY(0) scale(1);
+        }
+        /* Animated search icon */
+        @keyframes fm-scan {
+            0%   { stroke-dashoffset: 62; opacity: 0.4; }
+            50%  { stroke-dashoffset: 0;  opacity: 1; }
+            100% { stroke-dashoffset: 62; opacity: 0.4; }
+        }
+        @keyframes fm-pulse {
+            0%,100% { transform: scale(1);   opacity: 0.7; }
+            50%      { transform: scale(1.18); opacity: 1;   }
+        }
+        #fm-scan-circle { stroke-dasharray: 62; stroke-dashoffset: 62; }
+        #find-modal.active #fm-scan-circle { animation: fm-scan 2s ease-in-out infinite; }
+        #find-modal.active #fm-lens-dot    { animation: fm-pulse 2s ease-in-out infinite; }
 
-            card.innerHTML = '';
+        /* Find/Replace field — monospace, editor-style */
+        #find-modal .fm-field {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.25);
+            border: 1.5px solid var(--glass-border);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            font-size: 13px;
+            resize: none;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            line-height: 1.55;
+        }
+        #find-modal .fm-field:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        body.light-theme #find-modal .fm-field { background: rgba(0,0,0,0.06); }
 
-            if (!parsed || !parsed.type) {
-                _inlineAppendMsg('agent', raw.trim());
-            } else if (parsed.type === 'edit') {
-                _inlineAppendMsg('agent', '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> ' + (parsed.explanation || 'Revised fix — review and apply:'));
-                const newCard = _buildInlineEditCard(parsed.edits, targetTab);
-                _inlineAppendMsg('agent', '', newCard);
-            } else if (parsed.type === 'reorganize') {
-                _inlineAppendMsg('agent', '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> ' + (parsed.explanation || 'Revised reorganize:'));
-                const newCard = _buildInlineReorganizeCard(parsed.content, targetTab);
-                _inlineAppendMsg('agent', '', newCard);
-            } else {
-                _inlineAppendMsg('agent', raw.trim());
+        /* Toggle chips */
+        .fm-chip {
+            display: flex; align-items: center; gap: 4px;
+            padding: 4px 9px; border-radius: 8px;
+            border: 1.5px solid var(--glass-border);
+            background: transparent;
+            color: var(--text-color); opacity: 0.6;
+            font-family: 'Poppins', sans-serif; font-size: 10px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; user-select: none;
+        }
+        .fm-chip.on { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); opacity: 1; }
+        
+        .modal textarea, .modal input, .modal select { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: var(--text-color); font-family: 'Courier New', Courier, monospace; font-size: 13px; }
+        .modal-actions { display: flex; gap: 8px; }
+        .modal-btn { padding: 10px; border: none; border-radius: 8px; background: var(--accent); color: white; font-weight: 600; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; transition: opacity 0.2s, transform 0.15s; }
+        .modal-btn:active { opacity: 0.8; transform: scale(0.97); }
+        .modal-btn.secondary { background: rgba(128,128,128,0.2); color: var(--text-color); }
+
+        
+/* Find modal checkbox styles */
+        .find-options { display: flex; gap: 12px; margin-bottom: 8px; }
+        .find-check-label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.8; cursor: pointer; user-select: none; }
+        .find-check-label input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+
+        
+/* GitHub modal — full screen sheet */
+        #github-modal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.88);
+            bottom: auto !important;
+            width: 88%;
+            max-width: 380px;
+            max-height: 82vh;
+            overflow-y: auto;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 14px;
+            z-index: 110;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #github-modal::-webkit-scrollbar { display: none; }
+        #github-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #gh-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 105;
+            display: none; opacity: 0; transition: opacity 0.2s ease;
+        }
+        #gh-overlay.active { display: block; opacity: 1; }
+        #github-modal { pointer-events: none; }
+        #github-modal.active { pointer-events: auto; }
+        .gh-select-wrap { position: relative; margin-bottom: 8px; }
+        .gh-select-wrap select {
+            width: 100%; padding: 11px 36px 11px 12px; border-radius: 10px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px;
+            appearance: none; -webkit-appearance: none; cursor: pointer;
+            transition: border-color 0.15s;
+        }
+        .gh-select-wrap select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); outline: none; }
+        #github-modal input { font-family: 'Poppins', sans-serif; border-radius: 10px; padding: 11px 12px; transition: border-color 0.15s; }
+        #github-modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); outline: none; }
+
+        /* GitHub file tree */
+        #gh-file-tree { margin-top: 8px; max-height: 260px; overflow-y: auto; border-radius: 10px; background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); }
+        #gh-file-tree::-webkit-scrollbar { display: none; }
+        .gh-tree-item {
+            display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+            border-bottom: 1px solid var(--glass-border); cursor: pointer;
+            transition: background 0.15s; position: relative;
+        }
+        .gh-tree-item:last-child { border-bottom: none; }
+        .gh-tree-item:active { background: var(--accent-dim); }
+        .gh-tree-item.selected { background: var(--accent-dim); }
+        .gh-tree-item .gh-item-icon { font-size: 16px; color: var(--accent); flex-shrink: 0; }
+        .gh-tree-item .gh-item-name { flex: 1; font-size: 12px; font-weight: 600; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gh-tree-item .gh-item-actions { display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 0.15s; flex-shrink: 0; }
+        .gh-tree-item:hover .gh-item-actions, .gh-tree-item.selected .gh-item-actions { opacity: 1; pointer-events: auto; }
+        .gh-item-action-btn { width: 26px; height: 26px; border-radius: 6px; border: none; background: rgba(128,128,128,0.15); color: var(--text-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .gh-item-action-btn:active { background: var(--accent-dim); color: var(--accent); transform: scale(0.9); }
+        .gh-item-action-btn .material-icons-round { font-size: 14px; pointer-events: none; }
+        .gh-breadcrumb { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; padding: 6px 10px; background: rgba(0,0,0,0.15); border-radius: 8px; }
+        .gh-crumb { font-size: 11px; font-weight: 600; color: var(--accent); cursor: pointer; }
+        .gh-crumb-sep { font-size: 11px; opacity: 0.3; }
+        .gh-tree-loading { text-align: center; padding: 20px; font-size: 11px; opacity: 0.5; }
+
+        
+/* File Tabs Bar */
+        .file-tabs-bar { flex-shrink: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); padding: 0 6px; gap: 2px; }
+        .file-tabs-bar::-webkit-scrollbar { display: none; }
+
+        /* Chat open: keep header + tabbar pinned so keyboard can't push them */
+        body.chat-kb-open .app-header {
+            position: fixed !important;
+            top: 0; left: 0; right: 0;
+            z-index: 50;
+        }
+        body.chat-kb-open .file-tabs-bar {
+            position: fixed !important;
+            top: var(--chat-hdr-h, 48px);
+            left: 0; right: 0;
+            z-index: 49;
+        }
+        /* Prevent editor area going black when keyboard opens */
+        body.chat-kb-open #editor-wrapper {
+            background: var(--editor-bg) !important;
+        }
+        body.chat-kb-open #editor {
+            background: var(--editor-bg) !important;
+        }
+        .file-tab { display: flex; align-items: center; gap: 5px; padding: 6px 12px 6px 12px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.55; border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .file-tab.active { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }
+        .file-tab .ft-close { font-size: 13px; opacity: 0.4; margin-left: 2px; line-height: 1; transition: opacity 0.15s; pointer-events: auto; }
+        .file-tab .ft-close:active { opacity: 1; }
+
+        
+/* ===== WELCOME SCREEN ===== */
+        #welcome-screen {
+            position: fixed; inset: 0; z-index: 1000;
+            background: linear-gradient(135deg, #064e3b 0%, #065f46 40%, #0a0a0c 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 30px;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        #welcome-screen.hiding { opacity: 0; transform: scale(1.04); pointer-events: none; }
+        #welcome-screen.hidden { display: none; }
+        .welcome-card {
+            background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 28px;
+            padding: 36px 28px 28px; width: 100%; max-width: 360px;
+            box-shadow: none;
+            animation: welcomeCardIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+            text-align: center;
+        }
+        @keyframes welcomeCardIn {
+            from { opacity: 0; transform: translateY(40px) scale(0.92); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .welcome-logo {
+            width: 72px; height: 72px; border-radius: 20px; background: #10b981;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px; font-size: 28px; font-weight: 900; color: white;
+            font-family: monospace; box-shadow: none;
+            animation: welcomeLogoPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.4s both;
+        }
+        @keyframes welcomeLogoPop { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }
+        .welcome-title {
+            font-size: 28px; font-weight: 700; color: white; letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            animation: welcomeFadeUp 0.5s ease 0.55s both;
+        }
+        .welcome-sub {
+            font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; margin-bottom: 28px;
+            animation: welcomeFadeUp 0.5s ease 0.65s both;
+        }
+        @keyframes welcomeFadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        .welcome-features {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px;
+            animation: welcomeFadeUp 0.5s ease 0.75s both;
+        }
+        .welcome-feature {
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px;
+            border: 1px solid rgba(255,255,255,0.08); text-align: left;
+        }
+        .welcome-feature .material-icons-round { color: #10b981; font-size: 18px; flex-shrink:0; }
+        .welcome-feature span:last-child { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 600; }
+        .welcome-start-btn {
+            width: 100%; padding: 15px; border: none; border-radius: 16px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white; font-size: 15px; font-weight: 700; font-family: 'Poppins', sans-serif;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: welcomeFadeUp 0.5s ease 0.85s both;
+        }
+        .welcome-start-btn:active { transform: scale(0.97); box-shadow: none; }
+        .welcome-start-btn .material-icons-round { font-size: 20px; }
+
+        
+/* ===== REPO LOAD PROGRESS BAR ===== */
+        #repo-progress-overlay {
+            position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.7);
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 20px;
+        }
+        #repo-progress-overlay.visible { display: flex; }
+        .repo-progress-card {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 20px; padding: 28px 24px; width: 85%; max-width: 320px;
+            box-shadow: none;
+            animation: welcomeCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        .repo-progress-title { font-size: 14px; font-weight: 700; color: var(--text-color); margin-bottom: 6px; }
+        .repo-progress-sub { font-size: 11px; color: var(--text-color); opacity: 0.5; margin-bottom: 18px; }
+        .repo-progress-bar-track {
+            height: 6px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin-bottom: 10px;
+        }
+        .repo-progress-bar-fill {
+            height: 100%; background: linear-gradient(90deg, #10b981, #34d399);
+            border-radius: 10px; width: 0%; transition: width 0.3s ease;
+            box-shadow: none;
+        }
+        .repo-progress-count { font-size: 11px; color: var(--accent); font-weight: 600; text-align:right; }
+
+        
+/* ===== NEW PROJECT MODAL ===== */
+        #new-project-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #new-project-overlay.active { opacity: 1; pointer-events: auto; }
+        #new-project-modal {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px;
+            padding: 22px 20px; width: 88%; max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            transform: scale(0.9) translateY(10px); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+            font-family: 'Poppins', sans-serif; max-height: 90vh; overflow-y: auto;
+        }
+        #new-project-overlay.active #new-project-modal { transform: scale(1) translateY(0); }
+        #new-project-modal input, #new-project-modal select, #new-project-modal textarea {
+            width: 100%; padding: 11px 12px; border-radius: 10px; background: rgba(0,0,0,0.25);
+            border: 1px solid var(--glass-border); color: var(--text-color);
+            font-family: 'Poppins', sans-serif; font-size: 13px; margin-bottom: 10px;
+            transition: border-color 0.15s;
+        }
+        #new-project-modal input:focus, #new-project-modal select:focus, #new-project-modal textarea:focus {
+            border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        .np-section-label { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase;
+            letter-spacing: 0.8px; margin-bottom: 8px; margin-top: 14px; opacity: 0.9; }
+        .np-save-options { display: flex; gap: 8px; margin-bottom: 10px; }
+        .np-save-opt {
+            flex: 1; padding: 12px 8px; border: 1.5px solid var(--glass-border); border-radius: 12px;
+            background: rgba(0,0,0,0.15); cursor: pointer; text-align: center; transition: all 0.2s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .np-save-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+        .np-save-opt .material-icons-round { font-size: 22px; color: var(--accent); display: block; margin-bottom: 4px; }
+        .np-save-opt span:last-child { font-size: 10px; font-weight: 600; color: var(--text-color); }
+        .np-tab-bar { display: flex; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+        .np-tab { flex: 1; padding: 7px; text-align: center; font-size: 11px; font-weight: 600;
+            border-radius: 8px; cursor: pointer; color: var(--text-color); opacity: 0.5; transition: all 0.2s; }
+        .np-tab.active { background: var(--accent); color: white; opacity: 1; }
+        .np-pane { display: none; }
+        .np-pane.active { display: block; }
+        .np-repo-visibility { display: flex; gap: 8px; margin-bottom: 10px; }
+        .np-vis-opt {
+            flex: 1; padding: 10px 8px; border: 1.5px solid var(--glass-border); border-radius: 10px;
+            background: rgba(0,0,0,0.15); cursor: pointer; text-align: center;
+            font-family: 'Poppins', sans-serif; transition: all 0.2s;
+        }
+        .np-vis-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+        .np-vis-opt .material-icons-round { font-size: 18px; color: var(--accent); display: block; margin-bottom: 3px; }
+        .np-vis-opt span:last-child { font-size: 10px; font-weight: 600; color: var(--text-color); }
+
+        
+        /* ──────────────────────── Custom Dialog ──────────────────────── */
+#custom-dialog-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #custom-dialog-overlay.active { opacity: 1; pointer-events: auto; }
+        #custom-dialog-box {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 18px;
+            padding: 22px 20px 16px; width: 82%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            transform: scale(0.9) translateY(10px); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+            font-family: 'Poppins', sans-serif;
+        }
+        #custom-dialog-overlay.active #custom-dialog-box { transform: scale(1) translateY(0); }
+        #custom-dialog-icon { font-size: 28px; margin-bottom: 10px; }
+        #custom-dialog-title { font-size: 15px; font-weight: 600; color: var(--text-color); margin-bottom: 6px; }
+        #custom-dialog-msg { font-size: 12px; color: var(--text-color); opacity: 0.65; margin-bottom: 14px; line-height: 1.5; }
+        #custom-dialog-input { width: 100%; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px; margin-bottom: 12px; user-select: text; -webkit-user-select: text; }
+        #custom-dialog-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+        #custom-dialog-btns { display: flex; gap: 8px; }
+        .cdlg-btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-family: 'Poppins', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: transform 0.15s, opacity 0.15s; }
+        .cdlg-btn:active { transform: scale(0.96); opacity: 0.85; }
+        .cdlg-btn.primary { background: var(--accent); color: #fff; }
+        .cdlg-btn.danger { background: #ef4444; color: #fff; }
+        .cdlg-btn.secondary { background: rgba(128,128,128,0.18); color: var(--text-color); }
+
+        
+/* ===== CUSTOM GITHUB DROPDOWNS ===== */
+        .gh-custom-select { position: relative; margin-bottom: 10px; }
+        .gh-custom-trigger {
+            width: 100%; padding: 11px 36px 11px 12px; border-radius: 10px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 13px;
+            cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+             user-select: none;
+        }
+        .gh-custom-trigger.open { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+        .gh-custom-trigger .gh-trigger-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
+        .gh-custom-trigger .gh-trigger-text.selected { opacity: 1; color: var(--text-color); }
+        .gh-custom-trigger .material-icons-round { font-size: 18px; color: var(--accent); transition: transform 0.2s; flex-shrink: 0; }
+        .gh-custom-trigger.open .material-icons-round { transform: rotate(180deg); }
+        .gh-custom-list {
+            position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px;
+            box-shadow: none; z-index: 200; max-height: 200px; overflow-y: auto;
+            opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .gh-custom-list::-webkit-scrollbar { display: none; }
+        .gh-custom-list.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        .gh-custom-option {
+            padding: 11px 14px; font-family: 'Poppins', sans-serif; font-size: 12px;
+            color: var(--text-color); cursor: pointer; 
+            display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--glass-border);
+        }
+        .gh-custom-option:last-child { border-bottom: none; }
+        .gh-custom-option:active, .gh-custom-option.selected { background: var(--accent-dim); color: var(--accent); }
+        .gh-custom-option .material-icons-round { font-size: 15px; opacity: 0.6; }
+
+        
+/* ===== AGENT MODAL ===== */
+        #agent-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        #agent-overlay.active { opacity: 1; pointer-events: auto; }
+        #agent-modal {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.88);
+            width: 88%; max-width: 380px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 24px; padding: 0;
+            z-index: 210; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+        }
+        #agent-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+
+        /* Modal header strip */
+        #agent-modal-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 16px 18px 14px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        #agent-modal-avatar {
+            width: 36px; height: 36px; border-radius: 12px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        #agent-modal-avatar .material-icons-round { font-size: 18px; color: white; }
+
+        /* Scrollable body */
+        #agent-modal-body { padding: 16px 18px; overflow-y: auto; max-height: 72vh; }
+        #agent-modal-body::-webkit-scrollbar { display: none; }
+
+        /* Connected agent pill */
+        .am-agent-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 12px;
+            border: 1.5px solid var(--glass-border);
+            background: transparent; cursor: pointer;
+            transition: border-color 0.18s, background 0.18s, transform 0.12s;
+            margin-bottom: 6px;
+        }
+        .am-agent-row.active { border-color: var(--accent); background: var(--accent-dim); }
+        .am-agent-row:active { transform: scale(0.98); }
+        .am-agent-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; flex-shrink: 0; transition: background 0.3s; }
+        .am-agent-row.active .am-agent-dot { background: #10b981; }
+        .am-agent-name { flex: 1; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .am-agent-del { background: none; border: none; cursor: pointer; padding: 4px; opacity: 0.3; color: var(--text-color); border-radius: 6px; transition: opacity 0.15s, color 0.15s; display: flex; align-items: center; }
+        .am-agent-del:active { opacity: 1; color: #ef4444; }
+        .am-agent-del .material-icons-round { font-size: 15px; pointer-events: none; }
+
+        /* Key input */
+        #agent-api-key {
+            width: 100%; padding: 11px 13px; border-radius: 12px;
+            background: rgba(0,0,0,0.18); border: 1.5px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 12px; margin-bottom: 8px;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.18s, box-shadow 0.18s; outline: none;
+        }
+        #agent-api-key:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+        /* Provider quick-links */
+        .am-provider-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.1); cursor: pointer;
+            text-decoration: none; transition: background 0.15s, border-color 0.15s;
+            margin-bottom: 5px;
+        }
+        .am-provider-row:active { background: var(--accent-dim); border-color: var(--accent); }
+        .am-provider-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .am-provider-name { font-size: 12px; font-weight: 700; color: var(--text-color); }
+        .am-provider-tag { font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 5px; margin-left: 5px; }
+
+        .agent-provider-grid { display: none; }
+        .agent-provider-btn { display: none; }
+
+        /* Animated provider selection list */
+        #agent-model-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+            opacity: 0;
+        }
+        #agent-model-list.open {
+            max-height: 280px;
+            opacity: 1;
+        }
+        #agent-model-list-inner {
+            max-height: 260px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 4px 0 6px;
+        }
+        #agent-model-list-inner::-webkit-scrollbar { display: none; }
+        .am-model-row {
+            display: flex; align-items: center; gap: 9px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1.5px solid var(--glass-border);
+            background: transparent;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, transform 0.12s;
+            animation: amRowIn 0.2s ease both;
+        }
+        @keyframes amRowIn {
+            from { opacity:0; transform:translateY(6px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .am-model-row:active { transform: scale(0.97); }
+        .am-model-row:hover, .am-model-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+        .am-model-dot { width:15px; height:15px; border-radius:4px; border:1.5px solid var(--glass-border); background:transparent; flex-shrink:0; transition:background 0.15s,border-color 0.15s; display:flex; align-items:center; justify-content:center; }
+        .am-model-row.selected .am-model-dot { background:var(--accent); border-color:var(--accent); }
+        .am-model-dot::after { content:''; display:none; width:4px; height:7px; border:2px solid white; border-top:none; border-left:none; transform:rotate(45deg) translate(0px,-1px); }
+        .am-model-row.selected .am-model-dot::after { display:block; }
+        .am-model-name { flex:1; font-size:11px; font-weight:700; color:var(--text-color); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'Poppins',sans-serif; }
+        .am-model-tag { font-size:8px; font-weight:700; padding:2px 6px; border-radius:5px; flex-shrink:0; font-family:'Poppins',sans-serif; }
+
+        
+/* ===== AGENT BAR — compact strip inside nav panel ===== */
+        #agent-bar {
+            display: none; flex-direction: column; gap: 0;
+            border-bottom: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+        }
+        #agent-bar.visible { display: flex; }
+        #agent-compact-row {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 10px;
+        }
+        .agent-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; flex-shrink: 0; transition: background 0.3s; }
+        #agent-prompt {
+            flex: 1; padding: 7px 10px; border-radius: 10px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif; font-size: 12px;
+            resize: none; height: 34px; max-height: 90px; overflow-y: auto; line-height: 1.4;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.2s;
+        }
+        #agent-prompt:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+        #agent-attach-btn, #agent-send-btn {
+            width: 34px; height: 34px; border-radius: 10px; border: none; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+        #agent-attach-btn:active, #agent-send-btn:active { transform: scale(0.9); }
+        #agent-attach-btn { background: rgba(128,128,128,0.12); color: var(--text-color); }
+        #agent-send-btn { background: var(--accent); color: white; }
+        #agent-send-btn .material-icons-round, #agent-attach-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+        #agent-bar-label { font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+        #agent-close-btn { font-size: 16px; opacity: 0.4; cursor: pointer; pointer-events: auto; flex-shrink: 0; }
+        #agent-thinking {
+            display: none; align-items: center; gap: 6px; font-size: 10px; color: var(--accent); font-weight: 600;
+            padding: 0 10px 5px;
+        }
+        #agent-thinking.visible { display: flex; }
+        .agent-dots span { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin-right: 2px; animation: agentBounce 0.8s infinite; }
+        .agent-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .agent-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes agentBounce { 0%,80%,100%{ transform:translateY(0); opacity:0.6; } 40%{ transform:translateY(-4px); opacity:1; } } @keyframes activityFadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:0.7; transform:translateY(0); } }
+        @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+        @keyframes commitSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+        #agent-file-selector { padding: 0 10px 5px; }
+        #agent-file-select {
+            width:100%; padding:5px 8px; border-radius:7px;
+            background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);
+            color:var(--text-color); font-family:Poppins,sans-serif; font-size:10px;
+            font-weight:600; appearance:none; -webkit-appearance:none; cursor:pointer;
+        }
+    
+
+        /* Full-screen chat overlay */
+        #agent-chat-overlay {
+            position: fixed; inset: 0; z-index: 400;
+            background: rgba(0,0,0,0.6);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        #agent-chat-overlay.active { opacity: 1; pointer-events: auto; }
+
+        /* Chat panel — slides up like WhatsApp */
+        #agent-chat-panel {
+            position: fixed; left: 0; right: 0; bottom: 0;
+            height: 88vh; max-height: 88vh;
+            background: var(--glass-bg);
+            border-radius: 22px 22px 0 0;
+            border-top: 1px solid var(--glass-border);
+            z-index: 410;
+            display: flex; flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.32s cubic-bezier(0.34,1.2,0.64,1);
+            font-family: 'Poppins', sans-serif;
+        }
+        #agent-chat-panel.active { transform: translateY(0); }
+
+        /* Chat header bar */
+        #agent-chat-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        .chat-header-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg,#10b981,#059669);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .chat-header-avatar .material-icons-round { font-size: 18px; color: white; }
+        .chat-header-info { flex: 1; min-width: 0; }
+        .chat-header-name {
+            font-size: 14px; font-weight: 700; color: var(--text-color);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .chat-header-status {
+            font-size: 10px; color: var(--accent); font-weight: 600; margin-top: 1px;
+        }
+        #chat-session-name-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-color); opacity: 0.4;
+            display: flex; align-items: center;
+            padding: 4px; border-radius: 6px; transition: opacity 0.15s;
+        }
+        #chat-session-name-btn:active { opacity: 1; }
+        #chat-session-name-btn .material-icons-round { font-size: 17px; pointer-events: none; }
+        #chat-close-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-color); opacity: 0.45;
+            display: flex; align-items: center;
+            padding: 4px; border-radius: 6px;
+        }
+        #chat-close-btn .material-icons-round { font-size: 20px; pointer-events: none; }
+
+        /* Session name pill */
+        #chat-session-label {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            background: var(--accent-dim); border: 1px solid var(--accent);
+            border-radius: 20px; padding: 2px 9px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 120px; cursor: pointer;
+        }
+
+        /* Messages scroll area */
+        #agent-chat-messages {
+            flex: 1; overflow-y: auto; padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        #agent-chat-messages::-webkit-scrollbar { display: none; }
+
+        /* Individual message bubbles */
+        .chat-msg { display: flex; flex-direction: column; max-width: 85%; min-width: 0; }
+        .chat-msg.user { align-self: flex-end; align-items: flex-end; }
+        .chat-msg.agent { align-self: flex-start; align-items: flex-start; width: 100%; max-width: 100%; }
+
+        .chat-bubble {
+            padding: 9px 13px; border-radius: 16px;
+            font-size: 12px; line-height: 1.55; word-break: break-word;
+            min-width: 0; overflow: hidden; max-width: 100%; box-sizing: border-box;
+        }
+        .chat-msg.user .chat-bubble {
+            background: var(--accent); color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-msg.agent .chat-bubble {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--glass-border);
+            color: var(--text-color);
+            border-bottom-left-radius: 4px;
+        }
+        body.light-theme .chat-msg.agent .chat-bubble {
+            background: rgba(0,0,0,0.04);
+        }
+        .chat-time {
+            font-size: 9px; opacity: 0.4; margin-top: 3px; font-weight: 600;
+        }
+        .chat-msg-footer {
+            display: flex; align-items: center; gap: 6px; margin-top: 3px;
+        }
+        .chat-copy-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-color); opacity: 0; padding: 2px 5px;
+            border-radius: 6px; display: flex; align-items: center; gap: 3px;
+            font-size: 9px; font-weight: 600; font-family: 'Poppins', sans-serif;
+            transition: opacity 0.15s, background 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .chat-copy-btn .material-icons-round { font-size: 12px; pointer-events: none; }
+        .chat-msg:hover .chat-copy-btn,
+        .chat-msg:active .chat-copy-btn { opacity: 0.6; }
+        .chat-copy-btn:active { opacity: 1 !important; background: var(--accent-dim); color: var(--accent); }
+        .chat-copy-btn.copied { opacity: 1 !important; color: var(--accent); }
+
+        /* ── Code Canvas (Gemini-style) ── */
+        .code-canvas {
+            margin: 8px 0 4px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            background: #0d0d10;
+            font-family: 'Courier New', Courier, monospace;
+            max-width: 100%;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        body.light-theme .code-canvas { background: #1e1e2e; }
+        .code-canvas-header {
+            display: flex; align-items: center; gap: 7px;
+            padding: 6px 10px;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .code-canvas-lang {
+            font-size: 9px; font-weight: 700; font-family: 'Poppins', sans-serif;
+            color: var(--accent); text-transform: uppercase; letter-spacing: 0.7px; flex: 1;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .code-canvas-btn {
+            background: rgba(255,255,255,0.07); border: none; border-radius: 6px;
+            padding: 3px 7px; font-size: 9px; font-weight: 700;
+            font-family: 'Poppins', sans-serif; color: rgba(255,255,255,0.7);
+            cursor: pointer; display: flex; align-items: center; gap: 3px;
+            transition: background 0.15s, color 0.15s; flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .code-canvas-btn:active { background: var(--accent-dim); color: var(--accent); }
+        .code-canvas-btn .material-icons-round { font-size: 11px; pointer-events: none; }
+        .code-canvas-btn.copied { color: var(--accent); }
+        .code-canvas-body {
+            padding: 10px 12px;
+            overflow-x: auto;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.55;
+            color: #e0e0e0;
+            white-space: pre;
+            max-height: 260px;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* inline code */
+        .chat-inline-code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            background: rgba(16,185,129,0.12);
+            color: var(--accent);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+        /* chat markdown */
+        .chat-md-bold { font-weight: 700; }
+        .chat-md-li { padding-left: 14px; position: relative; }
+        .chat-md-li::before { content: '•'; position: absolute; left: 3px; color: var(--accent); }
+        .agent-step-card {
+            margin-top: 8px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+        .agent-step-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 12px;
+            background: rgba(16,185,129,0.08);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .agent-step-num {
+            width: 20px; height: 20px; border-radius: 50%;
+            background: var(--accent); color: white;
+            font-size: 10px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .agent-step-label {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 0.5px; flex: 1;
+        }
+        .agent-step-body {
+            padding: 10px 12px;
+            font-size: 12px; line-height: 1.6;
+            color: var(--text-color); opacity: 0.9;
+            background: rgba(0,0,0,0.12);
+        }
+        .agent-step-actions {
+            display: flex; gap: 8px;
+            padding: 9px 12px;
+            background: rgba(0,0,0,0.10);
+            border-top: 1px solid var(--glass-border);
+        }
+        .agent-step-accept {
+            flex: 1; padding: 8px; border: none; border-radius: 8px;
+            background: var(--accent); color: white;
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 5px;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .agent-step-accept:active { opacity: 0.85; transform: scale(0.97); }
+        .agent-step-accept .material-icons-round { font-size: 14px; pointer-events: none; }
+        .agent-step-reject {
+            padding: 8px 14px; border: 1px solid var(--glass-border); border-radius: 8px;
+            background: none; color: var(--text-color); opacity: 0.6;
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: opacity 0.15s, background 0.15s;
+        }
+        .agent-step-reject:active { background: rgba(239,68,68,0.1); color: #ef4444; opacity: 1; }
+        .agent-step-refine-btn {
+            padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px;
+            background: none; color: var(--accent);
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: background 0.15s, opacity 0.15s;
+            white-space: nowrap;
+        }
+        .agent-step-refine-btn:active { background: var(--accent-dim); }
+        .agent-step-refine-area {
+            padding: 8px 12px;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.1);
+            display: flex; gap: 8px; align-items: flex-end;
+        }
+        .agent-step-refine-input {
+            flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            border-radius: 8px; color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 12px; padding: 7px 10px; resize: none; outline: none;
+            line-height: 1.4; min-height: 34px; max-height: 80px;
+        }
+        .agent-step-refine-input:focus { border-color: var(--accent); }
+        .agent-step-refine-send {
+            width: 32px; height: 32px; border-radius: 8px; border: none; flex-shrink: 0;
+            background: var(--accent); color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .agent-step-refine-send:active { opacity: 0.8; transform: scale(0.9); }
+        .agent-step-refine-send .material-icons-round { font-size: 16px; pointer-events: none; }
+        .agent-step-done {
+            font-size: 10px; font-weight: 700; color: var(--text-color);
+            opacity: 0.4; padding: 9px 12px;
+            background: rgba(0,0,0,0.10);
+            border-top: 1px solid var(--glass-border);
+            text-align: center;
+        }
+        .agent-plan-item {
+            display: flex; gap: 8px; align-items: flex-start;
+            padding: 6px 0; border-bottom: 1px solid var(--glass-border);
+            font-size: 11px; line-height: 1.5;
+        }
+        .agent-plan-item:last-child { border-bottom: none; }
+        .agent-plan-num {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            min-width: 18px; margin-top: 1px;
+        }
+
+        /* Typing indicator bubble */
+        .chat-typing-bubble {
+            display: flex; align-items: center; gap: 4px;
+            padding: 10px 14px; border-radius: 16px; border-bottom-left-radius: 4px;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);
+            width: fit-content;
+        }
+        .chat-typing-bubble span {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: var(--accent); display: inline-block;
+            animation: agentBounce 0.8s infinite;
+        }
+        .chat-typing-bubble span:nth-child(2) { animation-delay: 0.2s; }
+        .chat-typing-bubble span:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Fix / Apply card inside chat bubble */
+        .chat-fix-card {
+            margin-top: 8px;
+            background: rgba(16,185,129,0.07);
+            border: 1px solid rgba(16,185,129,0.25);
+            border-radius: 10px; padding: 9px 11px;
+        }
+        .chat-fix-title {
+            font-size: 10px; font-weight: 700; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+        }
+        .chat-fix-reason {
+            font-size: 11px; color: var(--text-color); opacity: 0.8;
+            margin-bottom: 8px; line-height: 1.5;
+        }
+        .chat-fix-preview {
+            display: flex; gap: 5px; margin-bottom: 8px;
+        }
+        .chat-fix-side {
+            flex: 1; border-radius: 6px; padding: 5px 7px; min-width: 0;
+        }
+        .chat-fix-side.remove {
+            background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+        }
+        .chat-fix-side.insert {
+            background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);
+        }
+        .chat-fix-side-label {
+            font-size: 8px; font-weight: 700; letter-spacing: 0.4px; margin-bottom: 3px;
+        }
+        .chat-fix-side.remove .chat-fix-side-label { color: #ef4444; }
+        .chat-fix-side.insert .chat-fix-side-label { color: #10b981; }
+        .chat-fix-code {
+            font-family: monospace; font-size: 10px;
+            word-break: break-all; opacity: 0.9;
+        }
+        .chat-fix-side.remove .chat-fix-code { color: #ef4444; }
+        .chat-fix-side.insert .chat-fix-code { color: #10b981; }
+        .chat-apply-btn {
+            width: 100%; padding: 8px; border: none; border-radius: 8px;
+            background: var(--accent); color: white;
+            font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 6px;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .chat-apply-btn:active { opacity: 0.85; transform: scale(0.97); }
+        .chat-apply-btn.applied {
+            background: rgba(128,128,128,0.2); color: var(--text-color); cursor: default;
+        }
+        .chat-apply-btn .material-icons-round { font-size: 15px; pointer-events: none; }
+
+        /* Split file card */
+        .chat-split-card {
+            margin-top: 8px;
+            background: rgba(16,185,129,0.06);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 10px; padding: 9px 11px;
+        }
+        .chat-split-file-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 0; border-bottom: 1px solid var(--glass-border);
+        }
+        .chat-split-file-row:last-of-type { border-bottom: none; }
+        .chat-split-file-name {
+            flex: 1; font-size: 12px; font-weight: 600;
+            color: var(--text-color); overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap;
+        }
+        .chat-split-mini-btn {
+            background: var(--accent-dim); border: none; border-radius: 6px;
+            padding: 4px 7px; cursor: pointer; font-size: 10px;
+            font-family: 'Poppins', sans-serif; font-weight: 700;
+            color: var(--accent); transition: transform 0.15s;
+        }
+        .chat-split-mini-btn:active { transform: scale(0.92); }
+
+        /* Chat input row */
+        #agent-chat-input-row {
+            display: flex; align-items: flex-end; gap: 8px;
+            padding: 10px 14px;
+            padding-bottom: max(env(safe-area-inset-bottom), 14px);
+            border-top: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        #agent-chat-file-selector {
+            padding: 0 14px 6px; display: none;
+            flex-shrink: 0;
+        }
+        #agent-chat-file-select {
+            width: 100%; padding: 5px 8px; border-radius: 7px;
+            background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: Poppins,sans-serif;
+            font-size: 10px; font-weight: 600;
+            appearance: none; -webkit-appearance: none; cursor: pointer;
+        }
+        #agent-chat-textarea {
+            flex: 1; padding: 9px 12px; border-radius: 20px;
+            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 13px; resize: none; min-height: 38px;
+            max-height: 100px; overflow-y: auto; line-height: 1.4;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.2s;
+        }
+        #agent-chat-textarea:focus {
+            border-color: var(--accent); outline: none;
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        #agent-chat-attach-btn, #agent-chat-send-btn {
+            width: 38px; height: 38px; border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+        #agent-chat-attach-btn:active, #agent-chat-send-btn:active { transform: scale(0.88); }
+        #agent-chat-attach-btn { background: rgba(128,128,128,0.12); color: var(--text-color); }
+        #agent-chat-send-btn { background: var(--accent); color: white; }
+        #agent-chat-attach-btn .material-icons-round,
+        #agent-chat-send-btn .material-icons-round { font-size: 17px; pointer-events: none; }
+
+        /* Empty chat state */
+        #chat-empty-state {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 10px; opacity: 0.45; pointer-events: none;
+            padding: 20px;
+        }
+        #chat-empty-state .material-icons-round { font-size: 38px; color: var(--accent); }
+        #chat-empty-state p {
+            font-size: 12px; text-align: center; line-height: 1.6;
+            color: var(--text-color);
+        }
+
+
+
+        /* When chat is open, main-container splits into two halves */
+        .main-container.chat-split {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Editor half — top 50% */
+        .main-container.chat-split #editor {
+            position: relative;
+            top: auto; right: auto; bottom: auto; left: auto;
+            flex: 1;
+            min-height: 0;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        /* Chat half — bottom 50% */
+        #inline-chat-panel {
+            position: fixed;
+            left: 0; right: 0;
+            bottom: 0;
+            z-index: 41;
+            height: 45vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--glass-bg);
+            border-top: 2px solid var(--accent);
+            border-radius: var(--panel-round) var(--panel-round) 0 0;
+            box-shadow: 0 -3px 16px rgba(0,0,0,0.10);
+            overflow: hidden;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            pointer-events: none;
+            will-change: transform;
+        }
+        #inline-chat-panel.chat-open {
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Chat header — compact strip */
+        #inline-chat-header {
+            display: flex;
+            align-items: center;
+            pointer-events: auto;
+            gap: 8px;
+            padding: 7px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        .inline-chat-avatar {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .inline-chat-avatar .material-icons-round { font-size: 14px; color: white; }
+        #inline-chat-name {
+            font-size: 12px; font-weight: 700;
+            color: var(--text-color); flex: 1;
+        }
+        #inline-chat-status {
+            font-size: 10px; color: var(--accent); font-weight: 600;
+        }
+        #inline-chat-close {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-color); opacity: 0.4;
+            display: flex; align-items: center; padding: 2px;
+        }
+        #inline-chat-close .material-icons-round { font-size: 18px; pointer-events: none; }
+        /* Fullscreen toggle */
+        #inline-chat-fullscreen {
+            background: rgba(128,128,128,0.1); border: none; border-radius: 8px;
+            width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-color); opacity: 0.55; flex-shrink: 0;
+            transition: opacity 0.15s;
+        }
+        #inline-chat-fullscreen:active { opacity: 1; background: var(--accent-dim); }
+        #inline-chat-panel.chat-fullscreen {
+            top: var(--header-full-h, 80px) !important;
+            height: calc(100svh - var(--header-full-h, 80px)) !important;
+            border-radius: 0 !important;
+            padding-top: 0;
+            max-height: calc(100svh - var(--header-full-h, 80px)) !important;
+        }
+
+        /* Chat mode button — animated glow ring when ON */
+        #inline-chat-mode-btn { position: relative; transition: background 0.25s, color 0.25s, box-shadow 0.25s; }
+        #inline-chat-mode-btn.mode-on { background: var(--accent) !important; color: white !important; animation: chatModePulse 2s ease-out infinite; }
+        @keyframes chatModePulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); } 60% { box-shadow: 0 0 0 6px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+        #inline-chat-mode-btn.mode-on svg { filter: drop-shadow(0 0 3px rgba(255,255,255,0.4)); }
+        #chat-code-access-btn { display: none; position: relative; transition: background 0.25s, color 0.25s, box-shadow 0.25s; }
+        #chat-code-access-btn.access-on { background: rgba(245,158,11,0.18) !important; color: #f59e0b !important; border: 1.5px solid rgba(245,158,11,0.4) !important; }
+        #chat-code-access-btn.access-on svg { stroke: #f59e0b; }
+
+        /* Toast anchored above chat panel */
+        #chat-panel-toast { position:fixed; left:50%; transform:translateX(-50%) translateY(8px); bottom:46vh; background:var(--glass-bg); border:1px solid var(--glass-border); color:var(--text-color); padding:7px 14px; border-radius:20px; font-size:11px; font-weight:700; font-family:'Poppins',sans-serif; display:flex; align-items:center; gap:7px; z-index:9999; opacity:0; pointer-events:none; white-space:nowrap; box-shadow:0 -3px 12px rgba(0,0,0,0.25); transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+        #chat-panel-toast.show { opacity:1; }
+        #chat-panel-toast:not([style*="top"]).show { transform:translateX(-50%) translateY(0); }
+        #chat-panel-toast .cpt-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+        /* Messages area */
+        #inline-chat-messages {
+            flex: 1; overflow-y: auto;
+            padding: 10px 12px;
+            display: flex; flex-direction: column;
+            gap: 8px;
+            overscroll-behavior: contain;
+        }
+        #inline-chat-messages::-webkit-scrollbar { display: none; }
+
+        /* Reuse existing chat bubble styles */
+        #inline-chat-messages .chat-msg { max-width: 88%; min-width: 0; }
+        #inline-chat-messages .chat-msg.agent { max-width: 100%; width: 100%; }
+
+        /* Input row */
+        #inline-chat-input-row {
+            display: flex; align-items: flex-end; gap: 6px;
+            padding: 8px 10px;
+            padding-bottom: max(env(safe-area-inset-bottom), 10px);
+            border-top: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        #inline-chat-textarea {
+            flex: 1; padding: 8px 11px; border-radius: 18px;
+            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+            font-size: 12px; resize: none; min-height: 34px;
+            max-height: 80px; overflow-y: auto; line-height: 1.4;
+            user-select: text; -webkit-user-select: text;
+            transition: border-color 0.2s;
+        }
+        #inline-chat-textarea:focus {
+            border-color: var(--accent); outline: none;
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        #inline-chat-send-btn {
+            width: 34px; height: 34px; border-radius: 50%; border: none;
+            background: var(--accent); color: white;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: transform 0.15s, background 0.2s;
+        }
+        #inline-chat-send-btn:active { transform: scale(0.88); }
+        #inline-chat-send-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+        .prompt-preview-card { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 10px; margin: 4px 0; overflow: hidden; font-family: 'Poppins', sans-serif; }
+        .prompt-preview-header { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; user-select: none; }
+        .prompt-preview-header:active { background: rgba(16,185,129,0.08); }
+        .prompt-preview-title { font-size: 10px; font-weight: 700; color: var(--accent); flex: 1; }
+        .prompt-preview-size { font-size: 9px; color: var(--accent); opacity: 0.6; }
+        .prompt-preview-chevron { font-size: 14px; color: var(--accent); opacity: 0.7; transition: transform 0.2s; pointer-events: none; }
+        .prompt-preview-body { display: none; padding: 0 10px 8px; }
+        .prompt-preview-body.open { display: block; }
+        .prompt-preview-row { display: flex; gap: 6px; align-items: flex-start; padding: 3px 0; border-bottom: 1px solid rgba(16,185,129,0.08); font-size: 10px; }
+        .prompt-preview-row:last-child { border-bottom: none; }
+        .prompt-preview-label { color: var(--accent); font-weight: 700; opacity: 0.7; min-width: 70px; flex-shrink: 0; }
+        .prompt-preview-val { color: var(--text-color); opacity: 0.8; word-break: break-word; line-height: 1.4; }
+
+        /* Empty state inside inline chat */
+        #inline-chat-empty {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            flex: 1; opacity: 0.4; padding: 16px; text-align: center;
+            pointer-events: none;
+        }
+        #inline-chat-empty .material-icons-round { font-size: 28px; color: var(--accent); margin-bottom: 6px; }
+        #inline-chat-empty p { font-size: 11px; color: var(--text-color); line-height: 1.6; }
+
+        /* ── Ace Editor Diff Markers (agent preview) ── */
+        .ace-diff-remove-line {
+            position: absolute;
+            background: rgba(239, 68, 68, 0.18);
+            border-left: 3px solid #ef4444;
+            z-index: 4;
+        }
+        .ace-diff-add-line {
+            position: absolute;
+            background: rgba(16, 185, 129, 0.15);
+            border-left: 3px solid #10b981;
+            z-index: 4;
+        }
+        .ace_gutter-cell.ace-diff-remove {
+            background: rgba(239, 68, 68, 0.25);
+            color: #ef4444 !important;
+        }
+        .ace_gutter-cell.ace-diff-add {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981 !important;
+        }
+
+        /* AI Agent button — glowing when chat open */
+        .toolbar-btn.chat-active {
+            background: var(--accent-dim) !important;
+            color: var(--accent) !important;
+            opacity: 1 !important;
+        }
+
+        /* ══════════════════════════════════════════
+           DESKTOP LAYOUT  ≥ 768px
+           bottom-panel becomes a left sidebar
+        ══════════════════════════════════════════ */
+        @media (min-width: 768px) {
+
+            /* Sidebar fixed on left */
+            #bottom-panel {
+                position: fixed !important;
+                left: 0; top: 0; bottom: 0;
+                width: 220px;
+                height: 100% !important;
+                transform: none !important;
+                transition: transform 0.3s cubic-bezier(0.4,0,0.2,1) !important;
+                z-index: 40;
+                display: flex !important;
+                flex-direction: column;
+                overflow-y: auto;
+                overflow-x: hidden;
             }
-            _inlineChatScroll();
-        }).catch(err => {
-            card.innerHTML = `<div style="padding:9px 12px;font-size:11px;color:#ef4444;font-family:'Poppins',sans-serif;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Re-analysis failed: ${(err.message||'').slice(0,80)}</div>`;
-        });
-    }
+            #bottom-panel::-webkit-scrollbar { display: none; }
 
-    // ── "Looks good" — dismiss card, add positive confirmation to history ──
-    function _inlineConfirmWorking(btn) {
-        btn.closest('div').parentElement.innerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.06);border-radius:12px;border:1px solid rgba(16,185,129,0.2);">
-            <span class="material-icons-round" style="font-size:15px;color:var(--accent);">verified</span>
-            <span style="font-size:11px;font-weight:600;color:var(--accent);font-family:'Poppins',sans-serif;">Fix confirmed <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg></span>
-        </div>`;
-        _inlineChatHistory.push({ role: 'user', content: '[USER CONFIRMED: the fix worked correctly]' });
-        showToast('Fix confirmed!', 'verified');
-    }
-
-    function _applyInlineSplit(btn, files) {
-        if (!files || !files.length) return;
-        files.forEach(f => openFileInTab(f.filename, f.content, true));
-        btn.closest('div').parentElement.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.08);border-radius:12px;">
-            <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
-            <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;">${files.length} files created</span>
-        </div>`;
-        showToast(`${files.length} files created`, 'call_split');
-    }
-
-    function _applyInlineNewFile(btn, filename, content) {
-        openFileInTab(filename, content, true);
-        btn.closest('div').parentElement.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.08);border-radius:12px;">
-            <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
-            <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;">${filename} created</span>
-        </div>`;
-        showToast(`${filename} created`, 'add_circle');
-    }
-
-    // ── Universal Apply/Decline confirm card ──
-    // Used for new_file, split, reorganize — all go through here
-    function _buildConfirmCard({ type, icon, title, lines, onApply }) {
-        const card = document.createElement('div');
-        card.style.cssText = 'border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;margin-top:4px;';
-
-        const linesHTML = (lines||[]).map(l =>
-            `<div style="font-size:10px;font-family:'Poppins',sans-serif;color:var(--text-color);opacity:0.7;padding:2px 0;display:flex;align-items:center;gap:6px;">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-                ${l}
-            </div>`
-        ).join('');
-
-        card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
-                <span class="material-icons-round" style="font-size:15px;color:var(--accent);pointer-events:none;">${icon}</span>
-                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">${title}</span>
-            </div>
-            ${linesHTML ? `<div style="padding:8px 12px 4px;">${linesHTML}</div>` : ''}
-            <div style="padding:8px 12px;display:flex;gap:7px;" id="confirm-card-actions-${Date.now()}">
-                <button class="confirm-apply-btn" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:opacity 0.15s,transform 0.15s;">
-                    <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply
-                </button>
-                <button class="confirm-decline-btn" style="padding:9px 16px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;transition:opacity 0.15s;">
-                    Decline
-                </button>
-            </div>`;
-
-        const applyBtn = card.querySelector('.confirm-apply-btn');
-        const declineBtn = card.querySelector('.confirm-decline-btn');
-        const actRow = card.querySelector('[id^="confirm-card-actions"]');
-
-        applyBtn.onclick = () => {
-            onApply();
-            actRow.outerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.06);">
-                <span class="material-icons-round" style="font-size:14px;color:var(--accent);">check_circle</span>
-                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Applied <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg></span>
-                <button onclick="_agentUndoLast(this)" style="background:rgba(128,128,128,0.12);border:1px solid var(--glass-border);border-radius:8px;padding:3px 10px;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;color:var(--text-color);cursor:pointer;display:flex;align-items:center;gap:4px;">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;"><path d="M3 7v6h6"/><path d="M3 13C5.5 6.5 13 4 18 8s5 10 1 14"/></svg>
-                    Undo
-                </button>
-            </div>`;
-        };
-        declineBtn.onclick = () => {
-            actRow.outerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:rgba(239,68,68,0.05);">
-                <span class="material-icons-round" style="font-size:14px;color:#ef4444;opacity:0.7;">cancel</span>
-                <span style="font-size:11px;font-weight:600;color:var(--text-color);font-family:'Poppins',sans-serif;opacity:0.5;">Declined</span>
-            </div>`;
-            _inlineChatHistory.push({ role: 'user', content: '[USER DECLINED the suggested change]' });
-        };
-        return card;
-    }
-
-    // ── Inline chat: populate model dropdown ──
-    function _inlinePopulateModels() {
-        const activeAg = _activeAgent();
-        const modelLabel = document.getElementById('inline-model-label');
-        if (modelLabel) modelLabel.textContent = activeAg ? activeAg.providerName : 'Select Model';
-        // Remove no-agent banner if showing
-        if (activeAg) { const b = document.getElementById('inline-no-agent-banner'); if(b) b.remove(); }
-    }
-
-    let _modelDropdownCloseHandler = null;
-
-
-    // ── Shared outside-tap/click handler for dropdowns ──
-    const _ddOutsideHandlers = {};
-    function _inlineRegisterOutsideClose(which) {
-        _inlineUnregisterOutsideClose(which); // remove old first
-        const handler = (e) => {
-            const modelArea = document.getElementById('inline-model-trigger-area');
-            const fileArea  = document.getElementById('inline-file-selector');
-            if (which === 'model' && modelArea && modelArea.contains(e.target)) return;
-            if (which === 'file'  && fileArea  && fileArea.contains(e.target))  return;
-            if (which === 'model') _inlineCloseModelDropdown();
-            if (which === 'file')  _inlineCloseFileDropdown();
-        };
-        _ddOutsideHandlers[which] = handler;
-        setTimeout(() => {
-            document.addEventListener('touchstart', handler, { passive: true });
-            document.addEventListener('click',      handler);
-        }, 80);
-    }
-    function _inlineUnregisterOutsideClose(which) {
-        const h = _ddOutsideHandlers[which];
-        if (!h) return;
-        document.removeEventListener('touchstart', h);
-        document.removeEventListener('click', h);
-        delete _ddOutsideHandlers[which];
-    }
-    function _inlineToggleModelDropdown() {
-        const dd = document.getElementById('inline-model-dropdown');
-        const chevron = document.getElementById('inline-model-chevron');
-        if (!dd) return;
-        const isOpen = dd.style.display === 'block';
-        if (isOpen) {
-            _inlineCloseModelDropdown();
-        } else {
-            _inlineCloseFileDropdown();
-            _inlineRenderModelDropdown();
-            dd.style.display = 'block';
-            if(chevron) chevron.style.transform = 'rotate(180deg)';
-            _inlineRegisterOutsideClose('model');
-        }
-    }
-
-    function _inlineCloseModelDropdown() {
-        const dd = document.getElementById('inline-model-dropdown');
-        const chevron = document.getElementById('inline-model-chevron');
-        if(dd) dd.style.display = 'none';
-        if(chevron) chevron.style.transform = 'rotate(0deg)';
-        _inlineUnregisterOutsideClose('model');
-    }
-
-    function _inlineRenderModelDropdown() {
-        const dd = document.getElementById('inline-model-dropdown');
-        if (!dd) return;
-        dd.innerHTML = '';
-        if (agentList.length === 0) {
-            dd.innerHTML = `<div style="padding:12px;font-size:11px;color:var(--text-color);opacity:0.5;font-family:'Poppins',sans-serif;text-align:center;">No agents connected</div>
-            <div style="padding:0 10px 10px;"><button onclick="_inlineCloseModelDropdown();openAgentModal();" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;">Add Agent</button></div>`;
-            return;
-        }
-        // Group agents by category
-        const _catOrder = ['Coding','Reasoning','General','Nvidia','Auto'];
-        const _catColors = { Coding:'#10b981', Reasoning:'#8b5cf6', General:'#3b82f6', Nvidia:'#f59e0b', Auto:'#6b7280' };
-        const _catIcons = {
-            Coding:    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
-            Reasoning: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>',
-            General:   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>',
-            Nvidia:    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
-            Auto:      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
-        };
-        // Group by category — non-openrouter agents go under their provider name
-        const groups = {};
-        agentList.forEach((ag, i) => {
-            const cat = ag.category || ag.provider || 'Other';
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push({ ag, i });
-        });
-        // Render in order
-        const orderedCats = [..._catOrder.filter(c => groups[c]), ...Object.keys(groups).filter(c => !_catOrder.includes(c))];
-        orderedCats.forEach(cat => {
-            // Category header
-            const color = _catColors[cat] || 'var(--accent)';
-            const iconSvg = _catIcons[cat] || _catIcons.General;
-            const hdr = document.createElement('div');
-            hdr.style.cssText = `display:flex;align-items:center;gap:5px;padding:6px 14px 4px;margin-top:2px;`;
-            hdr.innerHTML = `<span style="color:${color};display:flex;align-items:center;">${iconSvg.replace('stroke="currentColor"','stroke="'+color+'"')}</span><span style="font-size:9px;font-weight:700;color:${color};font-family:Poppins,sans-serif;letter-spacing:0.05em;text-transform:uppercase;">${cat}</span>`;
-            dd.appendChild(hdr);
-            // Models in this category
-// Models in this category
-        groups[cat].forEach(({ ag, i }) => {
-            const row = document.createElement('div');
-            row.className = 'am-model-row'; row.style.cssText = (row.style.cssText||'') + '-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;';
-            row.style.animationDelay = (i * 35) + 'ms';
-            row.innerHTML = `
-                <div class="am-model-dot"></div>
-                <span class="am-model-name">${ag.providerName}</span>
-                <span class="am-model-tag" style="color:${ag.tagColor};background:${ag.tagColor}22;">${ag.tag||''}</span>
-            `;
-            row.addEventListener('touchstart', (e) => {
-                row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
-                row.style.background = 'rgba(128,128,128,0.12)';
-            }, { passive: true });
-            row.addEventListener('touchmove', (e) => {
-                if (row._ts) {
-                    const dy = Math.abs(e.touches[0].clientY - row._ts.y);
-                    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-                    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = ''; }
-                }
-            }, { passive: true });
-            row.ontouchend = (e) => {
-                const ts = row._ts; row._ts = null;
-                row.style.background = '';
-                if (!ts || ts.moved) return;
-                e.stopPropagation();
-                e.preventDefault();
-                _inlineSwitchModel(i);
-                _inlineCloseModelDropdown();
-            };
-            row.onclick = (e) => {
-                e.stopPropagation();
-                _inlineSwitchModel(i);
-                _inlineCloseModelDropdown();
-            };
-            dd.appendChild(row);
-        });
-        });
-        // Divider + Settings
-        const divider = document.createElement('div');
-        divider.style.cssText = 'height:1px;background:var(--glass-border);margin:0;';
-        dd.appendChild(divider);
-        const settings = document.createElement('div');
-        settings.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s;';
-        settings.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-color)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;pointer-events:none;opacity:0.5;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-            <span style="font-size:12px;font-weight:600;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;pointer-events:none;">Agent Settings</span>`;
-        settings.addEventListener('touchstart', () => { settings.style.background = 'rgba(128,128,128,0.08)'; }, { passive: true });
-        settings.addEventListener('touchend', () => { setTimeout(() => { settings.style.background = ''; }, 150); }, { passive: true });
-        settings.addEventListener('touchcancel', () => { settings.style.background = ''; }, { passive: true });
-        settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); openAgentModal(); };
-        dd.appendChild(settings);
-    }
-
-    // ── Inline chat: switch active model from dropdown ──
-    function _inlineSwitchModel(idx) {
-        activeAgentIdx = parseInt(idx) || 0;
-        _saveAgentList();
-        const ag = _activeAgent();
-        if (ag) {
-            document.getElementById('inline-chat-name').textContent = ag.providerName;
-            const ml = document.getElementById('inline-model-label');
-            if (ml) ml.textContent = ag.providerName;
-        }
-    }
-
-    // ── Inline chat: custom file selector dropdown ──
-    let _inlineSelectedTabId = null;
-
-    function _inlinePopulateTabs() {
-        _inlineSelectedTabId = activeTabId;
-        _inlineRenderFileDropdown();
-    }
-
-    function _inlineToggleFileDropdown(e) {
-        if (e) e.stopPropagation();
-        const dd = document.getElementById('inline-file-dropdown');
-        const chevron = document.getElementById('inline-file-chevron');
-        const trigger = document.getElementById('inline-file-trigger');
-        if (!dd) return;
-        const isOpen = dd.style.display === 'block';
-        if (isOpen) {
-            _inlineCloseFileDropdown();
-        } else {
-            _inlineCloseModelDropdown();
-            _inlineRenderFileDropdown();
-            dd.style.display = 'block';
-            if(chevron) chevron.style.transform = 'rotate(180deg)';
-            if(trigger) { trigger.style.borderColor = 'var(--accent)'; trigger.style.background = 'var(--accent-dim)'; }
-            _inlineRegisterOutsideClose('file');
-        }
-    }
-
-    function _inlineCloseFileDropdown(e) {
-        const trigger = document.getElementById('inline-file-trigger');
-        if (e && trigger && trigger.contains(e.target)) return;
-        const dd = document.getElementById('inline-file-dropdown');
-        const chevron = document.getElementById('inline-file-chevron');
-        const trig = document.getElementById('inline-file-trigger');
-        if(dd) dd.style.display = 'none';
-        if(chevron) chevron.style.transform = 'rotate(0deg)';
-        if(trig) { trig.style.borderColor = 'var(--glass-border)'; trig.style.background = 'rgba(128,128,128,0.1)'; }
-        _inlineUnregisterOutsideClose('file');
-    }
-
-    // ── Context tab IDs — files user has explicitly ticked as context ──
-    let _inlineContextTabIds = new Set();
-
-    function _inlineRenderFileDropdown() {
-            const dd = document.getElementById('inline-file-dropdown');
-            const label = document.getElementById('inline-file-label');
-            if (!dd) return;
-            dd.innerHTML = '';
-            dd.style.maxHeight = '250px';
-            dd.style.overflowY = 'auto';
-
-        // ── Section header ──
-        const header = document.createElement('div');
-        header.style.cssText = 'padding:6px 12px 4px;font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--glass-border);';
-        header.textContent = 'Target File';
-        dd.appendChild(header);
-
-        // ── "New File" option ──
-        const isNewSelected = _inlineSelectedTabId === 'new';
-        const newRow = document.createElement('div');
-        newRow.style.cssText = `display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'};`;
-        newRow.innerHTML = `
-            <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;">add_circle</span>
-            <span style="flex:1;font-size:11px;font-weight:700;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File</span>
-            <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isNewSelected ? '1' : '0'};">radio_button_checked</span>`;
-        newRow.addEventListener('touchstart', () => { newRow.style.background = 'rgba(16,185,129,0.12)'; }, { passive: true });
-        newRow.addEventListener('touchend', () => { setTimeout(() => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, 150); }, { passive: true });
-        newRow.addEventListener('touchcancel', () => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, { passive: true });
-        newRow.onclick = (e) => {
-            e.stopPropagation();
-            _inlineSelectedTabId = 'new';
-            _agentTargetTabId = null;
-            if(label) label.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File';
-            _inlineCloseFileDropdown();
-            _inlineRenderFileDropdown();
-        };
-        dd.appendChild(newRow);
-
-        // ── Existing file tabs — tap = set as target, long context icon = toggle context ──
-        fileTabs.forEach(t => {
-            const isTarget = t.id === _inlineSelectedTabId;
-            const isCtx = _inlineContextTabIds.has(t.id) && !isTarget;
-            const row = document.createElement('div');
-            row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);background:${isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent'};-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;`;
-            row.innerHTML = `
-                <span class="material-icons-round" style="font-size:14px;color:${isTarget ? 'var(--accent)' : 'var(--text-color)'};opacity:${isTarget ? '1' : '0.45'};pointer-events:none;">insert_drive_file</span>
-                <span style="flex:1;font-size:11px;font-weight:600;color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${t.name}</span>
-                <span title="Add as context" style="display:flex;align-items:center;padding:3px 5px;border-radius:5px;cursor:pointer;pointer-events:auto;background:${isCtx ? 'var(--accent-dim)' : 'transparent'};" id="ctx-btn-${t.id}">
-                    <span class="material-icons-round" style="font-size:13px;color:${isCtx ? 'var(--accent)' : 'var(--text-color)'};opacity:${isCtx ? '1' : '0.3'};pointer-events:none;">library_books</span>
-                </span>
-                <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
-
-            // Tap row = set as target file
-            const _rowBg = isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent';
-row.addEventListener('touchstart', (e) => {
-  row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
-  row.style.background = 'rgba(16,185,129,0.12)';
-}, { passive: true });
-row.addEventListener('touchmove', (e) => {
-  if (row._ts) {
-    const dy = Math.abs(e.touches[0].clientY - row._ts.y);
-    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; }
-  }
-}, { passive: true });
-row.ontouchend = (e) => {
-  const ts = row._ts; row._ts = null;
-  row.style.background = _rowBg;
-  if (!ts || ts.moved) return;
-  e.stopPropagation();
-  e.preventDefault();
-  if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
-    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
-    else _inlineContextTabIds.add(t.id);
-    _inlineRenderFileDropdown();
-    return;
-  }
-  _inlineSelectedTabId = t.id;
-  _agentTargetTabId = t.id;
-  _inlineContextTabIds.delete(t.id);
-  if(label) label.textContent = t.name;
-  _inlineCloseFileDropdown();
-  _inlineRenderFileDropdown();
-};
-row.onclick = (e) => {
-  e.stopPropagation();
-  if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
-    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
-    else _inlineContextTabIds.add(t.id);
-    _inlineRenderFileDropdown();
-    return;
-  }
-  _inlineSelectedTabId = t.id;
-  _agentTargetTabId = t.id;
-  _inlineContextTabIds.delete(t.id);
-  if(label) label.textContent = t.name;
-  _inlineCloseFileDropdown();
-  _inlineRenderFileDropdown();
-};
-            dd.appendChild(row);
-        });
-
-        // ── Context legend ──
-        const legend = document.createElement('div');
-        const ctxCount = _inlineContextTabIds.size;
-        legend.style.cssText = 'padding:6px 12px;font-size:9px;color:var(--text-color);opacity:0.4;font-family:Poppins,sans-serif;border-top:1px solid var(--glass-border);';
-        legend.innerHTML = ctxCount > 0
-            ? `<span style="color:var(--accent);opacity:0.8;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> ${ctxCount} context file${ctxCount>1?'s':''} added</span> &nbsp;— tap <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> to set target, tap <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> to toggle context`
-            : `Tap row = set target &nbsp;|&nbsp; Tap <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> = add as context`;
-        dd.appendChild(legend);
-
-        // Update label
-        if (label) {
-            if (_inlineSelectedTabId === 'new') {
-                label.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File';
-            } else {
-                const activeTab = fileTabs.find(t => t.id === _inlineSelectedTabId) || fileTabs.find(t => t.id === activeTabId);
-                const ctxTxt = ctxCount > 0 ? ` +${ctxCount}ctx` : '';
-                if (activeTab) label.textContent = activeTab.name + ctxTxt;
+            /* When hidden — slide left */
+            #bottom-panel.nav-hidden-desktop {
+                transform: translateX(-100%) !important;
             }
-        }
-    }
 
-    // ── Inline chat: attachment handling ──
-    let _inlineAttachment = null;
-
-    function _inlineTriggerAttach() {
-        const inp = document.getElementById('inline-chat-file-input');
-        if (!inp) return;
-        inp.click();
-    }
-
-    // Dedicated listener for inline chat file input — no conflict with agent-file-input
-    document.getElementById('inline-chat-file-input').addEventListener('change', (e) => {
-        const file = e.target.files[0]; if (!file) return;
-        if (file.size > 20 * 1024 * 1024) { showToast('File too large (max 20MB)', 'error_outline'); e.target.value = ''; return; }
-        const isBinary = /\.(png|jpg|jpeg|gif|webp|bmp|ico|svg|pdf|zip|rar|7z|tar|gz|exe|bin|wasm|ttf|otf|woff|woff2|mp3|mp4|wav|ogg|avi|mov|mkv)$/i.test(file.name);
-        const r = new FileReader();
-        if (isBinary) {
-            r.onload = ev => {
-                const sizeKB = (file.size / 1024).toFixed(1);
-                _inlineAttachment = { name: file.name, content: `[Binary file: ${file.name}, size: ${sizeKB}KB, type: ${file.type || 'unknown'}]` };
-                const bar  = document.getElementById('inline-attach-bar');
-                const name = document.getElementById('inline-attach-name');
-                if (bar)  bar.style.display = 'flex';
-                if (name) name.textContent = file.name;
-            };
-            r.readAsArrayBuffer(file);
-        } else {
-            r.onload = ev => {
-                _inlineAttachment = { name: file.name, content: ev.target.result };
-                const bar  = document.getElementById('inline-attach-bar');
-                const name = document.getElementById('inline-attach-name');
-                if (bar)  bar.style.display = 'flex';
-                if (name) name.textContent = file.name;
-            };
-            r.readAsText(file);
-        }
-        e.target.value = '';
-    });
-
-    function _inlineClearAttach() {
-        _inlineAttachment = null;
-        const bar = document.getElementById('inline-attach-bar');
-        if (bar) bar.style.display = 'none';
-    }
-
-    // ── Chat Mode ──
-    // When enabled: AI only chats (explains/analyses), never edits.
-    // All code in response goes to canvas. No apply/edit cards shown.
-    // _inlineChatModeOn declared early at top (default: true)
-    // When Chat Mode is ON, user can additionally grant AI read-access to target file code.
-    // Default OFF — AI gets empty code in chat mode unless user explicitly enables this.
-    // _chatCodeAccessOn declared early at top (default: false)
-
-    // Chat mode switch toast — centered, animated icon swap
-    function _showChatModeToast(isChatMode) {
-        let t = document.getElementById('chat-mode-toast');
-        if (!t) {
-            t = document.createElement('div');
-            t.id = 'chat-mode-toast';
-            t.style.cssText = [
-                'position:fixed',
-                'left:50%',
-                'top:50%',
-                'transform:translate(-50%,-50%) scale(0.85)',
-                'background:var(--glass-bg)',
-                'border:1px solid var(--glass-border)',
-                'color:var(--text-color)',
-                'padding:14px 24px',
-                'border-radius:20px',
-                'font-size:13px',
-                'font-weight:700',
-                'font-family:Poppins,sans-serif',
-                'display:flex',
-                'align-items:center',
-                'gap:10px',
-                'z-index:99999',
-                'opacity:0',
-                'pointer-events:none',
-                'white-space:nowrap',
-                'box-shadow:0 4px 20px rgba(0,0,0,0.10)',
-                'transition:opacity 0.22s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1)'
-            ].join(';');
-            document.body.appendChild(t);
-        }
-
-        // Animated swap: icon flips out, new one flips in
-        const iconWrap = document.createElement('span');
-        iconWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;flex-shrink:0;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);';
-
-        if (isChatMode) {
-            iconWrap.style.background = 'rgba(16,185,129,0.18)';
-            iconWrap.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
-            t.style.borderColor = 'rgba(16,185,129,0.35)';
-        } else {
-            iconWrap.style.background = 'rgba(245,158,11,0.18)';
-            iconWrap.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-            t.style.borderColor = 'rgba(245,158,11,0.35)';
-        }
-
-        const label = document.createElement('span');
-        label.textContent = isChatMode ? 'Chat Mode ON' : 'Edit Mode ON';
-        label.style.color = isChatMode ? '#10b981' : '#f59e0b';
-
-        t.innerHTML = '';
-        t.appendChild(iconWrap);
-        t.appendChild(label);
-
-        // Position: above chat panel in normal mode, center in fullscreen
-        const chatPanel = document.getElementById('inline-chat-panel');
-        if (_chatIsFullscreen || !chatPanel || !chatPanel.classList.contains('chat-open')) {
-            // Fullscreen or chat not open — center screen
-            t.style.top    = '50%';
-            t.style.bottom = 'auto';
-            t.style.transform = 'translate(-50%,-50%) scale(0.85)';
-        } else {
-            // Normal chat open — 16px above chat panel
-            const chatTop = chatPanel.getBoundingClientRect().top;
-            t.style.top    = 'auto';
-            t.style.bottom = (window.innerHeight - chatTop + 16) + 'px';
-            t.style.transform = 'translateX(-50%) scale(0.85)';
-        }
-
-        // Animate in
-        clearTimeout(t._timer);
-        requestAnimationFrame(() => {
-            t.style.opacity = '1';
-            if (_chatIsFullscreen || !chatPanel || !chatPanel.classList.contains('chat-open')) {
-                t.style.transform = 'translate(-50%,-50%) scale(1)';
-            } else {
-                t.style.transform = 'translateX(-50%) scale(1)';
+            /* bottom-area fills full height in sidebar */
+            #bottom-panel .bottom-area {
+                flex: 1;
+                border-top: none !important;
+                border-right: 1px solid var(--glass-border);
+                border-radius: 0 !important;
+                padding-top: 12px;
+                padding-bottom: 12px;
+                box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+                overflow-x: hidden;
             }
-        });
+            #bottom-panel .bottom-area::-webkit-scrollbar { display: none; }
 
-        // Animate icon: small bounce
-        setTimeout(() => { iconWrap.style.transform = 'scale(1.2) rotate(8deg)'; }, 60);
-        setTimeout(() => { iconWrap.style.transform = 'scale(1) rotate(0deg)'; }, 200);
+            /* Nav toggle pill — hide on desktop */
+            #nav-toggle-btn { display: none !important; }
 
-        // Animate out after 1.8s
-        t._timer = setTimeout(() => {
-            t.style.opacity = '0';
-            t.style.transform = t.style.bottom !== 'auto'
-                ? 'translateX(-50%) scale(0.9)'
-                : 'translate(-50%,-50%) scale(0.9)';
-        }, 1800);
-    }
+            /* Cursor nav row — useless on desktop (keyboard exists) */
+            .cursor-nav { display: none !important; }
 
-        function _toggleChatMode() {
-        _inlineChatModeOn = !_inlineChatModeOn;
-        const btn  = document.getElementById('inline-chat-mode-btn');
-        const icon = document.getElementById('chat-mode-icon');
-        const ta   = document.getElementById('inline-chat-textarea');
-        const accessBtn = document.getElementById('chat-code-access-btn');
-
-        if (_inlineChatModeOn) {
-            if (btn)  { btn.classList.add('mode-on'); btn.style.background = ''; btn.style.color = ''; }
-            if (icon) { icon.setAttribute('stroke', 'white'); icon.setAttribute('fill', 'rgba(255,255,255,0.15)'); }
-            if (ta)   ta.placeholder = 'Chat only — no edits...';
-            // Show code access toggle button
-            if (accessBtn) accessBtn.style.display = 'flex';
-        } else {
-            if (btn)  { btn.classList.remove('mode-on'); btn.style.background = 'rgba(128,128,128,0.12)'; btn.style.color = 'var(--text-color)'; }
-            if (icon) { icon.setAttribute('stroke', 'currentColor'); icon.setAttribute('fill', 'none'); }
-            if (ta)   ta.placeholder = 'Ask agent...';
-            // Hide code access button and reset its state
-            if (accessBtn) { accessBtn.style.display = 'none'; accessBtn.classList.remove('access-on'); }
-            _chatCodeAccessOn = false;
-        }
-
-        // Show centered mode-switch toast
-        _showChatModeToast(_inlineChatModeOn);
-    }
-
-    // ── Chat Code Access toggle — only visible when Chat Mode is ON ──
-    function _toggleChatCodeAccess() {
-        _chatCodeAccessOn = !_chatCodeAccessOn;
-        const btn = document.getElementById('chat-code-access-btn');
-        if (_chatCodeAccessOn) {
-            if (btn) btn.classList.add('access-on');
-            showToast('Code Access ON', 'code');
-        } else {
-            if (btn) btn.classList.remove('access-on');
-            showToast('Code Access OFF', 'code_off');
-        }
-    }
-
-    // ── Inline chat: fullscreen toggle ──
-    function _toggleChatFullscreen() {
-        _chatIsFullscreen = !_chatIsFullscreen;
-        const panel   = document.getElementById('inline-chat-panel');
-        const icon    = document.getElementById('fs-icon');
-        const header  = document.getElementById('header');
-        const tabsBar = document.getElementById('file-tabs-bar');
-        const hh      = (header  ? header.offsetHeight  : 48)
-                      + (tabsBar ? tabsBar.offsetHeight : 32);
-        if (_chatIsFullscreen) {
-            document.documentElement.style.setProperty('--header-h',      (header ? header.offsetHeight : 48) + 'px');
-            document.documentElement.style.setProperty('--header-full-h', hh + 'px');
-            panel.classList.add('chat-fullscreen');
-            if (icon) icon.innerHTML = '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>';
-        } else {
-            panel.classList.remove('chat-fullscreen');
-            if (icon) icon.innerHTML = '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>';
-        }
-    }
-
-    // ── Toggle all CSS animations OFF/ON ──
-    function toggleAnimations() {
-        _animationsDisabled = !_animationsDisabled;
-        const btn = document.getElementById('no-anim-btn');
-        if (_animationsDisabled) {
-            // Inject style to kill all animations/transitions
-            let s = document.getElementById('no-anim-style');
-            if (!s) {
-                s = document.createElement('style');
-                s.id = 'no-anim-style';
-                s.textContent = '*, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0ms !important; transition-duration: 0.001ms !important; transition-delay: 0ms !important; }';
-                document.head.appendChild(s);
+            /* Toolbar rows — vertical flow, full width */
+            .toolbar-rows-wrap {
+                max-height: none !important;
+                overflow: visible !important;
+                flex: 1;
             }
-            if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-dim)'; }
-            showToast('Animations OFF', 'motion_photos_off');
-            localStorage.setItem('codx_no_anim', '1');
-        } else {
-            const s = document.getElementById('no-anim-style');
-            if (s) s.remove();
-            if (btn) { btn.style.color = ''; btn.style.background = ''; }
-            showToast('Animations ON', 'motion_photos_on');
-            localStorage.removeItem('codx_no_anim');
-        }
-    }
-
-    function desktopZoomIn() {
-        let size = parseInt(editor.getOption('fontSize')) || 14;
-        size = Math.min(size + 1, 40);
-        editor.setOptions({ fontSize: size + 'px' });
-        _lastZoomSize = size;
-        localStorage.setItem('codx_fontsize', size);
-        showToast('Font ' + size + 'px', 'zoom_in');
-    }
-
-    function desktopZoomOut() {
-        let size = parseInt(editor.getOption('fontSize')) || 14;
-        size = Math.max(size - 1, 10);
-        editor.setOptions({ fontSize: size + 'px' });
-        _lastZoomSize = size;
-        localStorage.setItem('codx_fontsize', size);
-        showToast('Font ' + size + 'px', 'zoom_out');
-    }
-
-    function togglePlainTextMode() {
-        _forcePlainText = !_forcePlainText;
-        const btn = document.getElementById('plain-text-btn');
-        if (_forcePlainText) {
-            editor.session.setMode('ace/mode/text');
-            if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-dim)'; }
-            showToast('Plain Text ON', 'text_fields');
-            localStorage.removeItem('codx_plain_text'); // default state, no need to store
-        } else {
-            // Restore correct syntax mode
-            if (_pythonMode) {
-                editor.session.setMode('ace/mode/python');
-            } else {
-                _setEditorMode(currentFileName, editor.getValue());
+            .toolbar-rows {
+                flex-direction: column;
+                gap: 2px;
+                padding: 0 10px 10px 10px;
+                opacity: 1 !important;
+                transform: none !important;
+                pointer-events: auto !important;
             }
-            if (btn) { btn.style.color = ''; btn.style.background = ''; }
-            showToast('Syntax ON', 'code');
-            localStorage.setItem('codx_plain_text', '0'); // user explicitly disabled
+            .bottom-wrapper.nav-mini .toolbar-rows {
+                opacity: 1 !important;
+                transform: none !important;
+                pointer-events: auto !important;
+            }
+            .bottom-wrapper.nav-mini .toolbar-rows-wrap {
+                max-height: none !important;
+            }
+
+            /* Toolbar rows — single column full width */
+            .toolbar-row {
+                grid-template-columns: 1fr;
+                gap: 1px;
+            }
+
+            /* Desktop toolbar buttons — horizontal icon+label, comfortable */
+            .toolbar-btn {
+                flex-direction: row !important;
+                justify-content: flex-start !important;
+                gap: 10px;
+                padding: 9px 12px !important;
+                border-radius: 9px !important;
+                font-size: 13px !important;
+                opacity: 0.75;
+                width: 100%;
+            }
+            .toolbar-btn:hover { background: rgba(128,128,128,0.1); opacity: 1; }
+            .toolbar-btn .material-icons-round { font-size: 18px !important; flex-shrink: 0; }
+
+            /* Section label dividers between groups */
+            .toolbar-row::before {
+                display: none;
+            }
+
+            /* Last misc row — also single column */
+            #bottom-panel .bottom-area > div[style*="justify-content: center"] {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 1px;
+                padding: 0 10px;
+                margin-top: 4px;
+            }
+            #bottom-panel .bottom-area > div[style*="justify-content: center"] .toolbar-btn {
+                width: 100% !important;
+            }
+
+            /* Show section labels only on desktop */
+            .dt-section-label { display: block !important; }
+
+            /* Tools row — override inline styles for desktop */
+            #bottom-panel .toolbar-rows > div[style*="justify-content: center"] {
+                flex-direction: column !important;
+                width: 100% !important;
+                margin-top: 0 !important;
+                padding: 0 10px !important;
+            }
+            #bottom-panel .toolbar-rows > div[style*="justify-content: center"] .toolbar-btn {
+                width: 100% !important;
+            }
+
+            /* Sidebar section header labels */
+            .dt-section-label {
+                font-size: 9px;
+                font-weight: 700;
+                color: var(--text-color);
+                opacity: 0.35;
+                text-transform: uppercase;
+                letter-spacing: 0.7px;
+                padding: 12px 12px 4px;
+            }
+
+            /* Push editor + header right to make room for sidebar */
+            .app-layout {
+                padding-left: 220px;
+            }
+
+            /* Inline chat panel — account for sidebar */
+            #inline-chat-panel {
+                left: 220px !important;
+            }
+
+            /* Find modal — account for sidebar */
+            #find-modal {
+                left: calc(220px + 2%) !important;
+                width: calc(96% - 220px) !important;
+            }
+
+            /* Editor default font size — larger on desktop */
+            #editor { font-size: 16px !important; }
+
+            /* Desktop zoom buttons — header */
+            #header-zoom-in-btn, #header-zoom-out-btn { display: flex !important; }
+
+            /* Desktop zoom buttons — sidebar (hide, moved to header) */
+            #desktop-zoom-btns { display: none !important; }
+
+            /* Nav hide button in header — on desktop toggles sidebar */
+            /* (JS already calls toggleNavVisibility which uses translateY,
+                we override that with CSS transform for desktop) */
         }
-    }
 
-    // ══════════════════════════════════════════════════════
-    //  PYTHON MODE — Pyodide-powered in-browser Python runner
-    // ══════════════════════════════════════════════════════
+        /* ── Editor placeholder overlay — centered, shown when editor is empty ── */
+        #editor-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            text-align: center;
+            padding: 20px;
+            background: transparent;
+        }
+        #editor-placeholder.visible { opacity: 1; }
+        #editor-placeholder .ep-icon {
+            width: 44px; height: 44px;
+            border-radius: 14px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(16,185,129,0.25);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 12px;
+        }
+        #editor-placeholder .ep-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-color);
+            opacity: 0.45;
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 5px;
+        }
+        #editor-placeholder .ep-sub {
+            font-size: 10px;
+            color: var(--text-color);
+            opacity: 0.25;
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.7;
+        }
 
-    // _pythonMode declared early at top to prevent TDZ
-    let _pyodide    = null;    // Pyodide instance (lazy loaded)
-    let _pyLoading  = false;   // loading in progress
+        /* ──────────────────────── Chat History Panel ──────────────────────── */
 
-    // ── Toggle language (chip button) ──
-    function _toggleLangMode() {
-        _setLangMode(_pythonMode ? 'html' : 'python');
-    }
-
-    // ── Switch language mode ──
-    function _setLangMode(lang) {
-        const newIsPython = (lang === 'python');
-        if (newIsPython === _pythonMode) return; // no change
-
-        // ── Save current mode's session ──
-        saveSession();
-
-        // ── Load target mode's session ──
-        const loadKey = newIsPython ? 'codx_session_py' : 'codx_session_html';
-        let sess = null;
-        try { sess = JSON.parse(localStorage.getItem(loadKey)); } catch(e) {}
-
-        _pythonMode = newIsPython;
-
-        if (sess && sess.tabs && sess.tabs.length > 0) {
-            // Filter out tabs with wrong extension for this mode
-            const pyExts  = ['py'];
-            const htmlExts = ['html','htm','css','js','ts','jsx','tsx','json','md','txt','xml','svg'];
-            const allowedExts = _pythonMode ? pyExts : htmlExts;
-            const filtered = sess.tabs.filter(t => {
-                const ext = (t.name || '').split('.').pop().toLowerCase();
-                return allowedExts.includes(ext);
-            });
-            fileTabs     = filtered.length > 0 ? filtered : null;
-            activeTabId  = sess.active;
-            tabIdCounter = sess.counter || (Math.max(...sess.tabs.map(t => t.id)) + 1);
-            // If active tab was filtered out, pick first remaining
-            if (fileTabs && !fileTabs.find(t => t.id === activeTabId)) {
-                activeTabId = fileTabs[0].id;
+        #chat-history-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.22s ease;
+        }
+        #chat-history-overlay.active { opacity: 1; pointer-events: auto; }
+        #chat-history-panel {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            max-height: 80vh;
+            background: var(--glass-bg);
+            border-radius: 22px 22px 0 0;
+            border-top: 2px solid var(--accent);
+            z-index: 10000;
+            display: flex; flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.34,1.2,0.64,1);
+            overflow: hidden;
+        }
+        #chat-history-panel.active { transform: translateY(0); }
+        .chp-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        .chp-title {
+            flex: 1; font-size: 13px; font-weight: 700;
+            color: var(--text-color); font-family: 'Poppins', sans-serif;
+        }
+        .chp-close-btn {
+            background: rgba(128,128,128,0.1); border: none;
+            border-radius: 8px; width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-color); opacity: 0.6;
+            flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+        }
+        .chp-close-btn:active { opacity: 1; }
+        .chp-body {
+            flex: 1; overflow-y: auto;
+            padding: 8px 12px 32px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .chp-body::-webkit-scrollbar { display: none; }
+        .chp-date-label {
+            font-size: 9px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.7px; color: var(--text-color); opacity: 0.35;
+            padding: 10px 4px 4px; font-family: 'Poppins', sans-serif;
+        }
+        .chp-session-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            margin-bottom: 6px; cursor: pointer;
+            background: rgba(128,128,128,0.04);
+            transition: background 0.15s;
+            animation: chpFadeIn 0.2s ease both;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+        }
+        @keyframes chpFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .chp-session-row:active { background: var(--accent-dim); }
+        .chp-session-icon {
+            width: 30px; height: 30px; border-radius: 9px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(16,185,129,0.2);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .chp-session-info { flex: 1; min-width: 0; }
+        .chp-session-name {
+            font-size: 12px; font-weight: 600; color: var(--text-color);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-family: 'Poppins', sans-serif;
+        }
+        .chp-session-meta {
+            font-size: 10px; color: var(--text-color); opacity: 0.45;
+            display: flex; gap: 5px; align-items: center;
+            font-family: 'Poppins', sans-serif; margin-top: 2px;
+        }
+        .chp-del-btn {
+            background: none; border: none; padding: 5px;
+            cursor: pointer; color: var(--text-color); opacity: 0.25;
+            border-radius: 6px; display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+            transition: opacity 0.15s;
+        }
+        .chp-del-btn:active { opacity: 1; color: #ef4444; }
+        .chp-del-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+        .chp-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 48px 20px; gap: 12px;
+            text-align: center;
+        }
+        .chp-empty .material-icons-round { font-size: 40px; color: var(--accent); opacity: 0.5; }
+        .chp-empty p {
+            font-size: 12px; color: var(--text-color); opacity: 0.5;
+            font-family: 'Poppins', sans-serif; line-height: 1.6;
+        }
+        .chp-confirm-del {
+            display: flex; align-items: center; gap: 7px;
+            padding: 7px 13px 9px;
+            border-top: 1px solid rgba(239,68,68,0.2);
+        }
+        @media (min-width: 768px) {
+            #chat-history-panel {
+                left: auto; right: 24px; bottom: 24px;
+                width: 340px; max-height: 70vh;
+                border-radius: 18px;
+                border: 1px solid var(--glass-border);
+                transform: scale(0.92) translateY(10px);
+                opacity: 0;
+                transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1), opacity 0.2s ease;
+            }
+            #chat-history-panel.active {
+                transform: scale(1) translateY(0); opacity: 1;
             }
         }
 
-        if (!fileTabs || fileTabs.length === 0) {
-            // Fresh session for this mode
-            const blankName = _pythonMode ? 'main.py' : 'index.html';
-            fileTabs    = [{ id: ++tabIdCounter, name: blankName, content: '' }];
-            activeTabId = fileTabs[0].id;
-        }
 
-        const activeTab = fileTabs.find(t => t.id === activeTabId) || fileTabs[0];
-        activeTabId = activeTab.id;
-        currentFileName = activeTab.name;
-        _setEditorValueFast(activeTab.content);
-
-        const chipLabel  = document.getElementById('lang-chip-label');
-        const iconHtml   = document.getElementById('lang-icon-html');
-        const iconPy     = document.getElementById('lang-icon-py');
-
-        if (_pythonMode) {
-            if (iconHtml)  iconHtml.style.display  = 'none';
-            if (iconPy)    iconPy.style.display    = 'block';
-            if (chipLabel) chipLabel.textContent   = 'Python';
-            if (!_forcePlainText) editor.session.setMode('ace/mode/python');
-            showToast('Python Mode', 'code');
-        } else {
-            if (iconHtml)  iconHtml.style.display  = 'block';
-            if (iconPy)    iconPy.style.display    = 'none';
-            if (chipLabel) chipLabel.textContent   = 'HTML';
-            if (!_forcePlainText) _setEditorMode(currentFileName, editor.getValue());
-            const po = document.getElementById('python-output');
-            if (po) { po.style.visibility = 'hidden'; po.style.opacity = '0'; }
-            showToast('HTML Mode', 'html');
-        }
-
-        renderFileTabs();
-        _updateEditorPlaceholder();
-        // Update file input accept for current mode
-        const fi = document.getElementById('file-input');
-        if (fi) fi.accept = _pythonMode ? '.py' : '.html,.htm,.css,.js,.ts,.jsx,.tsx,.json,.md,.txt,.xml,.svg';
-    }
-
-    // ── Override switchTab to handle Python preview ──
-    const _origSwitchTab = switchTab;
-    switchTab = function(tabName, fromBtn) {
-        if (tabName === 'preview' && _pythonMode) {
-            // Python mode — show output panel, not HTML iframe
-            _pyShowOutputPanel();
-            _pyRunCode();
-            // Update tab UI manually
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            const tgt = document.getElementById('tab-preview');
-            if (tgt) tgt.classList.add('active');
-            // Hide toolbar (same as HTML preview)
-            const outerEl = document.getElementById('bottom-outer');
-            const innerEl = document.getElementById('bottom-panel');
-            const isDesktop = window.innerWidth >= 768;
-            const t2 = 'transform 0.3s cubic-bezier(0.4,0,0.2,1)';
-            if (!isDesktop) {
-                if (outerEl) { outerEl.style.transition = t2; outerEl.style.transform = 'translateY(100%)'; }
-                if (innerEl) { innerEl.style.transition = t2; innerEl.style.transform = 'translateY(100%)'; }
-            }
-            _inPreview = true;
-            document.getElementById('editor').style.opacity = '0';
-            document.getElementById('editor').style.pointerEvents = 'none';
-            document.getElementById('jumpers').style.display = 'none';
-            return;
-        }
-        // Going back to editor from python output
-        if (tabName === 'editor' && _pythonMode) {
-            const po = document.getElementById('python-output');
-            if (po) { po.style.visibility = 'hidden'; po.style.opacity = '0'; }
-        }
-        _origSwitchTab(tabName, fromBtn);
-    };
-
-    // ── Show python output panel ──
-    function _pyShowOutputPanel() {
-        const iframe = document.getElementById('preview');
-        const po     = document.getElementById('python-output');
-        if (iframe) iframe.classList.remove('active-pane');
-        if (po) { po.style.visibility = 'visible'; po.style.opacity = '1'; }
-    }
-
-    // ── Load Pyodide (lazy, once) ──
-    async function _pyEnsureLoaded() {
-        if (_pyodide) return _pyodide;
-        if (_pyLoading) {
-            // Wait until loaded
-            await new Promise(r => {
-                const check = setInterval(() => { if (_pyodide || !_pyLoading) { clearInterval(check); r(); } }, 100);
-            });
-            return _pyodide;
-        }
-        _pyLoading = true;
-        const loadEl  = document.getElementById('py-loading');
-        const loadMsg = document.getElementById('py-loading-msg');
-        if (loadEl) loadEl.style.display = 'flex';
-        if (loadMsg) loadMsg.textContent = 'Loading Python runtime...';
-
-        try {
-            // Load Pyodide script dynamically
-            if (!window.loadPyodide) {
-                await new Promise((res, rej) => {
-                    const s = document.createElement('script');
-                    s.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
-                    s.onload = res;
-                    s.onerror = () => rej(new Error('Failed to load Pyodide script'));
-                    document.head.appendChild(s);
-                });
-            }
-            if (loadMsg) loadMsg.textContent = 'Initialising Python...';
-            _pyodide = await loadPyodide({
-                indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/'
-            });
-            if (loadEl) loadEl.style.display = 'none';
-        } catch (err) {
-            _pyLoading = false;
-            if (loadEl) loadEl.style.display = 'none';
-            throw err;
-        }
-        _pyLoading = false;
-        return _pyodide;
-    }
-
-    // ── Run Python code ──
-    let _pyRunning = false;
-    async function _pyRunCode() {
-        if (_pyRunning) return; // prevent concurrent runs
-        const body    = document.getElementById('py-out-body');
-        const loadEl  = document.getElementById('py-loading');
-        const timeEl  = document.getElementById('py-run-time');
-        if (!body) return;
-
-        _pyRunning = true;
-        body.innerHTML = '';  // clear output every single run
-        const code = editor.getValue();
-        if (!code.trim()) {
-            _pyAppendLine('# No code to run', 'dim'); return;
-        }
-
-        const t0 = Date.now();
-
-        // Show loading if Pyodide not yet loaded
-        let py;
-        try {
-            if (!_pyodide) {
-                if (loadEl) loadEl.style.display = 'flex';
-            }
-            py = await _pyEnsureLoaded();
-        } catch (err) {
-            _pyAppendLine('⚠ Could not load Python runtime.', 'error');
-            _pyAppendLine(err.message, 'error');
-            _pyRunning = false;
-            return;
-        }
-
-        if (loadEl) loadEl.style.display = 'none';
-
-        // Redirect stdout/stderr — always fresh StringIO, never reuse
-        py.runPython(`
-import sys, io
-_codx_stdout = io.StringIO()
-_codx_stderr = io.StringIO()
-sys.stdout = _codx_stdout
-sys.stderr = _codx_stderr
-`);
-
-        let outText = '', errText = '';
-        try {
-            await py.runPythonAsync(code);
-        } catch (err) {
-            errText = err.message || String(err);
-        }
-
-        try {
-            outText = py.runPython('_codx_stdout.getvalue()');
-            errText = errText || py.runPython('_codx_stderr.getvalue()');
-        } catch(e) {}
-
-        // Restore stdout/stderr — use original references saved before redirect
-        try {
-            py.runPython(`
-import sys, io
-sys.stdout = sys.__stdout__ if hasattr(sys, '__stdout__') and sys.__stdout__ is not None else io.StringIO()
-sys.stderr = sys.__stderr__ if hasattr(sys, '__stderr__') and sys.__stderr__ is not None else io.StringIO()
-_codx_stdout = None
-_codx_stderr = None
-`);
-        } catch(e) {}
-
-        const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
-        if (timeEl) timeEl.textContent = elapsed + 's';
-
-        if (outText) {
-            outText.split('\n').forEach(line => _pyAppendLine(line, 'out'));
-        }
-        if (errText) {
-            errText.trim().split('\n').forEach(line => _pyAppendLine(line, 'error'));
-        }
-        if (!outText && !errText) {
-            _pyAppendLine('# Finished with no output', 'dim');
-        }
-
-        // Scroll to bottom
-        body.scrollTop = body.scrollHeight;
-        _pyRunning = false;
-    }
-
-    // ── Append a line to output ──
-    function _pyAppendLine(text, type) {
-        const body = document.getElementById('py-out-body');
-        if (!body) return;
-        const line = document.createElement('div');
-        const base = 'display:block;white-space:pre;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-height:1em;';
-        line.style.cssText = base + (type === 'error'
-            ? 'color:#f87171;'
-            : type === 'dim'
-            ? 'color:rgba(255,255,255,0.3);font-style:italic;'
-            : 'color:#e0e0e0;');
-        line.textContent = text;
-        body.appendChild(line);
-    }
+        
+    
