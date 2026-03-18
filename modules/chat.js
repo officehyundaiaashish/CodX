@@ -2696,6 +2696,32 @@ Use only line numbers visible in the context. Be precise.`;
 
     let _modelDropdownCloseHandler = null;
 
+
+    // ── Shared outside-tap/click handler for dropdowns ──
+    const _ddOutsideHandlers = {};
+    function _inlineRegisterOutsideClose(which) {
+        _inlineUnregisterOutsideClose(which); // remove old first
+        const handler = (e) => {
+            const modelArea = document.getElementById('inline-model-trigger-area');
+            const fileArea  = document.getElementById('inline-file-selector');
+            if (which === 'model' && modelArea && modelArea.contains(e.target)) return;
+            if (which === 'file'  && fileArea  && fileArea.contains(e.target))  return;
+            if (which === 'model') _inlineCloseModelDropdown();
+            if (which === 'file')  _inlineCloseFileDropdown();
+        };
+        _ddOutsideHandlers[which] = handler;
+        setTimeout(() => {
+            document.addEventListener('touchstart', handler, { passive: true });
+            document.addEventListener('click',      handler);
+        }, 80);
+    }
+    function _inlineUnregisterOutsideClose(which) {
+        const h = _ddOutsideHandlers[which];
+        if (!h) return;
+        document.removeEventListener('touchstart', h);
+        document.removeEventListener('click', h);
+        delete _ddOutsideHandlers[which];
+    }
     function _inlineToggleModelDropdown() {
         const dd = document.getElementById('inline-model-dropdown');
         const chevron = document.getElementById('inline-model-chevron');
@@ -2704,13 +2730,11 @@ Use only line numbers visible in the context. Be precise.`;
         if (isOpen) {
             _inlineCloseModelDropdown();
         } else {
-            _inlineCloseFileDropdown();  // close file dropdown if open
+            _inlineCloseFileDropdown();
             _inlineRenderModelDropdown();
             dd.style.display = 'block';
             if(chevron) chevron.style.transform = 'rotate(180deg)';
-            if(_modelDropdownCloseHandler) document.removeEventListener('click', _modelDropdownCloseHandler);
-            _modelDropdownCloseHandler = () => _inlineCloseModelDropdown();
-            setTimeout(() => document.addEventListener('click', _modelDropdownCloseHandler, { once: true }), 50);
+            _inlineRegisterOutsideClose('model');
         }
     }
 
@@ -2719,11 +2743,7 @@ Use only line numbers visible in the context. Be precise.`;
         const chevron = document.getElementById('inline-model-chevron');
         if(dd) dd.style.display = 'none';
         if(chevron) chevron.style.transform = 'rotate(0deg)';
-        // Remove pending close handler so it never fires as orphan
-        if(_modelDropdownCloseHandler) {
-            document.removeEventListener('click', _modelDropdownCloseHandler);
-            _modelDropdownCloseHandler = null;
-        }
+        _inlineUnregisterOutsideClose('model');
     }
 
     function _inlineRenderModelDropdown() {
@@ -2841,30 +2861,27 @@ Use only line numbers visible in the context. Be precise.`;
         if (!dd) return;
         const isOpen = dd.style.display === 'block';
         if (isOpen) {
-            dd.style.display = 'none';
-            if(chevron) chevron.style.transform = 'rotate(0deg)';
-            if(trigger) { trigger.style.borderColor = 'var(--glass-border)'; trigger.style.background = 'rgba(128,128,128,0.1)'; }
+            _inlineCloseFileDropdown();
         } else {
-            _inlineCloseModelDropdown();  // close model dropdown if open
+            _inlineCloseModelDropdown();
             _inlineRenderFileDropdown();
             dd.style.display = 'block';
             if(chevron) chevron.style.transform = 'rotate(180deg)';
             if(trigger) { trigger.style.borderColor = 'var(--accent)'; trigger.style.background = 'var(--accent-dim)'; }
-            setTimeout(() => {
-                document.addEventListener('click', _inlineCloseFileDropdown, { once: true });
-            }, 50);
+            _inlineRegisterOutsideClose('file');
         }
     }
 
     function _inlineCloseFileDropdown(e) {
-        // If click was on the trigger button itself, let _inlineToggleFileDropdown handle it
         const trigger = document.getElementById('inline-file-trigger');
         if (e && trigger && trigger.contains(e.target)) return;
         const dd = document.getElementById('inline-file-dropdown');
         const chevron = document.getElementById('inline-file-chevron');
+        const trig = document.getElementById('inline-file-trigger');
         if(dd) dd.style.display = 'none';
         if(chevron) chevron.style.transform = 'rotate(0deg)';
-        if(trigger) { trigger.style.borderColor = 'var(--glass-border)'; trigger.style.background = 'rgba(128,128,128,0.1)'; }
+        if(trig) { trig.style.borderColor = 'var(--glass-border)'; trig.style.background = 'rgba(128,128,128,0.1)'; }
+        _inlineUnregisterOutsideClose('file');
     }
 
     // ── Context tab IDs — files user has explicitly ticked as context ──
