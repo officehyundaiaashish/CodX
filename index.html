@@ -1684,6 +1684,8 @@
         .chp-empty p { font-size: 12px; color: var(--text-color); opacity: 0.5; font-family: 'Poppins', sans-serif; line-height: 1.6; }
         .chp-confirm-del { display: flex; align-items: center; gap: 7px; padding: 7px 13px 9px; border-top: 1px solid rgba(239,68,68,0.2); }
         #inline-chat-header { pointer-events: auto !important; }
+        .inline-edit-wrap { padding: 4px 0; width: 100%; }
+        .inline-edit-textarea:focus { border-color: var(--accent) !important; }
         @media (min-width: 768px) {
             #chat-history-panel { left: auto; right: 24px; bottom: 24px; width: 340px; max-height: 70vh; border-radius: 18px; border: 1px solid var(--glass-border); transform: scale(0.92) translateY(10px); opacity: 0; transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1), opacity 0.2s ease; }
             #chat-history-panel.active { transform: scale(1) translateY(0); opacity: 1; }
@@ -2947,8 +2949,16 @@
             localStorage.setItem(key, JSON.stringify({tabs: fileTabs, active: activeTabId, counter: tabIdCounter}));
         }
     }
-    window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveSession(); });
-    window.addEventListener('pagehide', saveSession);
+    window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            saveSession();
+            if (typeof _chSaveCurrentSession === 'function') _chSaveCurrentSession();
+        }
+    });
+    window.addEventListener('pagehide', () => {
+        saveSession();
+        if (typeof _chSaveCurrentSession === 'function') _chSaveCurrentSession();
+    });
 
     editor.session.on("change", function() {
         requestAnimationFrame(_updateEditorPlaceholder);
@@ -7139,12 +7149,130 @@ No markdown, no backticks, no explanation outside the array.`;
 
         footer.appendChild(ts);
         footer.appendChild(copyBtn);
+
+        // ── Edit button — only for user messages ──
+        if (role === 'user' && text) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'chat-copy-btn';
+            editBtn.title = 'Edit & Resend';
+            editBtn.innerHTML = '<span class="material-icons-round">edit</span>';
+            editBtn.onclick = () => _inlineEditMsg(wrap, text);
+            footer.appendChild(editBtn);
+        }
+
         wrap.appendChild(bubble);
         if (extraEl) bubble.appendChild(extraEl);
         wrap.appendChild(footer);
         box.appendChild(wrap);
         _inlineChatScroll();
         return bubble;
+    }
+
+    // ── Edit a sent message and resend ──
+    function _inlineEditMsg(msgWrap, originalText) {
+        // Agar already editing hai toh skip
+        if (msgWrap.querySelector('.inline-edit-wrap')) return;
+
+        // Bubble hide karo
+        const bubble = msgWrap.querySelector('.chat-bubble');
+        const footer = msgWrap.querySelector('.chat-msg-footer');
+        if (bubble) bubble.style.display = 'none';
+        if (footer) footer.style.display = 'none';
+
+        // Edit wrap banao
+        const editWrap = document.createElement('div');
+        editWrap.className = 'inline-edit-wrap';
+        editWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%;';
+
+        const ta = document.createElement('textarea');
+        ta.className = 'inline-edit-textarea';
+        ta.value = originalText;
+        ta.rows = 3;
+        ta.style.cssText = 'width:100%;padding:9px 12px;border-radius:12px;border:1.5px solid var(--accent);background:var(--editor-bg);color:var(--text-color);font-family:Poppins,sans-serif;font-size:12px;resize:none;outline:none;-webkit-user-select:text;user-select:text;';
+
+        // Auto resize
+        ta.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+        });
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:6px;justify-content:flex-end;';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.cssText = 'padding:6px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:Poppins,sans-serif;font-size:11px;font-weight:600;cursor:pointer;opacity:0.6;';
+        cancelBtn.onclick = () => {
+            editWrap.remove();
+            if (bubble) bubble.style.display = '';
+            if (footer) footer.style.display = '';
+        };
+
+        const sendBtn2 = document.createElement('button');
+        sendBtn2.style.cssText = 'padding:6px 14px;border-radius:9px;border:none;background:var(--accent);color:white;font-family:Poppins,sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;';
+        sendBtn2.innerHTML = '<span class="material-icons-round" style="font-size:14px;pointer-events:none;">send</span> Resend';
+        sendBtn2.onclick = () => {
+            const newText = ta.value.trim();
+            if (!newText) return;
+
+            const box2 = document.getElementById('inline-chat-messages');
+            const allMsgs = Array.from(box2.children);
+            const msgIdx = allMsgs.indexOf(msgWrap);
+
+            // Edited message ke BAAD ke saare DOM messages hata do
+            for (let i = allMsgs.length - 1; i > msgIdx; i--) {
+                allMsgs[i].remove();
+            }
+
+            // _chatHistory — edited message ke baad sab hatao, edited message update karo
+            if (msgIdx !== -1) {
+                _chatHistory = _chatHistory.slice(0, msgIdx);
+                _chatHistory.push({ role: 'user', text: newText, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) });
+            }
+
+            // _inlineChatHistory bhi trim karo — edited message se pehle tak
+            // (API ko sirf pre-edit context milega, fresh reply aayega)
+            const userTurns = _inlineChatHistory.filter(m => m.role === 'user').length;
+            const keepTurns = Math.max(0, msgIdx);
+            _inlineChatHistory = _inlineChatHistory.slice(0, keepTurns * 2);
+
+            // Edit wrap hatao, bubble update karo
+            editWrap.remove();
+            if (bubble) {
+                bubble.innerHTML = newText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+                bubble.style.display = '';
+            }
+            if (footer) footer.style.display = '';
+
+            // Textarea mein text set karo aur send karo
+            const mainTa = document.getElementById('inline-chat-textarea');
+            if (mainTa) {
+                mainTa.value = newText;
+                sendInlineChat();
+                mainTa.value = '';
+            }
+        };
+
+        // Enter = send, Shift+Enter = newline
+        ta.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn2.click();
+            }
+            if (e.key === 'Escape') cancelBtn.click();
+        });
+
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(sendBtn2);
+        editWrap.appendChild(ta);
+        editWrap.appendChild(btnRow);
+        msgWrap.appendChild(editWrap);
+
+        // Focus end of text
+        setTimeout(() => {
+            ta.focus();
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+        }, 50);
     }
 
     // ── Typing indicator + live activity log ──
