@@ -7236,13 +7236,23 @@ No markdown, no backticks, no explanation outside the array.`;
             const keepTurns = Math.max(0, msgIdx);
             _inlineChatHistory = _inlineChatHistory.slice(0, keepTurns * 2);
 
-            // Edit wrap hatao, bubble update karo
+            // Edit wrap hatao
             editWrap.remove();
-            if (bubble) {
-                bubble.innerHTML = newText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-                bubble.style.display = '';
+
+            // Bubble ko fresh querySelector se lo aur naya text set karo
+            const freshBubble = msgWrap.querySelector('.chat-bubble');
+            if (freshBubble) {
+                freshBubble.style.display = '';
+                freshBubble.innerHTML = newText
+                    .replace(/&/g,'&amp;')
+                    .replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;')
+                    .replace(/\n/g,'<br>');
             }
-            if (footer) footer.style.display = '';
+
+            // Footer bhi restore karo
+            const freshFooter = msgWrap.querySelector('.chat-msg-footer');
+            if (freshFooter) freshFooter.style.display = '';
 
             // Textarea mein text set karo aur send karo
             const mainTa = document.getElementById('inline-chat-textarea');
