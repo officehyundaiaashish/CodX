@@ -144,6 +144,8 @@
         wrap.appendChild(footer);
         box.appendChild(wrap);
         _chatScrollBottom();
+        // ── Auto-save on every message append ──
+        if (_chatHistory.length > 0) _chSaveCurrentSession();
         return bubble;
     }
 
@@ -781,6 +783,124 @@ No markdown, no backticks, no explanation outside the array.`;
             overlay.onclick = (e) => { if (e.target === overlay) closeChatHistoryPanel(); };
             document.body.appendChild(overlay);
 
+            // ── Inject CSS once ──
+            if (!document.getElementById('chp-style')) {
+                const st = document.createElement('style');
+                st.id = 'chp-style';
+                st.textContent = `
+                    #chat-history-overlay {
+                        position: fixed; inset: 0;
+                        background: rgba(0,0,0,0.55);
+                        z-index: 1100;
+                        opacity: 0; pointer-events: none;
+                        transition: opacity 0.22s ease;
+                    }
+                    #chat-history-overlay.active { opacity: 1; pointer-events: auto; }
+                    #chat-history-panel {
+                        position: fixed;
+                        bottom: 0; left: 0; right: 0;
+                        max-height: 80vh;
+                        background: var(--glass-bg);
+                        border-radius: 22px 22px 0 0;
+                        border-top: 1px solid var(--glass-border);
+                        z-index: 1101;
+                        display: flex; flex-direction: column;
+                        transform: translateY(100%);
+                        transition: transform 0.3s cubic-bezier(0.34,1.2,0.64,1);
+                        overflow: hidden;
+                    }
+                    #chat-history-panel.active { transform: translateY(0); }
+                    .chp-header {
+                        display: flex; align-items: center; gap: 10px;
+                        padding: 14px 16px 10px;
+                        border-bottom: 1px solid var(--glass-border);
+                        flex-shrink: 0;
+                    }
+                    .chp-title {
+                        flex: 1; font-size: 13px; font-weight: 700;
+                        color: var(--text-color); font-family: 'Poppins', sans-serif;
+                    }
+                    .chp-close-btn {
+                        background: rgba(128,128,128,0.1); border: none;
+                        border-radius: 8px; width: 28px; height: 28px;
+                        display: flex; align-items: center; justify-content: center;
+                        cursor: pointer; color: var(--text-color); opacity: 0.6;
+                    }
+                    .chp-body {
+                        flex: 1; overflow-y: auto; padding: 8px 12px 20px;
+                    }
+                    .chp-body::-webkit-scrollbar { display: none; }
+                    .chp-date-label {
+                        font-size: 9px; font-weight: 700; text-transform: uppercase;
+                        letter-spacing: 0.7px; color: var(--text-color); opacity: 0.35;
+                        padding: 10px 4px 4px; font-family: 'Poppins', sans-serif;
+                    }
+                    .chp-session-row {
+                        display: flex; align-items: center; gap: 10px;
+                        padding: 10px 12px; border-radius: 12px;
+                        border: 1px solid var(--glass-border);
+                        margin-bottom: 6px; cursor: pointer;
+                        background: rgba(128,128,128,0.04);
+                        transition: background 0.15s;
+                        animation: chpFadeIn 0.2s ease both;
+                    }
+                    @keyframes chpFadeIn {
+                        from { opacity: 0; transform: translateY(6px); }
+                        to   { opacity: 1; transform: translateY(0); }
+                    }
+                    .chp-session-row:active { background: var(--accent-dim); }
+                    .chp-session-icon {
+                        width: 30px; height: 30px; border-radius: 9px;
+                        background: var(--accent-dim);
+                        border: 1px solid rgba(16,185,129,0.2);
+                        display: flex; align-items: center; justify-content: center;
+                        flex-shrink: 0;
+                    }
+                    .chp-session-info { flex: 1; min-width: 0; }
+                    .chp-session-name {
+                        font-size: 12px; font-weight: 600; color: var(--text-color);
+                        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                        font-family: 'Poppins', sans-serif;
+                    }
+                    .chp-session-meta {
+                        font-size: 10px; color: var(--text-color); opacity: 0.45;
+                        display: flex; gap: 5px; align-items: center;
+                        font-family: 'Poppins', sans-serif; margin-top: 2px;
+                    }
+                    .chp-del-btn {
+                        background: none; border: none; padding: 4px;
+                        cursor: pointer; color: var(--text-color); opacity: 0.3;
+                        border-radius: 6px; display: flex; align-items: center;
+                        transition: opacity 0.15s;
+                    }
+                    .chp-del-btn:active { opacity: 1; color: #ef4444; }
+                    .chp-del-btn .material-icons-round { font-size: 16px; pointer-events: none; }
+                    .chp-empty {
+                        display: flex; flex-direction: column; align-items: center;
+                        justify-content: center; padding: 40px 20px; gap: 10px;
+                        text-align: center; opacity: 0.4;
+                    }
+                    .chp-empty .material-icons-round { font-size: 36px; color: var(--accent); }
+                    .chp-empty p { font-size: 12px; color: var(--text-color); font-family: 'Poppins', sans-serif; line-height: 1.6; }
+                    @media (min-width: 768px) {
+                        #chat-history-panel {
+                            left: auto; right: 24px; bottom: 24px;
+                            width: 340px; max-height: 70vh;
+                            border-radius: 18px;
+                            border: 1px solid var(--glass-border);
+                            transform: scale(0.92) translateY(10px);
+                            opacity: 0;
+                            transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1), opacity 0.2s ease;
+                        }
+                        #chat-history-panel.active {
+                            transform: scale(1) translateY(0);
+                            opacity: 1;
+                        }
+                    }
+                `;
+                document.head.appendChild(st);
+            }
+
             const panel = document.createElement('div');
             panel.id = 'chat-history-panel';
             panel.innerHTML = `
@@ -1083,6 +1203,9 @@ No markdown, no backticks, no explanation outside the array.`;
             ' Edit mode — toggle via buttons below</p></div>';
         showToast('New chat started', 'add_comment');
     }
+
+    // ── Save session on page unload / refresh ──
+    window.addEventListener('beforeunload', () => { _chSaveCurrentSession(); });
 
     function closeInlineChat() {
         _inlineChatOpen = false;
@@ -1670,9 +1793,10 @@ STRICT FORMAT RULES:
         _inlineAppendMsg('user', userRequest);
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
 
-        // ── Sync to _chatHistory for history panel ──
+        // ── Sync to _chatHistory + instant save ──
         if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
         _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
+        _chSaveCurrentSession();
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
@@ -1787,7 +1911,7 @@ PYODIDE RULES — follow strictly or code will break:
             _inlineChatHistory.push({ role: 'user', content: userMsg });
             _inlineChatHistory.push({ role: 'assistant', content: raw });
 
-            // ── Sync agent reply to _chatHistory for history panel ──
+            // ── Sync agent reply to _chatHistory + instant save ──
             _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
             _chSaveCurrentSession();
 
