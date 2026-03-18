@@ -428,11 +428,27 @@
             transform: translateY(100%) !important;
             pointer-events: none !important;
             visibility: hidden !important;
+            transition: none !important;
         }
         body.in-preview #inline-chat-panel {
             transform: translateY(100%) !important;
             pointer-events: none !important;
             visibility: hidden !important;
+            transition: none !important;
+        }
+        /* Header always visible and on top in preview */
+        body.in-preview #header {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 1000 !important;
+            pointer-events: auto !important;
+        }
+        /* editor-wrapper full height in preview */
+        body.in-preview #editor-wrapper {
+            height: 100% !important;
+            max-height: 100% !important;
+            min-height: 0 !important;
         }
 
         /* Chat panel open hone par sirf #editor block karo — wrapper nahi
@@ -2570,6 +2586,7 @@
             }
         } else {
             // Non-fullscreen chat: keyboard appears — keep editor visible above chat panel
+            if (_inPreview) return; // extra guard
             const kbHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
             const kbOpen   = kbHeight > 50;
             const hdrH     = (document.getElementById('header') || {}).offsetHeight || 0;
@@ -6864,6 +6881,7 @@ No markdown, no backticks, no explanation outside the array.`;
     }
 
     function openInlineChat() {
+        if (_inPreview) return; // Never open chat in preview mode
         if (!_activeAgent()) { openAgentModal(); return; }
         _inlineChatOpen = true;
 
@@ -6935,18 +6953,19 @@ No markdown, no backticks, no explanation outside the array.`;
         const aiBtn     = document.getElementById('ai-agent-btn');
         chatPanel.classList.remove('chat-open');
         document.body.classList.remove('chat-is-open');
-        // Reset panel position completely
-        chatPanel.style.bottom = '0';
-        chatPanel.style.height = '';
-        chatPanel.style.transform = '';
         if (aiBtn) aiBtn.classList.remove('chat-active');
-        // Restore body height + main-container
-        document.body.classList.remove('chat-kb-open');
-        const _mc = document.getElementById('editor-wrapper');
-        if (_mc) _mc.style.maxHeight = '';
-        _setBodyHeight();
-        const inner = document.getElementById('bottom-panel');
-        if(inner && !_navHidden && !_inPreview) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+        // Only restore layout if NOT in preview mode
+        if (!_inPreview) {
+            chatPanel.style.bottom = '0';
+            chatPanel.style.height = '';
+            chatPanel.style.transform = '';
+            document.body.classList.remove('chat-kb-open');
+            const _mc = document.getElementById('editor-wrapper');
+            if (_mc) { _mc.style.maxHeight = ''; _mc.style.height = ''; _mc.style.minHeight = ''; }
+            _setBodyHeight();
+            const inner = document.getElementById('bottom-panel');
+            if (inner && !_navHidden) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+        }
     }
 
     // ── Auto resize textarea ──
