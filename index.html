@@ -6201,13 +6201,11 @@ Rules:
         _agentUndoStack.push(editor.getValue());
         if (_agentUndoStack.length > 5) _agentUndoStack.shift();
 
-        // Save current editor content before applying
         const curTabBefore = fileTabs.find(t => t.id === activeTabId);
         if (curTabBefore) curTabBefore.content = editor.getValue();
 
         let applied = 0;
         const targetId = _agentTargetTabId || activeTabId;
-        // Search across ALL tabs so multi-file edits apply to the correct file each
         edits.forEach(edit => {
             const searchTabs = [
                 fileTabs.find(t => t.id === targetId),
@@ -6222,7 +6220,6 @@ Rules:
             }
         });
 
-        // Sync active editor
         const cur = fileTabs.find(t => t.id === activeTabId);
         if (cur) _setEditorValueFast(cur.content);
 
@@ -7146,6 +7143,13 @@ STRICT FORMAT RULES:
         _inlineAppendMsg('user', userRequest);
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
 
+        // ── Sync to _chatHistory so history panel can see this session ──
+        if (_chatSessionName === 'New Chat') {
+            _chatSessionName = _autoChatName(userRequest);
+        }
+        const _userTime = _chatTime();
+        _chatHistory.push({ role: 'user', text: userRequest, time: _userTime });
+
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
         // ── Switch to STOP button — batch both changes in one rAF to prevent flicker ──
@@ -7257,6 +7261,10 @@ Rules:
             // Save to history
             _inlineChatHistory.push({ role: 'user', content: userMsg });
             _inlineChatHistory.push({ role: 'assistant', content: raw });
+
+            // ── Sync agent reply to _chatHistory for history panel ──
+            _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
+            _chSaveCurrentSession();
 
             const parsed = _tryParseJSON(raw);
 
