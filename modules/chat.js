@@ -1403,9 +1403,13 @@ DECIDE THE RESPONSE TYPE YOURSELF based on what the user wants:
 Reply in plain text. Same language as user (English/Hindi/Hinglish).
 
 ─── EDIT (fix / change / add / remove / improve in existing code) ───
-Return ONLY this JSON, nothing else:
+If editing ONE file, return ONLY this JSON:
 {"type":"edit","explanation":"what changed","edits":[{"line_start":N,"line_end":N,"replace":"new code here"}]}
-Use exact line numbers shown. replace = complete replacement lines.
+
+If editing MULTIPLE files (when context files are provided and need changes too), return ONLY this JSON:
+{"type":"multi_edit","explanation":"what changed","files":[{"filename":"exact-file-name.ext","edits":[{"line_start":N,"line_end":N,"replace":"new code here"}]}]}
+
+Use exact line numbers shown for each file. replace = complete replacement lines.
 
 ─── NEW FILE (create a new file from scratch) ───
 Return ONLY this JSON, nothing else:
@@ -1526,18 +1530,24 @@ STRICT FORMAT RULES:
 
         // ── Code with line numbers (no truncation — all providers support large context) ──
         const _provider = _activeAgent()?.provider || '';
-        let numberedCode = code ? code.split('\n').map((l,i) => `${i+1}| ${l}`).join('\n') : '';
-        _inlineLogActivity('Code: ' + (numberedCode.length/1024).toFixed(1) + 'k (' + code.split('\n').length + ' lines)');
+        // Escape backticks in code so they don't break the prompt template
+        const _safeCode = code ? code.replace(/`/g, '\u0060') : '';
+        let numberedCode = _safeCode ? _safeCode.split('\n').map((l,i) => (i+1) + '| ' + l).join('\n') : '';
+        _inlineLogActivity('Code: ' + (numberedCode.length/1024).toFixed(1) + 'k (' + (code ? code.split('\n').length : 0) + ' lines)');
 
         // ── Context files (user explicitly ticked) ──
         let otherFilesCtx = '';
+        let contextFileNames = [];
         if (_inlineContextTabIds && _inlineContextTabIds.size > 0) {
             _inlineContextTabIds.forEach(tid => {
                 if (tid === (targetTab ? targetTab.id : activeTabId)) return;
                 const t = fileTabs.find(f => f.id === tid);
                 if (!t || !t.content?.trim()) return;
-                otherFilesCtx += `\n\n── CONTEXT FILE: ${t.name} ──\n```\n${t.content}\n````;
+                const safeContent = t.content.replace(/`/g, '\u0060');
+                otherFilesCtx += '\n\n── CONTEXT FILE: ' + t.name + ' ──\n```\n' + safeContent + '\n```';
+                contextFileNames.push(t.name);
             });
+        }
         }
 
         // ── Attachment ──
@@ -1551,8 +1561,13 @@ STRICT FORMAT RULES:
         const sessionBlock = sessionEvents ? `\n\n── SESSION EVENTS ──\n${sessionEvents}` : '';
 
         // ── Final message to AI ──
-        const codeBlock = (!_isNewFileMode && numberedCode) ? `\n\n── FULL CODE (with line numbers) ──\n```\n${numberedCode}\n```` : '';
-        const userMsg = `── CONTEXT ──${sessionBlock}${codeBlock}${otherFilesCtx}${attachCtx}\n\n── USER REQUEST ──\n${userRequest}`;
+        const codeBlock = (!_isNewFileMode && numberedCode)
+            ? '\n\n── FULL CODE (with line numbers) ──\n```\n' + numberedCode + '\n```'
+            : '';
+        const contextLabel = contextFileNames.length > 0
+            ? '\n── TARGET: ' + (targetTab ? targetTab.name : 'current') + ' | CONTEXT: ' + contextFileNames.join(', ') + ' ──'
+            : '';
+        const userMsg = '── CONTEXT ──' + contextLabel + sessionBlock + codeBlock + otherFilesCtx + attachCtx + '\n\n── USER REQUEST ──\n' + userRequest;
 
         // ── Show prompt info in live log ──
         const historyForAPI = _buildHistoryForAPI();
@@ -1625,6 +1640,26 @@ Rules:
                 } else {
                     if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
                     _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
+                }
+
+            // ── Multi-file Edit ──
+            } else if (parsed.type === 'multi_edit') {
+                const mfiles = parsed.files || [];
+                if (!mfiles.length) {
+                    _inlineAppendMsg('agent', parsed.explanation || 'No changes needed.');
+                } else {
+                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
+                    mfiles.forEach(mf => {
+                        // Find the tab by filename
+                        const mTab = fileTabs.find(t => t.name === mf.filename)
+                                  || fileTabs.find(t => t.name.toLowerCase() === (mf.filename || '').toLowerCase());
+                        if (!mTab) {
+                            _inlineAppendMsg('agent', '⚠ File not found in editor: ' + mf.filename);
+                            return;
+                        }
+                        if (!Array.isArray(mf.edits) || !mf.edits.length) return;
+                        _inlineAppendMsg('agent', '', _buildInlineEditCard(mf.edits, mTab));
+                    });
                 }
 
             // ── New file ──
