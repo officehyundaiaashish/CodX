@@ -422,15 +422,17 @@
         body.chat-kb-open #editor {
             background: var(--editor-bg) !important;
         }
-        /* Chat panel open hone par editor ke touch events block karo */
+        /* Chat panel open hone par sirf #editor block karo — wrapper nahi
+           (inline-chat-panel editor-wrapper ke andar hai) */
         body.chat-is-open #editor {
             pointer-events: none !important;
             touch-action: none !important;
             user-select: none !important;
             -webkit-user-select: none !important;
         }
-        body.chat-is-open #editor-wrapper {
-            pointer-events: none !important;
+        /* Chat panel khud aur uske andar sab clickable rahe */
+        body.chat-is-open #inline-chat-panel {
+            pointer-events: auto !important;
         }
         .file-tab { display: flex; align-items: center; gap: 5px; padding: 6px 12px 6px 12px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.55; border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         .file-tab.active { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }
@@ -1386,6 +1388,8 @@
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; flex-shrink: 0;
             transition: transform 0.15s, background 0.2s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
         #inline-chat-send-btn:active { transform: scale(0.88); }
         #inline-chat-send-btn .material-icons-round { font-size: 16px; pointer-events: none; }
@@ -1957,10 +1961,10 @@
             </div>
 
             <div id="inline-chat-input-row">
-                <button onclick="_inlineTriggerAttach()" title="Attach file" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                <button onclick="_inlineTriggerAttach()" title="Attach file" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">
                     <span class="material-icons-round" style="font-size:16px;pointer-events:none;">attach_file</span>
                 </button>
-                <button id="inline-chat-mode-btn" onclick="_toggleChatMode()" title="Chat Mode — only chat, no edits" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s;">
+                <button id="inline-chat-mode-btn" onclick="_toggleChatMode()" title="Chat Mode — only chat, no edits" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(128,128,128,0.12);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">
                     <svg id="chat-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 </button>
                 <button id="chat-code-access-btn" onclick="_toggleChatCodeAccess()" title="Give AI access to file code" style="width:32px;height:32px;border-radius:50%;border:1.5px solid transparent;background:rgba(128,128,128,0.12);color:var(--text-color);display:none;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.2s,color 0.2s,border-color 0.2s;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
@@ -7840,19 +7844,24 @@ STRICT FORMAT RULES:
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
-        // ── Switch to STOP button — batch both changes in one rAF to prevent flicker ──
+        // ── Guard: agar already processing hai to ignore ──
+        if (sendBtn.dataset.processing === '1') return;
+        sendBtn.dataset.processing = '1';
+        sendBtn.disabled = true;
+
+        // ── Switch to STOP button — synchronously to avoid stuck state ──
         const _inlineAbortCtrl = new AbortController();
-        requestAnimationFrame(() => {
-            sendBtn.innerHTML = '<span class="material-icons-round">stop</span>';
-            sendBtn.style.background = '#ef4444';
-        });
+        sendBtn.innerHTML = '<span class="material-icons-round">stop</span>';
+        sendBtn.style.background = '#ef4444';
+
         sendBtn.onclick = () => {
             _inlineAbortCtrl.abort();
-            sendBtn.onclick = sendInlineChat; // restore immediately so button is never dead
-            requestAnimationFrame(() => {
-                sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
-                sendBtn.style.background = '';
-            });
+            // Immediately restore — never leave dead
+            sendBtn.dataset.processing = '';
+            sendBtn.disabled = false;
+            sendBtn.onclick = sendInlineChat;
+            sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
+            sendBtn.style.background = '';
         };
 
         _inlineShowTyping();
@@ -8076,14 +8085,12 @@ Rules:
             const box = document.getElementById('inline-chat-messages');
             if (box) { box.appendChild(wrap); _inlineChatScroll(); }
         } finally {
-            // Restore onclick immediately — never leave button dead
+            // Restore button — never leave dead
+            sendBtn.dataset.processing = '';
             sendBtn.disabled = false;
             sendBtn.onclick = sendInlineChat;
-            // Visuals batched in rAF to prevent flash
-            requestAnimationFrame(() => {
-                sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
-                sendBtn.style.background = '';
-            });
+            sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
+            sendBtn.style.background = '';
             _inlineChatScroll();
         }
     }
