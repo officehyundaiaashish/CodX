@@ -1056,45 +1056,59 @@ No markdown, no backticks, no explanation outside the array.`;
             if (p.type === 'code') {
                 const id = 'cc_' + Math.random().toString(36).slice(2, 8);
 
-                // Strip line numbers from canvas content (e.g. "42| code" → "code")
+                // Strip line numbers from canvas content
                 const strippedContent = p.content.replace(/^\d+\| ?/gm, '');
                 const escaped = strippedContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
                 const b64 = btoa(unescape(encodeURIComponent(strippedContent)));
 
-                // Detect OLD / NEW block labels
+                // Detect OLD/NEW + extract optional filename from lang tag
+                // Formats: "old", "new", "old:filename.ext", "new:filename.ext"
                 const langLower = p.lang.toLowerCase();
-                const isOld = /old|original|before|current/.test(langLower);
-                const isNew = /new|updated|after|replace/.test(langLower);
+                const isOld = /^old[:\s]|^original|^before|^current/.test(langLower);
+                const isNew = /^new[:\s]|^updated|^after|^replace/.test(langLower);
+                // Extract filename from "old:filename.ext" or "new:filename.ext"
+                const fileMatch = p.lang.match(/^(?:old|new)[:\s]+(.+)$/i);
+                const blockFile = fileMatch ? fileMatch[1].trim() : null;
 
-                // Find previous CODE part (skip any text parts in between)
+                // Find previous CODE part for Apply button pairing
                 let prevCodePart = null;
                 for (let i = idx - 1; i >= 0; i--) {
                     if (parts[i].type === 'code') { prevCodePart = parts[i]; break; }
                     if (parts[i].type === 'text' && parts[i].content.trim().length > 30) break;
                 }
-                const prevIsOld = prevCodePart && /old|original|before|current/.test(prevCodePart.lang.toLowerCase());
+                const prevIsOld = prevCodePart && /^old[:\s]?|^original|^before|^current/.test(prevCodePart.lang.toLowerCase());
+                // Get filename from prev old block if available
+                const prevFileMatch = prevCodePart ? prevCodePart.lang.match(/^(?:old|new)[:\s]+(.+)$/i) : null;
+                const prevBlockFile = prevFileMatch ? prevFileMatch[1].trim() : null;
 
                 const applyBtn = (isNew && prevIsOld)
-                    ? `<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)" data-old="${btoa(unescape(encodeURIComponent(prevCodePart.content.replace(/^\d+\| ?/gm,''))))}" data-new="${b64}" data-b64="1" style="background:var(--accent);color:white;">
-                        <span class="material-icons-round">auto_fix_high</span>Apply
-                       </button>`
+                    ? '<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)"'
+                      + ' data-old="' + btoa(unescape(encodeURIComponent(prevCodePart.content.replace(/^\d+\| ?/gm,'')))) + '"'
+                      + ' data-new="' + b64 + '"'
+                      + (blockFile || prevBlockFile ? ' data-file="' + (blockFile || prevBlockFile) + '"' : '')
+                      + ' data-b64="1" style="background:var(--accent);color:white;">'
+                      + '<span class="material-icons-round">auto_fix_high</span>Apply'
+                      + (blockFile || prevBlockFile ? ' to ' + (blockFile || prevBlockFile) : '')
+                      + '</button>'
                     : '';
 
+                // Label: show file info if present
+                const blockLabel = blockFile
+                    ? (isOld ? '— ' : '+ ') + blockFile
+                    : p.lang;
                 const labelStyle = isOld ? 'color:#f87171;' : isNew ? 'color:#4ade80;' : '';
 
-                return `<div class="code-canvas">
-                    <div class="code-canvas-header">
-                        <span class="code-canvas-lang" style="${labelStyle}">${p.lang}</span>
-                        <button class="code-canvas-btn" onclick="_canvasOpenInEditor(this)" data-code="${b64}" data-lang="${p.lang}" data-b64="1">
-                            <span class="material-icons-round">open_in_new</span>Open
-                        </button>
-                        <button class="code-canvas-btn" id="${id}" onclick="_canvasCopy(this)" data-code="${b64}" data-b64="1">
-                            <span class="material-icons-round">content_copy</span>Copy
-                        </button>
-                        ${applyBtn}
-                    </div>
-                    <div class="code-canvas-body">${escaped}</div>
-                </div>`;
+                return '<div class="code-canvas">'
+                    + '<div class="code-canvas-header">'
+                    + '<span class="code-canvas-lang" style="' + labelStyle + '">' + blockLabel + '</span>'
+                    + '<button class="code-canvas-btn" onclick="_canvasOpenInEditor(this)" data-code="' + b64 + '" data-lang="' + p.lang + '" data-b64="1">'
+                    + '<span class="material-icons-round">open_in_new</span>Open</button>'
+                    + '<button class="code-canvas-btn" id="' + id + '" onclick="_canvasCopy(this)" data-code="' + b64 + '" data-b64="1">'
+                    + '<span class="material-icons-round">content_copy</span>Copy</button>'
+                    + applyBtn
+                    + '</div>'
+                    + '<div class="code-canvas-body">' + escaped + '</div>'
+                    + '</div>';
             }
             // Text: render inline markdown — preserve embedded SVGs, escape everything else
             // Step 1: extract SVG fragments, replace with placeholders
@@ -1121,7 +1135,12 @@ No markdown, no backticks, no explanation outside the array.`;
     function _canvasApplyReplace(btn) {
         let oldCode = decodeURIComponent(escape(atob(btn.dataset.old || '')));
         let newCode = decodeURIComponent(escape(atob(btn.dataset.new || '')));
-        const current = editor.getValue();
+        // Support data-file for multi-file apply
+        const targetFile = btn.dataset.file || null;
+        const targetFileTab = targetFile
+            ? (fileTabs.find(t => t.name === targetFile) || fileTabs.find(t => t.name.toLowerCase() === targetFile.toLowerCase()))
+            : null;
+        const current = targetFileTab ? targetFileTab.content : editor.getValue();
 
         // Strategy 1: exact match
         let matched = current.includes(oldCode);
@@ -1161,10 +1180,20 @@ No markdown, no backticks, no explanation outside the array.`;
                 : newCode;
 
             const updated = current.replace(matchedOld, indentedNew);
-            const curTab = fileTabs.find(t => t.id === activeTabId);
-            if (curTab) curTab.content = updated;
-            editor.setValue(updated, -1);
-            showToast('Applied ✓', 'auto_fix_high');
+            if (targetFileTab) {
+                targetFileTab.content = updated;
+                if (targetFileTab.id !== activeTabId) {
+                    switchFileTab(targetFileTab.id);
+                } else {
+                    editor.setValue(updated, -1);
+                }
+                if (targetFileTab.id === activeTabId) editor.setValue(updated, -1);
+            } else {
+                const curTab = fileTabs.find(t => t.id === activeTabId);
+                if (curTab) curTab.content = updated;
+                editor.setValue(updated, -1);
+            }
+            showToast('Applied ✓' + (targetFile ? ' to ' + targetFile : ''), 'auto_fix_high');
             btn.innerHTML = '<span class="material-icons-round">check</span>Applied';
             btn.style.background = '#16a34a';
             btn.onclick = null;
@@ -1544,7 +1573,9 @@ STRICT FORMAT RULES:
                 const t = fileTabs.find(f => f.id === tid);
                 if (!t || !t.content?.trim()) return;
                 const safeContent = t.content.replace(/`/g, '\u0060');
-                otherFilesCtx += '\n\n── CONTEXT FILE: ' + t.name + ' ──\n```\n' + safeContent + '\n```';
+                // Add line numbers to context files so AI can give correct line numbers for multi_edit
+                const numberedCtx = safeContent.split('\n').map((l, i) => (i+1) + '| ' + l).join('\n');
+                otherFilesCtx += '\n\n── CONTEXT FILE: ' + t.name + ' (editable) ──\n```\n' + numberedCtx + '\n```';
                 contextFileNames.push(t.name);
             });
         }
@@ -1593,20 +1624,11 @@ PYODIDE RULES — follow strictly or code will break:
 9. Only write .py files. Never generate HTML/CSS/JS.`
                 : `\nCURRENT MODE: HTML/Web. Write HTML, CSS, JavaScript as needed.`;
             // ── Chat Mode: use a pure-conversation system prompt ──
+            const _multiFileCtx = contextFileNames.length > 0
+                ? '\nMULTI-FILE: Target=' + (targetTab ? targetTab.name : 'current') + ' Context=' + contextFileNames.join(',') + '. Show OLD/NEW blocks per file with filename label.'
+                : '';
             const activeSystemPrompt = _inlineChatModeOn
-                ? `You are CodX Assistant, an AI coding assistant built into the CodX editor.
-If the user asks your name, you are "CodX Assistant".${_modeCtx}
-Rules:
-1. NEVER return JSON. NEVER return edit/new_file/split/reorganize JSON objects.
-2. Only respond in plain conversational text.
-3. If you need to show code, wrap it in fenced code blocks (triple backticks with language tag) — these render as Canvas cards the user can copy.
-4. When showing code changes, use this exact format:
-   - First write in plain text: "Lines X–Y" (where the change is)
-   - Then the OLD block: ```old\n<exact code, NO line numbers>\n```
-   - Then the NEW block: ```new\n<replacement code, NO line numbers>\n```
-   - Line numbers go in the chat text ONLY, never inside the code blocks.
-   - The app will show an Apply button on the NEW block to auto-replace.
-5. Keep responses clear, helpful, and to the point. Match the user's language (English or Hindi/Hinglish).`
+                ? 'You are CodX Assistant, an AI coding assistant built into the CodX editor. If the user asks your name, you are "CodX Assistant".' + _modeCtx + _multiFileCtx + '\nRules:\n1. NEVER return JSON. Only respond in plain text.\n2. Show code in fenced code blocks.\n3. For code changes in ONE file use:\n**filename — Lines X-Y:**\n```old\n<old code no line numbers>\n```\n```new\n<new code no line numbers>\n```\n4. For MULTIPLE files repeat per file with filename in lang tag:\n```old:filename.ext\n<old code>\n```\n```new:filename.ext\n<new code>\n```\n5. Line numbers in bold label ONLY, never inside code blocks.\n6. Be clear and concise. Match user language (English/Hindi/Hinglish).'
                 : _AGENT_SYSTEM_PROMPT + _modeCtx;
             const raw = await _callAgentAPI(activeSystemPrompt, userMsg, historyForAPI, _inlineAbortCtrl);
             _inlineLogActivity('Response: ' + (raw.length/1024).toFixed(1) + 'k received');
@@ -1623,9 +1645,30 @@ Rules:
 
             const parsed = _tryParseJSON(raw);
 
-            // ── CHAT MODE OVERRIDE: no edits, just show text + code canvas ──
+            // ── CHAT MODE: parse JSON first — if edit/multi_edit show apply cards, else show text ──
             if (_inlineChatModeOn) {
-                _inlineAppendMsg('agent', raw.trim());
+                if (parsed && (parsed.type === 'edit' || parsed.type === 'multi_edit')) {
+                    // AI returned edits even in chat mode — show them properly
+                    if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
+                    if (parsed.type === 'edit') {
+                        if (Array.isArray(parsed.edits) && parsed.edits.length) {
+                            _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
+                        }
+                    } else if (parsed.type === 'multi_edit') {
+                        (parsed.files || []).forEach(mf => {
+                            const mTab = fileTabs.find(t => t.name === mf.filename)
+                                      || fileTabs.find(t => t.name.toLowerCase() === (mf.filename||'').toLowerCase());
+                            if (!mTab) { _inlineAppendMsg('agent', '⚠ File not found: ' + mf.filename); return; }
+                            if (Array.isArray(mf.edits) && mf.edits.length) {
+                                _inlineAppendMsg('agent', mf.filename + ':', null);
+                                _inlineAppendMsg('agent', '', _buildInlineEditCard(mf.edits, mTab));
+                            }
+                        });
+                    }
+                } else {
+                    // Plain text / canvas response
+                    _inlineAppendMsg('agent', raw.trim());
+                }
                 return;
             }
 
