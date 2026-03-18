@@ -6700,20 +6700,36 @@ No markdown, no backticks, no explanation outside the array.`;
     }
 
     function _chRestoreSession(session) {
+        // Pehle current session save karo
         _chSaveCurrentSession();
-        _chatSessionId = session.id;
+
+        // Session data load karo
+        _chatSessionId   = session.id;
         _chatSessionName = session.name || 'New Chat';
-        _chatHistory = session.messages ? session.messages.slice() : [];
-        _chatMsgCounter = 0; _chatPendingEditsMap = {};
+        _chatHistory     = session.messages ? session.messages.slice() : [];
+        _chatMsgCounter  = _chatHistory.length;
+        _chatPendingEditsMap = {};
+        _inlineClearHistory();
+
+        // Chat panel open karo agar band ho
+        if (!_inlineChatOpen) {
+            openInlineChat();
+        }
+
+        // Messages render karo
         const box = document.getElementById('inline-chat-messages');
         if (box) {
             box.innerHTML = '';
             _chatHistory.forEach(msg => {
-                if (msg.role === 'user') _inlineAppendMsg('user', msg.text, msg.time, null);
-                else _inlineAppendMsg('agent', msg.text, msg.time, null);
+                if (msg.role === 'user') _inlineAppendMsg('user', msg.text || '', null);
+                else _inlineAppendMsg('agent', msg.text || '', null);
             });
         }
-        if (typeof _inlineChatScroll === 'function') _inlineChatScroll();
+
+        // Bottom scroll
+        setTimeout(() => {
+            if (typeof _inlineChatScroll === 'function') _inlineChatScroll();
+        }, 100);
     }
 
     // ── Save on refresh/close ──
@@ -6824,6 +6840,8 @@ No markdown, no backticks, no explanation outside the array.`;
 
     // ── Clear conversation UI + memory ──
     function _inlineClearChatUI() {
+        _chSaveCurrentSession();
+        _chNewSession();
         _inlineClearHistory();
         const box = document.getElementById('inline-chat-messages');
         if (!box) return;
@@ -6841,6 +6859,7 @@ No markdown, no backticks, no explanation outside the array.`;
     }
 
     function closeInlineChat() {
+        _chSaveCurrentSession();
         _inlineChatOpen = false;
         _inlineClearHistory();
         const chatPanel = document.getElementById('inline-chat-panel');
