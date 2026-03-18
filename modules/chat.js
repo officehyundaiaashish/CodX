@@ -10,6 +10,7 @@
         return words.length > 32 ? words.slice(0, 32) + '…' : words;
     }
 
+
     // ── Close the chat panel ──
     function closeChatPanel() {
         document.getElementById('agent-chat-overlay').classList.remove('active');
@@ -1385,6 +1386,7 @@ Rules:
         }
     }
 
+
     // ── Gemini rate limit warning — shown in chat as compact bar ──
     function _geminiWarnInChat(model, type, used, limit) {
         const warnId = 'gemini-warn-' + model.replace(/\./g,'_') + '-' + type;
@@ -1454,6 +1456,7 @@ Rules:
         const box = document.getElementById('inline-chat-messages');
         if (box) { box.appendChild(wrap); _inlineChatScroll(); }
     }
+
 
     // ── Build Reorganize card with full file diff ──
     function _buildInlineReorganizeCard(newContent, targetTab) {
@@ -1725,7 +1728,7 @@ Rules:
                     failReasons.push(`Line ${edit.line_start} is out of range (file has ${lines.length} lines)`);
                     return;
                 }
-                const newLines = (edit.replace || '').split('\n').map(l =>
+                const newLines = (edit.replace || '').split('\n').map(l => 
                     l.replace(/\t/g, '  ')      // all tabs → 2 spaces
                      .replace(/\s+$/, '')        // trailing whitespace per line
                 );
@@ -2063,6 +2066,7 @@ Use only line numbers visible in the context. Be precise.`;
         showToast('Fix confirmed!', 'verified');
     }
 
+
     function _applyInlineSplit(btn, files) {
         if (!files || !files.length) return;
         files.forEach(f => openFileInTab(f.filename, f.content, true));
@@ -2072,6 +2076,7 @@ Use only line numbers visible in the context. Be precise.`;
         </div>`;
         showToast(`${files.length} files created`, 'call_split');
     }
+
 
     function _applyInlineNewFile(btn, filename, content) {
         openFileInTab(filename, content, true);
@@ -2310,7 +2315,7 @@ Use only line numbers visible in the context. Be precise.`;
             dd.innerHTML = '';
             dd.style.maxHeight = '250px';
             dd.style.overflowY = 'auto';
-
+    
         // ── Section header ──
         const header = document.createElement('div');
         header.style.cssText = 'padding:6px 12px 4px;font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--glass-border);';
@@ -2352,25 +2357,23 @@ Use only line numbers visible in the context. Be precise.`;
 
             // Tap row = set as target file
             row.ontouchstart = () => { if(!event?.target?.closest('[id^="ctx-btn"]')) row.style.background = 'var(--accent-dim)'; };
-    // Tap row = set as target file
-    row.ontouchend = (e) => {
-      e.stopPropagation();
-      if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
-        // Toggle context
-        if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
-        else _inlineContextTabIds.add(t.id);
-        _inlineRenderFileDropdown();
-        return;
-      }
-      // Set as target
-      _inlineSelectedTabId = t.id;
-      _agentTargetTabId = t.id;
-      _inlineContextTabIds.delete(t.id); // target can't also be context
-      if(label) label.textContent = t.name;
-      _inlineCloseFileDropdown();
-      _inlineRenderFileDropdown();
-    };
-    row.onclick = row.ontouchend;
+            row.onclick = (e) => {
+                e.stopPropagation();
+                if (e.target.closest(`[id="ctx-btn-${t.id}"]`)) {
+                    // Toggle context
+                    if (_inlineContextTabIds.has(t.id)) _inlineContextTabIds.delete(t.id);
+                    else _inlineContextTabIds.add(t.id);
+                    _inlineRenderFileDropdown();
+                    return;
+                }
+                // Set as target
+                _inlineSelectedTabId = t.id;
+                _agentTargetTabId = t.id;
+                _inlineContextTabIds.delete(t.id); // target can't also be context
+                if(label) label.textContent = t.name;
+                _inlineCloseFileDropdown();
+                _inlineRenderFileDropdown();
+            };
             dd.appendChild(row);
         });
 
@@ -2446,6 +2449,8 @@ Use only line numbers visible in the context. Be precise.`;
     // When Chat Mode is ON, user can additionally grant AI read-access to target file code.
     // Default OFF — AI gets empty code in chat mode unless user explicitly enables this.
     // _chatCodeAccessOn declared early at top (default: false)
+
+
 
     // Chat mode switch toast — centered, animated icon swap
     function _showChatModeToast(isChatMode) {
@@ -2662,6 +2667,7 @@ Use only line numbers visible in the context. Be precise.`;
             localStorage.setItem('codx_plain_text', '0'); // user explicitly disabled
         }
     }
+
 
     // ══════════════════════════════════════════════════════
     //  PYTHON MODE — Pyodide-powered in-browser Python runner
