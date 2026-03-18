@@ -446,20 +446,27 @@
         _agentUndoStack.push(editor.getValue());
         if (_agentUndoStack.length > 5) _agentUndoStack.shift();
 
-        const targetId  = _agentTargetTabId || activeTabId;
-        const targetTab = fileTabs.find(t => t.id === targetId);
-        let code = targetTab ? targetTab.content : editor.getValue();
+        const curTabBefore = fileTabs.find(t => t.id === activeTabId);
+        if (curTabBefore) curTabBefore.content = editor.getValue();
+
         let applied = 0;
+        const targetId = _agentTargetTabId || activeTabId;
         edits.forEach(edit => {
-            if (code.includes(edit.find)) { code = code.split(edit.find).join(edit.replace); applied++; }
+            const searchTabs = [
+                fileTabs.find(t => t.id === targetId),
+                ...fileTabs.filter(t => t.id !== targetId)
+            ].filter(Boolean);
+            for (const tab of searchTabs) {
+                if (tab.content && tab.content.includes(edit.find)) {
+                    tab.content = tab.content.split(edit.find).join(edit.replace);
+                    applied++;
+                    break;
+                }
+            }
         });
-        if (targetTab) {
-            targetTab.content = code;
-            if (targetId !== activeTabId) switchFileTab(targetId);
-        }
-        _setEditorValueFast(code);
+
         const cur = fileTabs.find(t => t.id === activeTabId);
-        if (cur) cur.content = code;
+        if (cur) _setEditorValueFast(cur.content);
 
         // Mark button as applied
         btn.className = 'chat-apply-btn applied';
@@ -754,7 +761,7 @@ No markdown, no backticks, no explanation outside the array.`;
             const wrap = document.createElement('div');
             wrap.className = 'chat-msg agent';
             wrap.appendChild(errEl);
-            const box = document.getElementById('chat-messages');
+            const box = document.getElementById('agent-chat-messages');
             if (box) { box.appendChild(wrap); box.scrollTop = box.scrollHeight; }
         } finally {
             sendBtn.disabled = false;
@@ -766,7 +773,6 @@ No markdown, no backticks, no explanation outside the array.`;
     // ══════════════════════════════════════════
 
     function openChatHistoryPanel() {
-        // Save current session before showing history
         _chSaveCurrentSession();
         // Inject panel HTML if not exists
         if (!document.getElementById('chat-history-panel')) {
@@ -1664,12 +1670,9 @@ STRICT FORMAT RULES:
         _inlineAppendMsg('user', userRequest);
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
 
-        // ── Sync to _chatHistory so history panel can see this session ──
-        if (_chatSessionName === 'New Chat') {
-            _chatSessionName = _autoChatName(userRequest);
-        }
-        const _userTime = _chatTime();
-        _chatHistory.push({ role: 'user', text: userRequest, time: _userTime });
+        // ── Sync to _chatHistory for history panel ──
+        if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
+        _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
@@ -2815,16 +2818,18 @@ Use only line numbers visible in the context. Be precise.`;
             `;
             row.addEventListener('touchstart', (e) => {
                 row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+                row.style.background = 'rgba(128,128,128,0.12)';
             }, { passive: true });
             row.addEventListener('touchmove', (e) => {
                 if (row._ts) {
                     const dy = Math.abs(e.touches[0].clientY - row._ts.y);
                     const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-                    if (dy > 8 || dx > 8) row._ts.moved = true;
+                    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = ''; }
                 }
             }, { passive: true });
             row.ontouchend = (e) => {
                 const ts = row._ts; row._ts = null;
+                row.style.background = '';
                 if (!ts || ts.moved) return;
                 e.stopPropagation();
                 e.preventDefault();
@@ -2848,7 +2853,9 @@ Use only line numbers visible in the context. Be precise.`;
         settings.innerHTML = `
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-color)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;pointer-events:none;opacity:0.5;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             <span style="font-size:12px;font-weight:600;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;pointer-events:none;">Agent Settings</span>`;
-        settings.ontouchstart = () => { settings.style.background = 'rgba(128,128,128,0.08)'; };
+        settings.addEventListener('touchstart', () => { settings.style.background = 'rgba(128,128,128,0.08)'; }, { passive: true });
+        settings.addEventListener('touchend', () => { setTimeout(() => { settings.style.background = ''; }, 150); }, { passive: true });
+        settings.addEventListener('touchcancel', () => { settings.style.background = ''; }, { passive: true });
         settings.onclick = (e) => { e.stopPropagation(); _inlineCloseModelDropdown(); openAgentModal(); };
         dd.appendChild(settings);
     }
@@ -2929,7 +2936,9 @@ Use only line numbers visible in the context. Be precise.`;
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;">add_circle</span>
             <span style="flex:1;font-size:11px;font-weight:700;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File</span>
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isNewSelected ? '1' : '0'};">radio_button_checked</span>`;
-        newRow.ontouchstart = () => newRow.style.background = 'rgba(16,185,129,0.12)';
+        newRow.addEventListener('touchstart', () => { newRow.style.background = 'rgba(16,185,129,0.12)'; }, { passive: true });
+        newRow.addEventListener('touchend', () => { setTimeout(() => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, 150); }, { passive: true });
+        newRow.addEventListener('touchcancel', () => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, { passive: true });
         newRow.onclick = (e) => {
             e.stopPropagation();
             _inlineSelectedTabId = 'new';
@@ -2955,18 +2964,21 @@ Use only line numbers visible in the context. Be precise.`;
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
 
             // Tap row = set as target file
+            const _rowBg = isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent';
 row.addEventListener('touchstart', (e) => {
   row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+  row.style.background = 'rgba(16,185,129,0.12)';
 }, { passive: true });
 row.addEventListener('touchmove', (e) => {
   if (row._ts) {
     const dy = Math.abs(e.touches[0].clientY - row._ts.y);
     const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-    if (dy > 8 || dx > 8) row._ts.moved = true;
+    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; }
   }
 }, { passive: true });
 row.ontouchend = (e) => {
   const ts = row._ts; row._ts = null;
+  row.style.background = _rowBg;
   if (!ts || ts.moved) return;
   e.stopPropagation();
   e.preventDefault();
