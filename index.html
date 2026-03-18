@@ -2079,6 +2079,7 @@
                 <div class="dt-section-label" style="display:none;">Tools</div>
                 <div style="display: flex; justify-content: center; width: 100%; margin-top: 4px; gap: 4px;">
                     <button class="toolbar-btn" id="ai-agent-btn" onclick="toggleInlineChat()" style="width: 68px;"><span class="material-icons-round">smart_toy</span>AI Agent</button>
+                    <button class="toolbar-btn" onclick="openAIMail()" style="width: 68px;" title="AI Mail — RediffMail + AI"><span class="material-icons-round">mail</span>AI Mail</button>
                     <button class="toolbar-btn" onclick="location.reload()" title="Restart app" style="width: 60px;"><span class="material-icons-round">refresh</span>Refresh</button>
                     <button class="toolbar-btn" id="no-anim-btn" onclick="toggleAnimations()" title="Disable all animations" style="width: 68px;"><span class="material-icons-round">motion_photos_off</span>No Anim</button>
                     <button class="toolbar-btn" id="plain-text-btn" onclick="togglePlainTextMode()" title="Force plain text mode" style="width: 68px;"><span class="material-icons-round">text_fields</span>Plain Text</button>
@@ -9353,6 +9354,15 @@ Use only line numbers visible in the context. Be precise.`;
     }
 
     // ── Toggle all CSS animations OFF/ON ──
+    // ── AI Mail ──
+    function openAIMail() {
+        // Expose _callAgentAPI so ai-mail.html can use it via window.opener
+        window._callAgentAPI = _callAgentAPI;
+        const w = window.open('ai-mail.html', 'ai-mail',
+            'width=420,height=820,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
+        if (!w) { showToast('Allow popups to open AI Mail', 'error_outline'); }
+    }
+
     function toggleAnimations() {
         _animationsDisabled = !_animationsDisabled;
         const btn = document.getElementById('no-anim-btn');
