@@ -4,6 +4,43 @@
     let _chatMsgCounter = 0;
     let _chatPendingEditsMap = {};  // msgId → edits array (for per-message apply)
 
+    // ── Chat History Sessions (localStorage) ──
+    const _CH_KEY = 'codx_chat_sessions';
+    let _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+    function _chLoadAll() {
+        try { return JSON.parse(localStorage.getItem(_CH_KEY) || '[]'); } catch(e) { return []; }
+    }
+    function _chSaveAll(sessions) {
+        try { localStorage.setItem(_CH_KEY, JSON.stringify(sessions.slice(-80))); } catch(e) {}
+    }
+    function _chSaveCurrentSession() {
+        if (!_chatHistory.length) return;
+        const sessions = _chLoadAll();
+        const idx = sessions.findIndex(s => s.id === _chatSessionId);
+        const session = {
+            id: _chatSessionId,
+            name: _chatSessionName,
+            date: new Date().toISOString(),
+            messages: _chatHistory.slice()
+        };
+        if (idx !== -1) sessions[idx] = session;
+        else sessions.push(session);
+        _chSaveAll(sessions);
+    }
+    function _chDeleteSession(id) {
+        const sessions = _chLoadAll().filter(s => s.id !== id);
+        _chSaveAll(sessions);
+    }
+    function _chNewSession() {
+        _chSaveCurrentSession();
+        _chatSessionId   = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        _chatSessionName = 'New Chat';
+        _chatHistory     = [];
+        _chatMsgCounter  = 0;
+        _chatPendingEditsMap = {};
+    }
+
     // ── Auto-generate session name from first user message ──
     function _autoChatName(text) {
         const words = text.trim().split(/\s+/).slice(0, 5).join(' ');
@@ -54,13 +91,14 @@
     }
 
     // ── Append a message bubble ──
-    function _appendChatMsg(role, text, time, extraEl) {
+    function _appendChatMsg(role, text, time, extraEl, msgIdx) {
         const box = document.getElementById('agent-chat-messages');
         const empty = document.getElementById('chat-empty-state');
         if (empty) empty.remove();
 
         const wrap = document.createElement('div');
         wrap.className = 'chat-msg ' + role;
+        if (msgIdx !== undefined) wrap.dataset.msgIdx = msgIdx;
 
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble';
@@ -74,7 +112,7 @@
             .replace(/\x00SVG(\d+)\x00/g, (_, i) => _svgFrags[+i] || '');
         bubble.innerHTML = _safeText;
 
-        // Footer: timestamp + copy button
+        // Footer: timestamp + copy + edit (for user messages)
         const footer = document.createElement('div');
         footer.className = 'chat-msg-footer';
 
@@ -99,12 +137,116 @@
 
         footer.appendChild(ts);
         footer.appendChild(copyBtn);
+
+        // Edit button — only for user messages
+        if (role === 'user' && msgIdx !== undefined) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'chat-edit-btn';
+            editBtn.innerHTML = '<span class="material-icons-round">edit</span>';
+            editBtn.title = 'Edit message';
+            editBtn.onclick = () => _startEditMsg(wrap, bubble, text, msgIdx);
+            footer.appendChild(editBtn);
+        }
+
         wrap.appendChild(bubble);
         if (extraEl) bubble.appendChild(extraEl);
         wrap.appendChild(footer);
         box.appendChild(wrap);
         _chatScrollBottom();
         return bubble;
+    }
+
+    // ── Start editing a message ──
+    function _startEditMsg(wrap, bubble, originalText, msgIdx) {
+        // Already editing?
+        if (wrap.querySelector('.chat-edit-wrap')) return;
+        bubble.style.display = 'none';
+
+        const editWrap = document.createElement('div');
+        editWrap.className = 'chat-edit-wrap';
+
+        const ta = document.createElement('textarea');
+        ta.className = 'chat-edit-textarea';
+        ta.value = originalText;
+        ta.rows = 3;
+        setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 50);
+        ta.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'chat-edit-actions';
+
+        const sendBtn = document.createElement('button');
+        sendBtn.className = 'chat-edit-send';
+        sendBtn.innerHTML = '<span class="material-icons-round" style="font-size:13px;pointer-events:none;">send</span> Resend';
+        sendBtn.onclick = () => {
+            const newText = ta.value.trim();
+            if (!newText) return;
+            _submitEditMsg(wrap, bubble, originalText, newText, msgIdx);
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'chat-edit-cancel';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.onclick = () => {
+            editWrap.remove();
+            bubble.style.display = '';
+        };
+
+        // Send on Enter (not Shift+Enter)
+        ta.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
+
+        actions.appendChild(sendBtn);
+        actions.appendChild(cancelBtn);
+        editWrap.appendChild(ta);
+        editWrap.appendChild(actions);
+        wrap.insertBefore(editWrap, wrap.querySelector('.chat-msg-footer'));
+    }
+
+    // ── Submit edited message — remove subsequent messages and resend ──
+    async function _submitEditMsg(wrap, bubble, originalText, newText, msgIdx) {
+        // Remove all messages after this one from DOM
+        const box = document.getElementById('agent-chat-messages');
+        const allMsgs = Array.from(box.children);
+        const wrapIdx = allMsgs.indexOf(wrap);
+        for (let i = allMsgs.length - 1; i > wrapIdx; i--) {
+            allMsgs[i].remove();
+        }
+
+        // Truncate _chatHistory to this message (exclusive)
+        _chatHistory = _chatHistory.slice(0, msgIdx);
+
+        // Remove edit UI, restore bubble with new text
+        const editWrap = wrap.querySelector('.chat-edit-wrap');
+        if (editWrap) editWrap.remove();
+
+        // Update bubble text
+        const _svgFrags = [];
+        const _safeText = newText
+            .replace(/<svg[\s\S]*?<\/svg>/g, (m) => { _svgFrags.push(m); return '\x00SVG' + (_svgFrags.length - 1) + '\x00'; })
+            .replace(/\n/g, '<br>')
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/&lt;br&gt;/g,'<br>')
+            .replace(/\x00SVG(\d+)\x00/g, (_, i) => _svgFrags[+i] || '');
+        bubble.innerHTML = _safeText;
+        bubble.style.display = '';
+
+        // Update history with new text
+        _chatHistory.push({ role: 'user', text: newText, time: _chatTime() });
+        wrap.dataset.msgIdx = _chatHistory.length - 1;
+
+        // Now send as new message
+        const textarea = document.getElementById('agent-chat-textarea');
+        if (textarea) textarea.value = newText;
+        sendChatMessage();
+        if (textarea) textarea.value = '';
     }
 
     // ── Show typing indicator ──
@@ -360,7 +502,8 @@
 
         // Append user bubble
         const userTime = _chatTime();
-        _appendChatMsg('user', userRequest, userTime);
+        const userMsgIdx = _chatHistory.length;
+        _appendChatMsg('user', userRequest, userTime, null, userMsgIdx);
         _chatHistory.push({ role: 'user', text: userRequest, time: userTime });
 
         // Clear input
@@ -518,6 +661,7 @@ No markdown, no backticks, no explanation outside the array.`;
             const agentTime = _chatTime();
             _appendChatMsg('agent', agentText, agentTime, extraEl);
             _chatHistory.push({ role: 'agent', text: agentText, time: agentTime, msgId });
+            _chSaveCurrentSession();
 
         } catch (err) {
             _hideChatTyping();
@@ -533,6 +677,201 @@ No markdown, no backticks, no explanation outside the array.`;
         }
     }
 
+
+    // ══════════════════════════════════════════
+    // ── CHAT HISTORY PANEL ──
+    // ══════════════════════════════════════════
+
+    function openChatHistoryPanel() {
+        // Inject panel HTML if not exists
+        if (!document.getElementById('chat-history-panel')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'chat-history-overlay';
+            overlay.onclick = (e) => { if (e.target === overlay) closeChatHistoryPanel(); };
+            document.body.appendChild(overlay);
+
+            const panel = document.createElement('div');
+            panel.id = 'chat-history-panel';
+            panel.innerHTML = `
+                <div class="chp-header">
+                    <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <span class="material-icons-round" style="color:var(--accent);font-size:16px;pointer-events:none;">history</span>
+                    </div>
+                    <div class="chp-title">Chat History</div>
+                    <button class="chp-close-btn" onclick="closeChatHistoryPanel()">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="chp-body" id="chp-body"></div>
+            `;
+            document.body.appendChild(panel);
+        }
+
+        _chRenderHistory();
+
+        requestAnimationFrame(() => {
+            document.getElementById('chat-history-overlay').classList.add('active');
+            document.getElementById('chat-history-panel').classList.add('active');
+        });
+    }
+
+    function closeChatHistoryPanel() {
+        const overlay = document.getElementById('chat-history-overlay');
+        const panel   = document.getElementById('chat-history-panel');
+        if (overlay) overlay.classList.remove('active');
+        if (panel)   panel.classList.remove('active');
+    }
+
+    function _chRenderHistory() {
+        const body = document.getElementById('chp-body');
+        if (!body) return;
+        body.innerHTML = '';
+
+        const sessions = _chLoadAll().slice().reverse(); // newest first
+
+        if (!sessions.length) {
+            body.innerHTML = `<div class="chp-empty">
+                <span class="material-icons-round">chat_bubble_outline</span>
+                <p>No saved chats yet.<br>Start chatting — sessions auto-save!</p>
+            </div>`;
+            return;
+        }
+
+        // Group by date
+        const groups = {};
+        sessions.forEach(s => {
+            const d   = new Date(s.date);
+            const now = new Date();
+            let label;
+            const diffDays = Math.floor((now - d) / 86400000);
+            if (diffDays === 0) label = 'Today';
+            else if (diffDays === 1) label = 'Yesterday';
+            else if (diffDays < 7) label = d.toLocaleDateString([], { weekday: 'long' });
+            else label = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+            if (!groups[label]) groups[label] = [];
+            groups[label].push(s);
+        });
+
+        let animDelay = 0;
+        Object.entries(groups).forEach(([label, groupSessions]) => {
+            const dateLabel = document.createElement('div');
+            dateLabel.className = 'chp-date-label';
+            dateLabel.textContent = label;
+            body.appendChild(dateLabel);
+
+            groupSessions.forEach((session, i) => {
+                const row = document.createElement('div');
+                row.className = 'chp-session-row';
+                row.style.animationDelay = (animDelay * 40) + 'ms';
+                animDelay++;
+
+                const msgCount = session.messages ? session.messages.length : 0;
+                const userMsgs = session.messages ? session.messages.filter(m => m.role === 'user').length : 0;
+                const timeStr  = new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                row.innerHTML = `
+                    <div class="chp-session-icon">
+                        <span class="material-icons-round" style="color:var(--accent);font-size:15px;pointer-events:none;">chat</span>
+                    </div>
+                    <div class="chp-session-info">
+                        <div class="chp-session-name">\${session.name || 'Unnamed Chat'}</div>
+                        <div class="chp-session-meta">
+                            <span>\${timeStr}</span>
+                            <span style="opacity:0.4;">·</span>
+                            <span>\${userMsgs} message\${userMsgs !== 1 ? 's' : ''}</span>
+                        </div>
+                    </div>
+                `;
+
+                // Click to restore session
+                row.onclick = (e) => {
+                    if (e.target.closest('.chp-del-btn')) return;
+                    _chRestoreSession(session);
+                    closeChatHistoryPanel();
+                };
+
+                // Delete button
+                const delBtn = document.createElement('button');
+                delBtn.className = 'chp-del-btn';
+                delBtn.innerHTML = '<span class="material-icons-round">delete_outline</span>';
+                delBtn.title = 'Delete';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    _chConfirmDelete(session.id, row);
+                };
+                row.appendChild(delBtn);
+                body.appendChild(row);
+            });
+        });
+    }
+
+    function _chConfirmDelete(sessionId, rowEl) {
+        // Inline confirm — no browser dialogs
+        rowEl.style.transition = 'all 0.2s';
+        rowEl.style.background = 'rgba(239,68,68,0.1)';
+        rowEl.style.borderColor = 'rgba(239,68,68,0.4)';
+
+        const existing = rowEl.querySelector('.chp-confirm-del');
+        if (existing) { existing.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; return; }
+
+        const confirmBar = document.createElement('div');
+        confirmBar.className = 'chp-confirm-del';
+        confirmBar.style.cssText = 'display:flex;align-items:center;gap:7px;padding:7px 13px 9px;border-top:1px solid rgba(239,68,68,0.2);';
+        confirmBar.innerHTML = `
+            <span style="font-size:10px;font-weight:600;color:#ef4444;font-family:Poppins,sans-serif;flex:1;">Delete this chat?</span>
+            <button onclick="event.stopPropagation();_chDoDelete('\${sessionId}', this.closest('.chp-session-row'))" style="padding:5px 11px;border-radius:7px;border:none;background:#ef4444;color:white;font-family:Poppins,sans-serif;font-size:10px;font-weight:700;cursor:pointer;">Delete</button>
+            <button onclick="event.stopPropagation();this.closest('.chp-confirm-del').remove();this.closest('.chp-session-row').style.background='';this.closest('.chp-session-row').style.borderColor='';" style="padding:5px 10px;border-radius:7px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:Poppins,sans-serif;font-size:10px;font-weight:600;cursor:pointer;opacity:0.6;">Cancel</button>
+        `;
+        rowEl.appendChild(confirmBar);
+    }
+
+    function _chDoDelete(sessionId, rowEl) {
+        _chDeleteSession(sessionId);
+        rowEl.style.transition = 'all 0.25s';
+        rowEl.style.opacity = '0';
+        rowEl.style.transform = 'translateX(20px)';
+        setTimeout(() => {
+            rowEl.remove();
+            // If no more rows, show empty state
+            const body = document.getElementById('chp-body');
+            if (body && !body.querySelector('.chp-session-row')) {
+                body.innerHTML = `<div class="chp-empty">
+                    <span class="material-icons-round">chat_bubble_outline</span>
+                    <p>No saved chats yet.</p>
+                </div>`;
+            }
+        }, 280);
+    }
+
+    function _chRestoreSession(session) {
+        // Save current session first
+        _chSaveCurrentSession();
+        // Load selected session
+        _chatSessionId   = session.id;
+        _chatSessionName = session.name || 'New Chat';
+        _chatHistory     = session.messages ? session.messages.slice() : [];
+        _chatMsgCounter  = 0;
+        _chatPendingEditsMap = {};
+
+        // Clear and re-render messages
+        const box = document.getElementById('agent-chat-messages');
+        if (box) {
+            box.innerHTML = '';
+            _chatHistory.forEach((msg, idx) => {
+                if (msg.role === 'user') {
+                    _appendChatMsg('user', msg.text, msg.time, null, idx);
+                } else {
+                    _appendChatMsg('agent', msg.text, msg.time, null);
+                }
+            });
+        }
+
+        // Update session label
+        const lbl = document.getElementById('chat-session-label');
+        if (lbl) lbl.textContent = _chatSessionName;
+
+        showToast('Chat restored', 'history');
+    }
     // ── Override openAgentBar to open inline chat instead ──
     openAgentBar = function() {
         openInlineChat();
@@ -636,22 +975,22 @@ No markdown, no backticks, no explanation outside the array.`;
         }, 150);
     }
 
-    // ── Clear conversation UI + memory ──
+    // ── Clear conversation UI + memory (starts new session) ──
     function _inlineClearChatUI() {
+        _chSaveCurrentSession();
+        _chNewSession();
         _inlineClearHistory();
         const box = document.getElementById('inline-chat-messages');
         if (!box) return;
-        box.innerHTML = `<div id="inline-chat-empty">
-            <span class="material-icons-round">chat</span>
-            <p>Ask me about your code.<br>I can explain, fix &amp; apply changes.</p>
-            <p style="font-size:9px;opacity:0.55;margin-top:6px;line-height:1.7;">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                Chat mode &nbsp;·&nbsp;
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Edit mode — toggle via buttons below
-            </p>
-        </div>`;
-        showToast('Conversation cleared', 'delete_sweep');
+        box.innerHTML = '<div id="inline-chat-empty">' +
+            '<span class="material-icons-round">chat</span>' +
+            '<p>Ask me about your code.<br>I can explain, fix &amp; apply changes.</p>' +
+            '<p style="font-size:9px;opacity:0.55;margin-top:6px;line-height:1.7;">' +
+            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' +
+            ' Chat mode &nbsp;·&nbsp; ' +
+            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+            ' Edit mode — toggle via buttons below</p></div>';
+        showToast('New chat started', 'add_comment');
     }
 
     function closeInlineChat() {
@@ -850,7 +1189,7 @@ No markdown, no backticks, no explanation outside the array.`;
         if (!ta) return;
         const currentCode = editor.getValue();
         const numbered = currentCode.split('\n').map((l,i) => `${i+1}| ${l}`).join('\n');
-        ta.value = `The OLD BLOCK you gave me doesn't match anything in my current code.\n\nOLD BLOCK you sent:\n\`\`\`\n${oldCode}\n\`\`\`\n\nMy CURRENT CODE (with line numbers):\n\`\`\`\n${numbered}\n\`\`\`\n\nPlease find the correct matching block in my current code and send the correct OLD BLOCK and NEW BLOCK again.`;
+        ta.value = `The OLD BLOCK you gave me doesn't match anything in my current code.\n\nOLD BLOCK you sent:\n```\n${oldCode}\n```\n\nMy CURRENT CODE (with line numbers):\n```\n${numbered}\n```\n\nPlease find the correct matching block in my current code and send the correct OLD BLOCK and NEW BLOCK again.`;
         sendInlineChat();
     }
 
@@ -1197,7 +1536,7 @@ STRICT FORMAT RULES:
                 if (tid === (targetTab ? targetTab.id : activeTabId)) return;
                 const t = fileTabs.find(f => f.id === tid);
                 if (!t || !t.content?.trim()) return;
-                otherFilesCtx += `\n\n── CONTEXT FILE: ${t.name} ──\n\`\`\`\n${t.content}\n\`\`\``;
+                otherFilesCtx += `\n\n── CONTEXT FILE: ${t.name} ──\n```\n${t.content}\n````;
             });
         }
 
@@ -1212,7 +1551,7 @@ STRICT FORMAT RULES:
         const sessionBlock = sessionEvents ? `\n\n── SESSION EVENTS ──\n${sessionEvents}` : '';
 
         // ── Final message to AI ──
-        const codeBlock = (!_isNewFileMode && numberedCode) ? `\n\n── FULL CODE (with line numbers) ──\n\`\`\`\n${numberedCode}\n\`\`\`` : '';
+        const codeBlock = (!_isNewFileMode && numberedCode) ? `\n\n── FULL CODE (with line numbers) ──\n```\n${numberedCode}\n```` : '';
         const userMsg = `── CONTEXT ──${sessionBlock}${codeBlock}${otherFilesCtx}${attachCtx}\n\n── USER REQUEST ──\n${userRequest}`;
 
         // ── Show prompt info in live log ──
@@ -1248,8 +1587,8 @@ Rules:
 3. If you need to show code, wrap it in fenced code blocks (triple backticks with language tag) — these render as Canvas cards the user can copy.
 4. When showing code changes, use this exact format:
    - First write in plain text: "Lines X–Y" (where the change is)
-   - Then the OLD block: \`\`\`old\n<exact code, NO line numbers>\n\`\`\`
-   - Then the NEW block: \`\`\`new\n<replacement code, NO line numbers>\n\`\`\`
+   - Then the OLD block: ```old\n<exact code, NO line numbers>\n```
+   - Then the NEW block: ```new\n<replacement code, NO line numbers>\n```
    - Line numbers go in the chat text ONLY, never inside the code blocks.
    - The app will show an Apply button on the NEW block to auto-replace.
 5. Keep responses clear, helpful, and to the point. Match the user's language (English or Hindi/Hinglish).`
@@ -1842,9 +2181,9 @@ Original intent: "${e.find ? e.find.slice(0,80) : `lines ${e.line_start}-${e.lin
 Replacement needed: "${(e.replace||'').slice(0,80)}"
 
 Surrounding code context (line numbers shown):
-\`\`\`
+```
 ${contextLines}
-\`\`\``;
+````;
             }).join('\n\n---\n\n');
 
             const retrySystemPrompt = `You are a code edit assistant. The following edits FAILED because the target location could not be found.
@@ -2019,7 +2358,7 @@ Use only line numbers visible in the context. Be precise.`;
         const sessionSummaryBlock2 = sessionEvents2 ? `\n\n── SESSION EVENTS ──\n${sessionEvents2}` : '';
 
         // Build re-analysis message — full current code + all context
-        const reAnalyseMsg = `── CURRENT FILE: ${filename} ──${sessionSummaryBlock2}\n\n── FULL CODE (current state, after previous fix was applied) ──\n\`\`\`\n${numberedCode}\n\`\`\`\n\n── USER REPORT ──\nThe previous fix was applied but the issue is STILL present. Analyse the current code above carefully — it already includes the previous changes. Identify what is still wrong and provide a corrected fix.`;
+        const reAnalyseMsg = `── CURRENT FILE: ${filename} ──${sessionSummaryBlock2}\n\n── FULL CODE (current state, after previous fix was applied) ──\n```\n${numberedCode}\n```\n\n── USER REPORT ──\nThe previous fix was applied but the issue is STILL present. Analyse the current code above carefully — it already includes the previous changes. Identify what is still wrong and provide a corrected fix.`;
 
         // Include full chat history so AI sees the full conversation context
         const historyForAPI = _buildHistoryForAPI();
