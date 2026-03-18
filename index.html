@@ -1861,7 +1861,7 @@
                     <div id="inline-file-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;min-width:180px;max-height:260px;overflow-y:auto;overflow-x:hidden;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;z-index:200;box-shadow:0 4px 14px rgba(0,0,0,0.10);">
                     </div>
                 </div>
-                <button onclick="openChatHistoryPanel()" title="Chat History" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--accent);opacity:0.7;flex-shrink:0;transition:opacity 0.15s;pointer-events:auto;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7">
+                <button onclick="openChatHistoryPanel()" title="Chat History" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--accent);opacity:0.7;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">history</span>
                 </button>
                 <button onclick="_inlineClearChatUI()" title="New Chat" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.5;flex-shrink:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.5">
@@ -5983,6 +5983,33 @@ Rules:
     let _chatSessionName = 'New Chat';
     let _chatMsgCounter = 0;
     let _chatPendingEditsMap = {};  // msgId → edits array (for per-message apply)
+    const _CH_KEY = 'codx_chat_sessions';
+    let _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+    function _chLoadAll() {
+        try { return JSON.parse(localStorage.getItem(_CH_KEY) || '[]'); } catch(e) { return []; }
+    }
+    function _chSaveAll(sessions) {
+        try { localStorage.setItem(_CH_KEY, JSON.stringify(sessions.slice(-80))); } catch(e) {}
+    }
+    function _chSaveCurrentSession() {
+        if (!_chatHistory.length) return;
+        const sessions = _chLoadAll();
+        const idx = sessions.findIndex(s => s.id === _chatSessionId);
+        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice() };
+        if (idx !== -1) sessions[idx] = session;
+        else sessions.push(session);
+        _chSaveAll(sessions);
+    }
+    function _chDeleteSession(id) {
+        const sessions = _chLoadAll().filter(s => s.id !== id);
+        _chSaveAll(sessions);
+    }
+    function _chNewSession() {
+        _chSaveCurrentSession();
+        _chatSessionId = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        _chatSessionName = 'New Chat'; _chatHistory = []; _chatMsgCounter = 0; _chatPendingEditsMap = {};
+    }
 
     // ── Auto-generate session name from first user message ──
     function _autoChatName(text) {
@@ -6085,8 +6112,6 @@ Rules:
         wrap.appendChild(footer);
         box.appendChild(wrap);
         _chatScrollBottom();
-        // ── Auto-save on every message ──
-        if (typeof _chSaveCurrentSession === 'function' && typeof _chatHistory !== 'undefined' && _chatHistory.length > 0) _chSaveCurrentSession();
         return bubble;
     }
 
@@ -6208,16 +6233,9 @@ Rules:
         let applied = 0;
         const targetId = _agentTargetTabId || activeTabId;
         edits.forEach(edit => {
-            const searchTabs = [
-                fileTabs.find(t => t.id === targetId),
-                ...fileTabs.filter(t => t.id !== targetId)
-            ].filter(Boolean);
+            const searchTabs = [fileTabs.find(t => t.id === targetId), ...fileTabs.filter(t => t.id !== targetId)].filter(Boolean);
             for (const tab of searchTabs) {
-                if (tab.content && tab.content.includes(edit.find)) {
-                    tab.content = tab.content.split(edit.find).join(edit.replace);
-                    applied++;
-                    break;
-                }
+                if (tab.content && tab.content.includes(edit.find)) { tab.content = tab.content.split(edit.find).join(edit.replace); applied++; break; }
             }
         });
         const cur = fileTabs.find(t => t.id === activeTabId);
@@ -6520,6 +6538,148 @@ No markdown, no backticks, no explanation outside the array.`;
             sendBtn.disabled = false;
         }
     }
+
+    // ══════════════════════════════════════════
+    // ── CHAT HISTORY PANEL ──
+    // ══════════════════════════════════════════
+
+    function openChatHistoryPanel() {
+        _chSaveCurrentSession();
+        if (!document.getElementById('chat-history-panel')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'chat-history-overlay';
+            overlay.onclick = (e) => { if (e.target === overlay) closeChatHistoryPanel(); };
+            document.body.appendChild(overlay);
+            const panel = document.createElement('div');
+            panel.id = 'chat-history-panel';
+            panel.innerHTML = `
+                <div class="chp-header">
+                    <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <span class="material-icons-round" style="color:var(--accent);font-size:16px;pointer-events:none;">history</span>
+                    </div>
+                    <div class="chp-title">Chat History</div>
+                    <button class="chp-close-btn" onclick="closeChatHistoryPanel()">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="chp-body" id="chp-body"></div>
+            `;
+            document.body.appendChild(panel);
+        }
+        _chRenderHistory();
+        requestAnimationFrame(() => {
+            document.getElementById('chat-history-overlay').classList.add('active');
+            document.getElementById('chat-history-panel').classList.add('active');
+        });
+    }
+
+    function closeChatHistoryPanel() {
+        const overlay = document.getElementById('chat-history-overlay');
+        const panel   = document.getElementById('chat-history-panel');
+        if (overlay) overlay.classList.remove('active');
+        if (panel)   panel.classList.remove('active');
+    }
+
+    function _chRenderHistory() {
+        const body = document.getElementById('chp-body');
+        if (!body) return;
+        body.innerHTML = '';
+        const sessions = _chLoadAll().slice().reverse();
+        if (!sessions.length) {
+            body.innerHTML = '<div class="chp-empty"><span class="material-icons-round">chat_bubble_outline</span><p>No saved chats yet.<br>Start chatting!</p></div>';
+            return;
+        }
+        const groups = {};
+        sessions.forEach(s => {
+            const d = new Date(s.date), now = new Date();
+            const diffDays = Math.floor((now - d) / 86400000);
+            let label = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Yesterday' : diffDays < 7 ? d.toLocaleDateString([], { weekday: 'long' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+            if (!groups[label]) groups[label] = [];
+            groups[label].push(s);
+        });
+        let animDelay = 0;
+        Object.entries(groups).forEach(([label, groupSessions]) => {
+            const dateLabel = document.createElement('div');
+            dateLabel.className = 'chp-date-label';
+            dateLabel.textContent = label;
+            body.appendChild(dateLabel);
+            groupSessions.forEach(session => {
+                const row = document.createElement('div');
+                row.className = 'chp-session-row';
+                row.style.animationDelay = (animDelay * 40) + 'ms'; animDelay++;
+                const userMsgs = session.messages ? session.messages.filter(m => m.role === 'user').length : 0;
+                const timeStr = new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                row.innerHTML = '<div class="chp-session-icon"><span class="material-icons-round" style="color:var(--accent);font-size:15px;pointer-events:none;">chat</span></div>' +
+                    '<div class="chp-session-info">' +
+                    '<div class="chp-session-name">' + (session.name || 'Unnamed Chat') + '</div>' +
+                    '<div class="chp-session-meta"><span>' + timeStr + '</span><span style="opacity:0.4;">·</span><span>' + userMsgs + ' message' + (userMsgs !== 1 ? 's' : '') + '</span></div>' +
+                    '</div>';
+                row.onclick = (e) => { if (e.target.closest('.chp-del-btn')) return; _chRestoreSession(session); closeChatHistoryPanel(); };
+                const delBtn = document.createElement('button');
+                delBtn.className = 'chp-del-btn';
+                delBtn.innerHTML = '<span class="material-icons-round">delete_outline</span>';
+                delBtn.onclick = (e) => { e.stopPropagation(); _chConfirmDelete(session.id, row); };
+                row.appendChild(delBtn);
+                body.appendChild(row);
+            });
+        });
+    }
+
+    function _chConfirmDelete(sessionId, rowEl) {
+        rowEl.style.background = 'rgba(239,68,68,0.1)';
+        rowEl.style.borderColor = 'rgba(239,68,68,0.4)';
+        const existing = rowEl.querySelector('.chp-confirm-del');
+        if (existing) { existing.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; return; }
+        const confirmBar = document.createElement('div');
+        confirmBar.className = 'chp-confirm-del';
+        const delBtn2 = document.createElement('button');
+        delBtn2.textContent = 'Delete';
+        delBtn2.style.cssText = 'padding:5px 11px;border-radius:7px;border:none;background:#ef4444;color:white;font-family:Poppins,sans-serif;font-size:10px;font-weight:700;cursor:pointer;';
+        delBtn2.onclick = (e) => { e.stopPropagation(); _chDoDelete(sessionId, rowEl); };
+        const cancelBtn2 = document.createElement('button');
+        cancelBtn2.textContent = 'Cancel';
+        cancelBtn2.style.cssText = 'padding:5px 10px;border-radius:7px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:Poppins,sans-serif;font-size:10px;font-weight:600;cursor:pointer;opacity:0.6;';
+        cancelBtn2.onclick = (e) => { e.stopPropagation(); confirmBar.remove(); rowEl.style.background = ''; rowEl.style.borderColor = ''; };
+        const label2 = document.createElement('span');
+        label2.textContent = 'Delete this chat?';
+        label2.style.cssText = 'font-size:10px;font-weight:600;color:#ef4444;font-family:Poppins,sans-serif;flex:1;';
+        confirmBar.appendChild(label2);
+        confirmBar.appendChild(delBtn2);
+        confirmBar.appendChild(cancelBtn2);
+        rowEl.appendChild(confirmBar);
+    }
+
+    function _chDoDelete(sessionId, rowEl) {
+        _chDeleteSession(sessionId);
+        rowEl.style.transition = 'all 0.25s';
+        rowEl.style.opacity = '0'; rowEl.style.transform = 'translateX(20px)';
+        setTimeout(() => {
+            rowEl.remove();
+            const body = document.getElementById('chp-body');
+            if (body && !body.querySelector('.chp-session-row'))
+                body.innerHTML = '<div class="chp-empty"><span class="material-icons-round">chat_bubble_outline</span><p>No saved chats yet.</p></div>';
+        }, 280);
+    }
+
+    function _chRestoreSession(session) {
+        _chSaveCurrentSession();
+        _chatSessionId = session.id;
+        _chatSessionName = session.name || 'New Chat';
+        _chatHistory = session.messages ? session.messages.slice() : [];
+        _chatMsgCounter = 0; _chatPendingEditsMap = {};
+        const box = document.getElementById('inline-chat-messages');
+        if (box) {
+            box.innerHTML = '';
+            _chatHistory.forEach(msg => {
+                if (msg.role === 'user') _inlineAppendMsg('user', msg.text, msg.time, null);
+                else _inlineAppendMsg('agent', msg.text, msg.time, null);
+            });
+        }
+        if (typeof _inlineChatScroll === 'function') _inlineChatScroll();
+    }
+
+    // ── Save on refresh/close ──
+    window.addEventListener('beforeunload', () => { _chSaveCurrentSession(); });
 
     // ── Override openAgentBar to open inline chat instead ──
     openAgentBar = function() {
@@ -7142,15 +7302,9 @@ STRICT FORMAT RULES:
 
         _inlineAppendMsg('user', userRequest);
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
-        // ── Sync to _chatHistory + instant save ──
-        if (typeof _chSaveCurrentSession === 'function') {
-            if (typeof _chatSessionName !== 'undefined' && _chatSessionName === 'New Chat' && typeof _autoChatName === 'function')
-                _chatSessionName = _autoChatName(userRequest);
-            if (typeof _chatHistory !== 'undefined' && typeof _chatTime === 'function') {
-                _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
-                _chSaveCurrentSession();
-            }
-        }
+        if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
+        _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
+        _chSaveCurrentSession();
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
@@ -7263,11 +7417,8 @@ Rules:
             // Save to history
             _inlineChatHistory.push({ role: 'user', content: userMsg });
             _inlineChatHistory.push({ role: 'assistant', content: raw });
-            // ── Sync agent reply + save ──
-            if (typeof _chSaveCurrentSession === 'function' && typeof _chatHistory !== 'undefined') {
-                _chatHistory.push({ role: 'agent', text: raw.trim(), time: (typeof _chatTime === 'function' ? _chatTime() : '') });
-                _chSaveCurrentSession();
-            }
+            _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
+            _chSaveCurrentSession();
 
             const parsed = _tryParseJSON(raw);
 
@@ -8364,14 +8515,11 @@ Use only line numbers visible in the context. Be precise.`;
             const _rowBg = isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent';
             row.addEventListener('touchstart', (e) => {
                 row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
-                if (!e.target.closest(`[id="ctx-btn-${t.id}"]`)) row.style.background = 'rgba(16,185,129,0.12)';
+                if (!e.target.closest('[id="ctx-btn-' + t.id + '"]')) row.style.background = 'rgba(16,185,129,0.12)';
             }, { passive: true });
             row.addEventListener('touchmove', (e) => {
-                if (row._ts) {
-                    const dy = Math.abs(e.touches[0].clientY - row._ts.y);
-                    const dx = Math.abs(e.touches[0].clientX - row._ts.x);
-                    if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; }
-                }
+                if (row._ts) { const dy = Math.abs(e.touches[0].clientY - row._ts.y), dx = Math.abs(e.touches[0].clientX - row._ts.x);
+                if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; } }
             }, { passive: true });
             row.addEventListener('touchend', () => { row._ts = null; setTimeout(() => { row.style.background = _rowBg; }, 150); }, { passive: true });
             row.addEventListener('touchcancel', () => { row._ts = null; row.style.background = _rowBg; }, { passive: true });
