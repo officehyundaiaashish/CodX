@@ -422,6 +422,16 @@
         body.chat-kb-open #editor {
             background: var(--editor-bg) !important;
         }
+        /* Chat panel open hone par editor ke touch events block karo */
+        body.chat-is-open #editor {
+            pointer-events: none !important;
+            touch-action: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+        body.chat-is-open #editor-wrapper {
+            pointer-events: none !important;
+        }
         .file-tab { display: flex; align-items: center; gap: 5px; padding: 6px 12px 6px 12px; font-size: 11px; font-weight: 600; color: var(--text-color); opacity: 0.55; border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         .file-tab.active { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }
         .file-tab .ft-close { font-size: 13px; opacity: 0.4; margin-left: 2px; line-height: 1; transition: opacity 0.15s; pointer-events: auto; }
@@ -6585,7 +6595,10 @@ No markdown, no backticks, no explanation outside the array.`;
         if (!_chatHistory.length) return;
         const sessions = _chLoadAll();
         const sidx = sessions.findIndex(s => s.id === _chatSessionId);
-        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice() };
+        // Active file ka naam save karo
+        const _activeTab = fileTabs && fileTabs.find(t => t.id === (_agentTargetTabId || activeTabId));
+        const _fileName = _activeTab ? _activeTab.name : '';
+        const session = { id: _chatSessionId, name: _chatSessionName, date: new Date().toISOString(), messages: _chatHistory.slice(), fileName: _fileName };
         if (sidx !== -1) sessions[sidx] = session;
         else sessions.push(session);
         _chSaveAll(sessions);
@@ -6663,9 +6676,10 @@ No markdown, no backticks, no explanation outside the array.`;
                 row.style.animationDelay = (delay * 40) + 'ms'; delay++;
                 const userMsgs = session.messages ? session.messages.filter(m => m.role === 'user').length : 0;
                 const t = new Date(session.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                const fileTag = session.fileName ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--accent-dim);color:var(--accent);font-family:Poppins,sans-serif;flex-shrink:0;">' + session.fileName + '</span>' : '';
                 row.innerHTML = '<div class="chp-session-icon"><span class="material-icons-round" style="color:var(--accent);font-size:15px;pointer-events:none;">chat</span></div>' +
                     '<div class="chp-session-info"><div class="chp-session-name">' + (session.name || 'Unnamed Chat') + '</div>' +
-                    '<div class="chp-session-meta"><span>' + t + '</span><span style="opacity:0.4">·</span><span>' + userMsgs + ' msg' + (userMsgs !== 1 ? 's' : '') + '</span></div></div>';
+                    '<div class="chp-session-meta"><span>' + t + '</span><span style="opacity:0.4">·</span><span>' + userMsgs + ' msg' + (userMsgs !== 1 ? 's' : '') + '</span>' + fileTag + '</div></div>';
                 row.onclick = (e) => { if (e.target.closest('.chp-del-btn')) return; _chRestoreSession(session); closeChatHistoryPanel(); };
                 const db = document.createElement('button');
                 db.className = 'chp-del-btn';
@@ -6730,9 +6744,34 @@ No markdown, no backticks, no explanation outside the array.`;
         const box = document.getElementById('inline-chat-messages');
         if (box) {
             box.innerHTML = '';
+
+            // Session ka file tag header mein dikhao
+            if (session.fileName) {
+                const fileHdr = document.createElement('div');
+                fileHdr.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;margin:4px 0 8px;background:var(--accent-dim);border-radius:10px;font-size:10px;font-weight:700;color:var(--accent);font-family:Poppins,sans-serif;';
+                fileHdr.innerHTML = '<span class="material-icons-round" style="font-size:13px;pointer-events:none;">insert_drive_file</span>' + session.fileName;
+                box.appendChild(fileHdr);
+            }
+
             _chatHistory.forEach(msg => {
-                if (msg.role === 'user') _inlineAppendMsg('user', msg.text || '', null);
-                else _inlineAppendMsg('agent', msg.text || '', null);
+                if (msg.role === 'user') {
+                    _inlineAppendMsg('user', msg.text || '', null);
+                } else {
+                    // Agent message — _renderMsgHTML se render karo
+                    // JSON type responses ko clean summary ke roop mein dikhao
+                    let displayText = msg.text || '';
+                    // Agar pure JSON tha (edit/reorganize) to explanation dikhao
+                    if (displayText.trim().startsWith('{') && displayText.includes('"type"')) {
+                        try {
+                            const parsed = JSON.parse(displayText.replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim());
+                            if (parsed.explanation) displayText = '✅ ' + parsed.explanation;
+                            else if (parsed.type === 'edit') displayText = '✅ Code edit applied';
+                            else if (parsed.type === 'reorganize') displayText = '✅ File reorganized';
+                            else if (parsed.type === 'new_file') displayText = '✅ New file: ' + (parsed.filename || '');
+                        } catch(e) {}
+                    }
+                    _inlineAppendMsg('agent', displayText, null);
+                }
             });
         }
 
@@ -6820,6 +6859,7 @@ No markdown, no backticks, no explanation outside the array.`;
 
         chatPanel.classList.add('chat-open');
         if (aiBtn) aiBtn.classList.add('chat-active');
+        document.body.classList.add('chat-is-open');
 
         const inner = document.getElementById('bottom-panel');
         if(inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
@@ -6875,6 +6915,7 @@ No markdown, no backticks, no explanation outside the array.`;
         const chatPanel = document.getElementById('inline-chat-panel');
         const aiBtn     = document.getElementById('ai-agent-btn');
         chatPanel.classList.remove('chat-open');
+        document.body.classList.remove('chat-is-open');
         // Reset panel position completely
         chatPanel.style.bottom = '0';
         chatPanel.style.height = '';
