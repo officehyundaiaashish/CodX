@@ -7144,11 +7144,14 @@ STRICT FORMAT RULES:
         requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
 
         // ── Sync to _chatHistory so history panel can see this session ──
-        if (_chatSessionName === 'New Chat') {
-            _chatSessionName = _autoChatName(userRequest);
+        if (typeof _chSaveCurrentSession === 'function') {
+            if (typeof _chatSessionName !== 'undefined' && _chatSessionName === 'New Chat') {
+                if (typeof _autoChatName === 'function') _chatSessionName = _autoChatName(userRequest);
+            }
+            if (typeof _chatHistory !== 'undefined') {
+                _chatHistory.push({ role: 'user', text: userRequest, time: (typeof _chatTime === 'function' ? _chatTime() : new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})) });
+            }
         }
-        const _userTime = _chatTime();
-        _chatHistory.push({ role: 'user', text: userRequest, time: _userTime });
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
@@ -7263,8 +7266,10 @@ Rules:
             _inlineChatHistory.push({ role: 'assistant', content: raw });
 
             // ── Sync agent reply to _chatHistory for history panel ──
-            _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
-            _chSaveCurrentSession();
+            if (typeof _chSaveCurrentSession === 'function' && typeof _chatHistory !== 'undefined') {
+                _chatHistory.push({ role: 'agent', text: raw.trim(), time: (typeof _chatTime === 'function' ? _chatTime() : '') });
+                _chSaveCurrentSession();
+            }
 
             const parsed = _tryParseJSON(raw);
 
