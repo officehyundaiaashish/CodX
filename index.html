@@ -422,6 +422,19 @@
         body.chat-kb-open #editor {
             background: var(--editor-bg) !important;
         }
+        /* ── Preview mode: bottom panels completely locked ── */
+        body.in-preview #bottom-outer,
+        body.in-preview #bottom-panel {
+            transform: translateY(100%) !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+        }
+        body.in-preview #inline-chat-panel {
+            transform: translateY(100%) !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+        }
+
         /* Chat panel open hone par sirf #editor block karo — wrapper nahi
            (inline-chat-panel editor-wrapper ke andar hai) */
         body.chat-is-open #editor {
@@ -3247,6 +3260,7 @@
 
         if(tabName === 'preview') {
             _inPreview = true;
+            document.body.classList.add('in-preview');
             prvEl.classList.add('active-pane');
             edEl.style.opacity = '0';
             edEl.style.pointerEvents = 'none';
@@ -3265,6 +3279,7 @@
             _refreshPreview();
         } else {
             _inPreview = false;
+            document.body.classList.remove('in-preview');
             prvEl.classList.remove('active-pane');
             edEl.style.opacity = '1';
             edEl.style.pointerEvents = 'auto';
