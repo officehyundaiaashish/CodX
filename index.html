@@ -7386,6 +7386,213 @@ No markdown, no backticks, no explanation outside the array.`;
         if (wrap) wrap.remove();
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ── CODX SMART AGENT — Project-tied Memory + Context System ──
+    // ═══════════════════════════════════════════════════════════════
+    // Keys are project-specific — naya project = fresh context
+    // Conv history persists across API calls — AI hamesha context mein rehta hai
+
+    function _codxProjectKey() {
+        // Active tab name = project identifier
+        const tab = fileTabs && fileTabs.find(t => t.id === activeTabId);
+        const name = tab ? tab.name.replace(/[^a-zA-Z0-9]/g, '_') : 'default';
+        return name;
+    }
+
+    function _codxMapKey()  { return 'codx_map_'  + _codxProjectKey(); }
+    function _codxConvKey() { return 'codx_conv_' + _codxProjectKey(); }
+    function _codxFileKey() { return 'codx_file_' + _codxProjectKey(); }
+
+    let _codxScanned = false;
+
+    // ── SCAN: Ek baar poori file scan karo — map banao ──
+    function _codxScanFile() {
+        const targetTab = fileTabs.find(t => t.id === (_agentTargetTabId || activeTabId))
+                       || fileTabs.find(t => t.id === activeTabId);
+        if (!targetTab || !targetTab.content.trim()) {
+            showToast('No file to scan', 'warning'); return;
+        }
+
+        const btn = document.getElementById('codx-scan-btn');
+        const ind = document.getElementById('codx-scan-indicator');
+        if (btn) { btn.style.animation = 'scanPulse 1s ease-in-out infinite'; }
+
+        const code  = targetTab.content;
+        const lines = code.split('\n');
+        const map   = { functions: {}, css: {}, variables: {}, html_refs: {}, fileName: targetTab.name };
+
+        lines.forEach((line, i) => {
+            const ln = i + 1;
+
+            // Functions (named + arrow)
+            const fnM = line.match(/(?:async\s+)?function\s+(\w+)\s*\(/);
+            if (fnM) map.functions[fnM[1]] = { start: ln };
+
+            const arM = line.match(/(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|\w+)\s*=>/);
+            if (arM) map.functions[arM[1]] = { start: ln };
+
+            // Variables
+            const vrM = line.match(/^\s*(?:let|const|var)\s+(\w+)\s*=/);
+            if (vrM && !arM) map.variables[vrM[1]] = ln;
+
+            // CSS selectors
+            const csM = line.match(/^\s*(#[\w-]+|\.[\w-]+(?:\.[\w-]+)*)\s*\{/);
+            if (csM) map.css[csM[1]] = ln;
+
+            // HTML onclick references
+            const onM = line.match(/onclick="([\w_]+)\(/g);
+            if (onM) onM.forEach(m => {
+                const fn = m.replace('onclick="','').replace('(','');
+                if (!map.html_refs[fn]) map.html_refs[fn] = [];
+                map.html_refs[fn].push(ln);
+            });
+        });
+
+        // Function end lines compute karo (brace matching)
+        Object.keys(map.functions).forEach(fn => {
+            const s = map.functions[fn].start - 1;
+            let depth = 0, started = false, end = Math.min(s + 50, lines.length);
+            for (let i = s; i < Math.min(s + 800, lines.length); i++) {
+                for (const ch of lines[i]) {
+                    if (ch === '{') { depth++; started = true; }
+                    else if (ch === '}') { depth--; }
+                }
+                if (started && depth <= 0) { end = i + 1; break; }
+            }
+            map.functions[fn].end = end;
+        });
+
+        // Project-specific keys mein save karo
+        try {
+            localStorage.setItem(_codxMapKey(),  JSON.stringify(map));
+            localStorage.setItem(_codxFileKey(), code);
+        } catch(e) {
+            // Storage full — sirf map save karo
+            try { localStorage.setItem(_codxMapKey(), JSON.stringify(map)); } catch(e2) {}
+        }
+
+        _codxScanned = true;
+        if (btn) { btn.style.animation = ''; btn.style.background = 'var(--accent-dim)'; btn.style.color = 'var(--accent)'; btn.style.boxShadow = '0 0 0 1.5px var(--accent)'; }
+        if (ind) { ind.style.display = 'flex'; }
+
+        const fc = Object.keys(map.functions).length;
+        const cc = Object.keys(map.css).length;
+        const vc = Object.keys(map.variables).length;
+        showToast('Scanned: ' + fc + ' fn · ' + cc + ' CSS · ' + vc + ' vars', 'radar');
+        _inlineAppendMsg('agent',
+            '✅ **' + targetTab.name + '** scanned!\n' +
+            fc + ' functions · ' + cc + ' CSS selectors · ' + vc + ' variables mapped.\n\n' +
+            'Ab har API call mein main relevant context automatically include karunga. ' +
+            'Conversation bhi persist hogi — ek session se doosre session tak.');
+    }
+
+    // ── CONTEXT BUILDER: Request se related code chunks dhundho ──
+    function _codxBuildContext(userRequest) {
+        const mapRaw  = localStorage.getItem(_codxMapKey());
+        const fileRaw = localStorage.getItem(_codxFileKey());
+        if (!mapRaw || !fileRaw) return null;
+
+        const map   = JSON.parse(mapRaw);
+        const lines = fileRaw.split('\n');
+
+        // Keywords
+        const words = (userRequest.toLowerCase().match(/\b[a-zA-Z_][a-zA-Z0-9_]{2,}\b/g) || []);
+
+        // Score every mapped item
+        const scores = {};
+        const scoreItem = (name, lineNum) => {
+            const nl = name.toLowerCase().replace(/^[#._]/,'');
+            let score = 0;
+            words.forEach(w => {
+                if (nl === w) score += 6;
+                else if (nl.includes(w)) score += 3;
+                else if (w.includes(nl) && nl.length > 3) score += 1;
+            });
+            if (score > 0) scores[name] = { score, line: lineNum };
+        };
+
+        Object.entries(map.functions).forEach(([fn, info]) => scoreItem(fn, info.start));
+        Object.entries(map.css || {}).forEach(([sel, ln]) => scoreItem(sel, ln));
+        Object.entries(map.variables || {}).forEach(([v, ln]) => scoreItem(v, ln));
+
+        // Top 8 relevant
+        const top = Object.entries(scores)
+            .sort((a, b) => b[1].score - a[1].score)
+            .slice(0, 8);
+
+        if (!top.length) return null;
+
+        // Extract chunks with line numbers
+        const chunks = [];
+        const usedRanges = new Set();
+
+        top.forEach(([name]) => {
+            const fnInfo = map.functions[name];
+            let s, e;
+            if (fnInfo) {
+                s = Math.max(0, fnInfo.start - 2);
+                e = Math.min(lines.length, (fnInfo.end || fnInfo.start + 30) + 2);
+            } else {
+                const ln = (map.css && map.css[name]) || (map.variables && map.variables[name]) || 1;
+                s = Math.max(0, ln - 2);
+                e = Math.min(lines.length, ln + 30);
+            }
+
+            const key = s + '-' + e;
+            if (usedRanges.has(key)) return;
+            usedRanges.add(key);
+
+            // Line-numbered snippet
+            const snippet = lines.slice(s, e)
+                .map((l, i) => (s + i + 1) + '| ' + l)
+                .join('\n');
+
+            chunks.push({ name, score: scores[name].score, snippet, startLine: s + 1, endLine: e });
+        });
+
+        return { chunks, summary: top.slice(0,4).map(([n]) => n).join(', '), totalLines: lines.length };
+    }
+
+    // ── CONVERSATION MEMORY: Project-tied, API call ke beech persist ──
+    function _codxSaveConv(role, content) {
+        try {
+            const key  = _codxConvKey();
+            const conv = JSON.parse(localStorage.getItem(key) || '[]');
+            conv.push({ role, content, t: Date.now() });
+            localStorage.setItem(key, JSON.stringify(conv.slice(-30))); // last 30 messages
+        } catch(e) {}
+    }
+
+    function _codxLoadConv() {
+        try {
+            const conv = JSON.parse(localStorage.getItem(_codxConvKey()) || '[]');
+            // Last 10 turns (20 messages) for API — enough context, not too heavy
+            return conv.slice(-20).map(m => ({
+                role: m.role === 'agent' ? 'assistant' : m.role,
+                content: m.content
+            }));
+        } catch(e) { return []; }
+    }
+
+    function _codxClearConversation() {
+        try { localStorage.removeItem(_codxConvKey()); } catch(e) {}
+    }
+
+    // ── RESTORE: Page load hone par scan state restore karo ──
+    setTimeout(function() {
+        if (localStorage.getItem(_codxMapKey())) {
+            _codxScanned = true;
+            const btn = document.getElementById('codx-scan-btn');
+            const ind = document.getElementById('codx-scan-indicator');
+            if (btn) { btn.style.background = 'var(--accent-dim)'; btn.style.color = 'var(--accent)'; btn.style.boxShadow = '0 0 0 1.5px var(--accent)'; }
+            if (ind) { ind.style.display = 'flex'; }
+        }
+    }, 700);
+
+    // ── Tab change hone par scan state update ──
+    // (Naya tab = different project = alag keys = sahi context)
+    const _origSwitchFileTab = typeof switchFileTab !== 'undefined' ? switchFileTab : null;
+
     //  NEW AGENT WORKFLOW — Single API call, AI decides
     //  No regex intent detection — AI handles everything
 
@@ -7500,6 +7707,7 @@ STRICT FORMAT RULES:
         if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
         _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
         _chSaveCurrentSession();
+        if (typeof _codxSaveConv === 'function') _codxSaveConv('user', userRequest);
 
         const sendBtn = document.getElementById('inline-chat-send-btn');
 
@@ -7559,10 +7767,27 @@ STRICT FORMAT RULES:
 
         // ── Final message to AI ──
         const codeBlock = (!_isNewFileMode && numberedCode) ? `\n\n── FULL CODE (with line numbers) ──\n\`\`\`\n${numberedCode}\n\`\`\`` : '';
-        const userMsg = `── CONTEXT ──${sessionBlock}${codeBlock}${otherFilesCtx}${attachCtx}\n\n── USER REQUEST ──\n${userRequest}`;
+        // ── Smart context: project-specific relevant chunks ──
+        let _smartCtx = '';
+        if (typeof _codxScanned !== 'undefined' && _codxScanned && !otherFilesCtx) {
+            const sctx = _codxBuildContext(userRequest);
+            if (sctx && sctx.chunks.length > 0) {
+                _smartCtx = '\n\n── SMART CONTEXT (auto-scanned relevant sections) ──\n' +
+                    sctx.chunks.map(c =>
+                        '\n[' + c.name + ' — lines ' + c.startLine + '-' + c.endLine + ']\n```\n' + c.snippet + '\n```'
+                    ).join('\n') +
+                    '\n\n(File: ' + sctx.totalLines + ' lines total. Use these line numbers for edits.)';
+                _inlineLogActivity('Smart ctx: ' + sctx.summary);
+            }
+        }
+        // Smart conversation history — project-specific, persists across API calls
+        const _smartHist = (typeof _codxLoadConv === 'function' && typeof _codxScanned !== 'undefined' && _codxScanned)
+            ? _codxLoadConv() : [];
+
+        const userMsg = `── CONTEXT ──${sessionBlock}${codeBlock}${otherFilesCtx}${_smartCtx}${attachCtx}\n\n── USER REQUEST ──\n${userRequest}`;
 
         // ── Show prompt info in live log ──
-        const historyForAPI = _buildHistoryForAPI();
+        const historyForAPI = (typeof _smartHist !== 'undefined' && _smartHist.length > 0) ? _smartHist : _buildHistoryForAPI();
         if (!_isNewFileMode && targetTab) _inlineLogActivity('Target: ' + targetTab.name);
         if (historyForAPI.length > 0)     _inlineLogActivity('History: ' + historyForAPI.length + ' msgs');
         _inlineLogActivity('Prompt ready: ' + (userMsg.length/1024).toFixed(1) + 'k chars');
@@ -7614,6 +7839,7 @@ Rules:
             _inlineChatHistory.push({ role: 'assistant', content: raw });
             _chatHistory.push({ role: 'agent', text: raw.trim(), time: _chatTime() });
             _chSaveCurrentSession();
+            _codxSaveConv('assistant', raw.trim());
 
             const parsed = _tryParseJSON(raw);
 
