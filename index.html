@@ -3684,7 +3684,7 @@
                 <span class="material-icons-round gh-item-icon">${icon}</span>
                 <span class="gh-item-name">${item.name}</span>
                 <div class="gh-item-actions">
-                    ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Open" onclick="event.stopPropagation();_ghQuickOpen('${item.path}')"><span class="material-icons-round">edit</span></button>` : ''}
+                    ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Open in Editor" onclick="event.stopPropagation();_ghQuickOpen('${item.path}')"><span class="material-icons-round">open_in_new</span></button>` : ''}
                     ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Download" onclick="event.stopPropagation();_ghQuickDownload('${item.path}','${item.name}')"><span class="material-icons-round">download</span></button>` : ''}
                     <button class="gh-item-action-btn" title="Rename" onclick="event.stopPropagation();_ghSelectItem(this.closest('.gh-tree-item'),'${item.path}','${item.name}','${item.type}','${item.sha||''}');renameGhFile()"><span class="material-icons-round">drive_file_rename_outline</span></button>
                     <button class="gh-item-action-btn" title="Delete" style="color:#ef4444" onclick="event.stopPropagation();_ghSelectItem(this.closest('.gh-tree-item'),'${item.path}','${item.name}','${item.type}','${item.sha||''}');deleteGhFile()"><span class="material-icons-round">delete</span></button>
