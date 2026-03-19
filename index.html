@@ -3415,8 +3415,32 @@
     }
     async function saveFile() {
         const code = editor.getValue();
-        if (window.showSaveFilePicker) { try { const handle = await window.showSaveFilePicker({ suggestedName: currentFileName }); const writable = await handle.createWritable(); await writable.write(code); await writable.close(); return; } catch (err) {} }
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' })); a.download = currentFileName; a.click();
+        if (!code && code !== '') { showToast('Nothing to save.', 'warning'); return; }
+        const ext = (currentFileName || '').split('.').pop().toLowerCase();
+        const mime = ext === 'html' || ext === 'htm' ? 'text/html'
+                   : ext === 'css'  ? 'text/css'
+                   : ext === 'js'   ? 'application/javascript'
+                   : ext === 'json' ? 'application/json'
+                   : 'text/plain';
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({ suggestedName: currentFileName });
+                const writable = await handle.createWritable();
+                await writable.write(new Blob([code], { type: mime }));
+                await writable.close();
+                showToast('Saved!', 'check_circle');
+                return;
+            } catch (err) {
+                if (err.name === 'AbortError') return; // user cancelled — do nothing
+                // Fall through to blob download on any other error
+            }
+        }
+        const blob = new Blob([code], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = currentFileName || 'index.html';
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
     }
     // ── Nav hide/restore for modals (find, agent) ──
 
