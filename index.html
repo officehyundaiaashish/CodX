@@ -3245,6 +3245,7 @@
                 if(outerEl) { outerEl.style.transition = t; outerEl.style.transform = 'translateY(100%)'; }
                 if(innerEl) { innerEl.style.transition = t; innerEl.style.transform = 'translateY(100%)'; }
             }
+            // Desktop: toolbar stays visible (sidebar layout)
             // Force hide chat panel in preview — it's fixed positioned and would overlay preview
             const chatPanel = document.getElementById('inline-chat-panel');
             if (chatPanel) { chatPanel.style.transform = 'translateY(100%)'; chatPanel.style.pointerEvents = 'none'; }
@@ -9364,7 +9365,7 @@ Use only line numbers visible in the context. Be precise.`;
     function desktopZoomIn() {
         let size = parseInt(editor.getOption('fontSize')) || 14;
         size = Math.min(size + 1, 40);
-        editor.setOptions({ fontSize: size + 'px' });
+        _origSetFontSize(size + 'px');
         _lastZoomSize = size;
         localStorage.setItem('codx_fontsize', size);
         showToast('Font ' + size + 'px', 'zoom_in');
@@ -9373,7 +9374,7 @@ Use only line numbers visible in the context. Be precise.`;
     function desktopZoomOut() {
         let size = parseInt(editor.getOption('fontSize')) || 14;
         size = Math.max(size - 1, 10);
-        editor.setOptions({ fontSize: size + 'px' });
+        _origSetFontSize(size + 'px');
         _lastZoomSize = size;
         localStorage.setItem('codx_fontsize', size);
         showToast('Font ' + size + 'px', 'zoom_out');
@@ -9497,7 +9498,7 @@ Use only line numbers visible in the context. Be precise.`;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             const tgt = document.getElementById('tab-preview');
             if (tgt) tgt.classList.add('active');
-            // Hide toolbar (same as HTML preview)
+            // Hide toolbar (same as HTML preview) — mobile only
             const outerEl = document.getElementById('bottom-outer');
             const innerEl = document.getElementById('bottom-panel');
             const isDesktop = window.innerWidth >= 768;
@@ -9506,6 +9507,7 @@ Use only line numbers visible in the context. Be precise.`;
                 if (outerEl) { outerEl.style.transition = t2; outerEl.style.transform = 'translateY(100%)'; }
                 if (innerEl) { innerEl.style.transition = t2; innerEl.style.transform = 'translateY(100%)'; }
             }
+            // Desktop: toolbar stays visible (sidebar layout)
             _inPreview = true;
             document.getElementById('editor').style.opacity = '0';
             document.getElementById('editor').style.pointerEvents = 'none';
