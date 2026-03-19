@@ -410,15 +410,13 @@
         body.chat-kb-open #editor {
             background: var(--editor-bg) !important;
         }
-        /* ── Preview mode: bottom panels locked on mobile only ── */
-        @media (max-width: 767px) {
-            body.in-preview #bottom-outer,
-            body.in-preview #bottom-panel {
-                transform: translateY(100%) !important;
-                pointer-events: none !important;
-                visibility: hidden !important;
-                transition: none !important;
-            }
+        /* ── Preview mode: bottom panels completely locked ── */
+        body.in-preview #bottom-outer,
+        body.in-preview #bottom-panel {
+            transform: translateY(100%) !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+            transition: none !important;
         }
         body.in-preview #inline-chat-panel {
             transform: translateY(100%) !important;
