@@ -4916,7 +4916,7 @@
             if (cfg.provider === 'anthropic') {
                 res = await fetch(cfg.url, {
                     method: 'POST', signal: controller.signal,
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.key, 'anthropic-version': '2023-06-01' },
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
                     body: JSON.stringify({ model: cfg.model, max_tokens: _maxTok, system: systemPrompt, messages })
                 });
                 d = await res.json();
