@@ -3416,42 +3416,51 @@
     async function saveFile() {
         const code = editor.getValue();
         if (code === null || code === undefined) { showToast('Nothing to save.', 'warning'); return; }
-        const ext = (currentFileName || '').split('.').pop().toLowerCase();
-        const mime = ext === 'html' || ext === 'htm' ? 'text/html'
-                   : ext === 'css'  ? 'text/css'
-                   : ext === 'js'   ? 'application/javascript'
-                   : ext === 'json' ? 'application/json'
-                   : 'text/plain';
-        if (window.showSaveFilePicker) {
+        const fileName = currentFileName || 'index.html';
+        const ext = fileName.split('.').pop().toLowerCase();
+
+        // Desktop: use File System Access API (not available on mobile browsers)
+        // showSaveFilePicker is desktop-only — Chrome Android/Safari iOS don't support it
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (!isMobile && window.showSaveFilePicker) {
             try {
-                // Build the accept map for the types array — must match actual file extension
+                const mimeForPicker = ext === 'html' || ext === 'htm' ? 'text/html'
+                    : ext === 'css'  ? 'text/css'
+                    : ext === 'js'   ? 'application/javascript'
+                    : ext === 'json' ? 'application/json'
+                    : 'text/plain';
                 const acceptMap = {};
-                acceptMap[mime] = ['.' + (ext || 'html')];
+                acceptMap[mimeForPicker] = ['.' + ext];
                 const handle = await window.showSaveFilePicker({
-                    suggestedName: currentFileName || 'index.html',
-                    types: [{
-                        description: (ext || 'html').toUpperCase() + ' File',
-                        accept: acceptMap
-                    }]
+                    suggestedName: fileName,
+                    types: [{ description: ext.toUpperCase() + ' File', accept: acceptMap }]
                 });
                 const writable = await handle.createWritable();
-                // Write as encoded bytes to guarantee correct size — avoids 0-byte bug on mobile browsers
                 const encoder = new TextEncoder();
                 await writable.write(encoder.encode(code));
                 await writable.close();
                 showToast('Saved!', 'check_circle');
                 return;
             } catch (err) {
-                if (err.name === 'AbortError') return; // user cancelled — do nothing
-                // Fall through to blob download on any other error
+                if (err.name === 'AbortError') return;
+                // fall through to blob download
             }
         }
-        const blob = new Blob([code], { type: mime });
+
+        // Mobile & fallback: blob download with octet-stream MIME
+        // ROOT CAUSE FIX: Using text/html or other text MIMEs causes Android's download
+        // manager to save the file as .bin (blocks executable types). Using
+        // application/octet-stream forces Android to trust the filename extension instead,
+        // so index.html saves as index.html, styles.css as styles.css, etc.
+        const blob = new Blob([code], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = currentFileName || 'index.html';
-        document.body.appendChild(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+        showToast('Saved: ' + fileName, 'check_circle');
     }
     // ── Nav hide/restore for modals (find, agent) ──
 
@@ -6847,17 +6856,4 @@ No markdown, no backticks, no explanation outside the array.`;
     window.addEventListener('beforeunload', () => { _chSaveCurrentSession(); });
 
     // ── Override openAgentBar to open inline chat instead ──
-    openAgentBar = function() {
-        openInlineChat();
-    };
-
-    // ── Keep openAgentModal working (for settings) ──
-    // No change needed — openAgentModal still opens the agent config modal
-
-    // ── Sync agent name whenever agent changes ──
-    const _origUpdateAgentBarLabel = _updateAgentBarLabel;
-    _updateAgentBarLabel = function() {
-        _origUpdateAgentBarLabel();
-        const ag = _activeAgent();
-        if (ag) {
-            const nameEl = document.g
+    openAgentBar = function(
