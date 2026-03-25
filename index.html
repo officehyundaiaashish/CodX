@@ -3424,9 +3424,20 @@
                    : 'text/plain';
         if (window.showSaveFilePicker) {
             try {
-                const handle = await window.showSaveFilePicker({ suggestedName: currentFileName });
+                // Build the accept map for the types array — must match actual file extension
+                const acceptMap = {};
+                acceptMap[mime] = ['.' + (ext || 'html')];
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: currentFileName || 'index.html',
+                    types: [{
+                        description: (ext || 'html').toUpperCase() + ' File',
+                        accept: acceptMap
+                    }]
+                });
                 const writable = await handle.createWritable();
-                await writable.write(code); // FIX: pass string directly, not Blob — Blob causes 0 bytes on some browsers
+                // Write as encoded bytes to guarantee correct size — avoids 0-byte bug on mobile browsers
+                const encoder = new TextEncoder();
+                await writable.write(encoder.encode(code));
                 await writable.close();
                 showToast('Saved!', 'check_circle');
                 return;
@@ -6849,16 +6860,4 @@ No markdown, no backticks, no explanation outside the array.`;
         _origUpdateAgentBarLabel();
         const ag = _activeAgent();
         if (ag) {
-            const nameEl = document.getElementById('chat-agent-name');
-            if (nameEl) nameEl.textContent = ag.providerName;
-        }
-    };
-
-    // Editor upar (50%), chat neeche (50%) — seedha split screen
-
-    // _inlineChatOpen declared at script top (var) to avoid TDZ in visualViewport handler
-
-    // ── Conversation history for inline chat ──
-    // Each entry: {role: 'user'|'assistant', content: string}
-    // Special entries use role 'user' with content starting with [APPLIED] or [CONFIRMED] or [REJECTED]
-    let _inlineChatHist
+            const nameEl = document.g
