@@ -9748,7 +9748,7 @@ _codx_stderr = None
         body.appendChild(line);
     }
 
-    // ── NEW: Save button ka kaam (localStorage mein save — NO DOWNLOAD) ──
+    // ── NEW: Save button — ab user se poochhega "kahan save karna hai" ──
     function saveCurrentFile() {
         const activeTab = fileTabs.find(t => t.id === activeTabId);
         if (!activeTab) {
@@ -9767,19 +9767,30 @@ _codx_stderr = None
             return;
         }
 
+        // ← Yeh line user se poochhegi
+        let newName = window.prompt("Kahan save karna hai?\nFilename daalo:", activeTab.name);
+        if (newName === null) return;                    // cancel kiya to kuch mat karo
+        if (newName.trim() === '') newName = activeTab.name;
+
+        // Agar naam change kiya to tab ka naam bhi update kar do
+        if (newName !== activeTab.name) {
+            activeTab.name = newName.trim();
+            renderFileTabs();                            // tabs bar refresh
+        }
+
         // Session save kar do (localStorage mein permanent)
         saveSession();
 
-        showToast(activeTab.name + ' saved successfully in localStorage', 'save');
+        showToast(activeTab.name + ' saved successfully', 'save');
     }
 
-    // Auto-connect Save button to local save (download band kar diya)
+    // Auto-connect Save button (download wala purana onclick hata diya)
     setTimeout(() => {
         const allBtns = document.querySelectorAll('.toolbar-btn');
         allBtns.forEach(btn => {
             const icon = btn.querySelector('.material-icons-round');
             if (icon && (icon.textContent === 'save' || icon.textContent.includes('save'))) {
-                btn.onclick = saveCurrentFile;        // purana download wala onclick hata diya
+                btn.onclick = saveCurrentFile;
                 btn.title = 'Save to localStorage';
             }
         });
