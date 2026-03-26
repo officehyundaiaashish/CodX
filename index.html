@@ -3446,18 +3446,32 @@
             }
         }
 
-        // Mobile + fallback blob download
-        // FIX: Must use application/octet-stream — Android blocks text/html, text/css etc.
-        // and renames them to .bin. octet-stream makes Android honour the filename extension.
-        const blob = new Blob([code], { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 30000); // Increased timeout to prevent 0 byte file issue on Android
-        showToast('Saved: ' + fileName, 'check_circle');
+        // Naya tareeqa: Modern browsers/Desktop ke liye 'Save As' dialog force karega
+        if (window.showSaveFilePicker) {
+            window.showSaveFilePicker({ suggestedName: fileName })
+                .then(handle => handle.createWritable())
+                .then(writable => {
+                    writable.write(code).then(() => {
+                        writable.close();
+                        showToast('Saved: ' + fileName, 'check_circle');
+                    });
+                })
+                .catch(err => {
+                    // Agar user ne cancel kar diya toh kuch mat karo
+                    if (err.name !== 'AbortError') console.error(err);
+                });
+        } else {
+            // Purana tareeqa: Android / Mobile ke liye fallback (Kyunki Android isey support nahi karta)
+            const blob = new Blob([code], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 30000);
+            showToast('Saved: ' + fileName, 'check_circle');
+        }
     }
     // ── Nav hide/restore for modals (find, agent) ──
 
