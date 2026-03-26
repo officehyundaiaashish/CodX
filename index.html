@@ -263,10 +263,12 @@
             border: 1px solid var(--glass-border);
             box-shadow: 0 8px 32px rgba(0,0,0,0.22);
             transition: opacity 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+            z-index: 100001 !important;           /* ← Yeh line add ki */
         }
         #find-modal.active {
             opacity: 1; pointer-events: auto;
             transform: translateX(-50%) translateY(0) scale(1);
+            z-index: 100001 !important;           /* ← Yeh line add ki */
         }
         /* Animated search icon */
         @keyframes fm-scan {
@@ -1720,6 +1722,15 @@
         @media (min-width: 768px) {
             #chat-history-panel { left: auto; right: 24px; bottom: 24px; width: 340px; max-height: 70vh; border-radius: 18px; border: 1px solid var(--glass-border); transform: scale(0.92) translateY(10px); opacity: 0; transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1), opacity 0.2s ease; }
             #chat-history-panel.active { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        /* Force editor selection to stay ABOVE Find modal (even when keyboard open) */
+        body.chat-kb-open #editor .ace_selection,
+        body.chat-kb-open #editor .ace_selected-word {
+            z-index: 99999 !important;
+        }
+
+        #editor {
+            z-index: 20 !important;
         }
     </style>
 </head>
