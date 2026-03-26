@@ -186,19 +186,155 @@ body.dark .theme-toggle .icon-moon {
  transform: rotate(0deg);
 }
 
-@media (max-width: 350px) {
- .display input { font-size: 1.6rem; }
- button { font-size: 1.2rem; padding: 0.8rem; }
+/* History Sheet Styles - Added */
+.history-toggle {
+ position: absolute;
+ top: 0.5rem;
+ right: 4.2rem;
+ width: 36px;
+ height: 36px;
+ border-radius: 50%;
+ background: var(--surface-light);
+ border: none;
+ cursor: pointer;
+ color: inherit;
+ padding: 0;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ transition: all var(--transition);
+ box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+ z-index: 10;
+}
+body.dark .history-toggle {
+ background: var(--surface-dark);
+ box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.history-toggle:hover {
+ transform: scale(1.1);
+ box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.history-toggle svg {
+ width: 20px;
+ height: 20px;
+}
+
+.history-sheet {
+ position: fixed;
+ top: 0;
+ right: -320px;
+ width: 320px;
+ height: 100vh;
+ background: #f5f7fa;                    /* Solid matt light color */
+ box-shadow: -10px 0 40px rgba(0,0,0,0.25);
+ transition: right var(--transition);
+ z-index: 300;
+ overflow-y: auto;
+ padding: 1rem;
+ color: var(--text-light);
+}
+body.dark .history-sheet {
+ background: #1e1e2f;                    /* Solid matt dark color */
+ box-shadow: -10px 0 40px rgba(0,0,0,0.6);
+ color: var(--text-dark);
+}
+.history-sheet.open {
+ right: 0;
+}
+
+.history-header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ margin-bottom: 1rem;
+ padding-bottom: 0.5rem;
+ border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+body.dark .history-header {
+ border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.history-header h3 {
+ margin: 0;
+ font-size: 1.3rem;
+ color: inherit;
+}
+.clear-btn {
+ background: #ff6b6b;
+ color: white;
+ border: none;
+ padding: 0.4rem 0.8rem;
+ border-radius: var(--radius);
+ font-size: 0.9rem;
+ cursor: pointer;
+}
+.clear-btn:hover {
+ background: #ff5252;
+}
+
+.history-list {
+ display: flex;
+ flex-direction: column;
+ gap: 0.6rem;
+}
+.history-item {
+ background: #ffffff;                    /* Solid white for light */
+ padding: 0.8rem;
+ border-radius: var(--radius);
+ box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+ cursor: pointer;
+ transition: all var(--transition);
+ font-size: 1rem;
+ border: 1px solid rgba(0,0,0,0.08);
+}
+body.dark .history-item {
+ background: #2a2a3f;                    /* Solid matt dark for items */
+ border: 1px solid rgba(255,255,255,0.08);
+}
+.history-item:hover {
+ transform: translateX(-4px);
+ box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.history-item .expression {
+ font-size: 1.05rem;
+ margin-bottom: 0.3rem;
+ color: inherit;
+}
+.history-item .result {
+ font-size: 1.25rem;
+ font-weight: 600;
+ color: var(--equals-light);
+}
+body.dark .history-item .result {
+ color: var(--equals-dark);
 }
 </style>
 </head>
 <body>
 <body>
  <div class="calculator">
+   <!-- History Button - Added -->
+   <button class="history-toggle" id="historyToggle" aria-label="Show history">
+     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M12 8V12L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+       <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+     </svg>
+   </button>
+
  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
  <span class="icon icon-sun">☀️</span>
  <span class="icon icon-moon">🌙</span>
  </button>
+
+ <!-- History Sheet - Added -->
+ <div class="history-sheet" id="historySheet">
+   <div class="history-header">
+     <h3>History</h3>
+     <button id="clearHistory" class="clear-btn">Clear All</button>
+   </div>
+   <div class="history-list" id="historyList">
+     <!-- History items will be added here by JavaScript -->
+   </div>
+ </div>
 
  <div class="display">
  <input type="text" id="expression" placeholder="0" readonly>
@@ -252,22 +388,101 @@ body.dark .theme-toggle .icon-moon {
   const expressionInput = document.getElementById('expression');
   const previewEl = document.getElementById('preview');
   const themeToggle = document.getElementById('themeToggle');
+  const historyToggle = document.getElementById('historyToggle');
+  const historySheet = document.getElementById('historySheet');
+  const historyList = document.getElementById('historyList');
+  const clearHistoryBtn = document.getElementById('clearHistory');
+
+  let current = '';
+  let history = [];
+
+  // Load history from localStorage
+  function loadHistory() {
+    const saved = localStorage.getItem('calcHistory');
+    if (saved) {
+      history = JSON.parse(saved);
+      renderHistory();
+    }
+  }
+
+  // Save history to localStorage
+  function saveHistory() {
+    localStorage.setItem('calcHistory', JSON.stringify(history));
+  }
+
+  // Render history items
+  function renderHistory() {
+    historyList.innerHTML = '';
+    if (history.length === 0) {
+      historyList.innerHTML = '<div style="text-align:center; color:#888; padding:2rem;">No history yet</div>';
+      return;
+    }
+    history.forEach((item) => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.innerHTML = `
+        <div class="expression">${item.expr}</div>
+        <div class="result">= ${item.result}</div>
+      `;
+      div.addEventListener('click', () => {
+        current = item.result.toString();
+        expressionInput.value = current;
+        historySheet.classList.remove('open');
+        updatePreview();
+      });
+      historyList.appendChild(div);
+    });
+  }
+
+  // Add to history
+  function addToHistory(expr, result) {
+    history.unshift({ expr: expr, result: result });
+    if (history.length > 50) history.pop();
+    renderHistory();
+    saveHistory();
+  }
+
+  // Clear history
+  clearHistoryBtn.addEventListener('click', () => {
+    if (confirm('Clear all history?')) {
+      history = [];
+      renderHistory();
+      saveHistory();
+    }
+  });
+
+  // Toggle history sheet
+  historyToggle.addEventListener('click', (e) => {
+    e.stopImmediatePropagation();
+    if (historySheet.classList.contains('open')) {
+      historySheet.classList.remove('open');
+    } else {
+      historySheet.classList.add('open');
+    }
+  });
+
+  // Close history when clicking outside
+  document.addEventListener('click', (e) => {
+    if (historySheet.classList.contains('open') && 
+        !historySheet.contains(e.target) && 
+        e.target !== historyToggle && 
+        !historyToggle.contains(e.target)) {
+      historySheet.classList.remove('open');
+    }
+  });
 
   // Detect system preference and apply dark mode if needed
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.classList.add('dark');
   }
 
-themeToggle.addEventListener('click', () => {
-  const isDark = document.body.classList.toggle('dark');
-  themeToggle.setAttribute('aria-pressed', isDark);
-});
-
-  let current = '';
+  themeToggle.addEventListener('click', () => {
+    const isDark = document.body.classList.toggle('dark');
+    themeToggle.setAttribute('aria-pressed', isDark);
+  });
 
   function updatePreview() {
     try {
-      // Replace display symbols with JS equivalents for eval
       let expr = current
         .replace(/×/g, '*')
         .replace(/÷/g, '/')
@@ -281,8 +496,6 @@ themeToggle.addEventListener('click', () => {
         .replace(/log/g, 'Math.log10')
         .replace(/ln/g, 'Math.log');
 
-      // Wrap trig arguments in radians conversion if needed (assuming user inputs degrees)
-      // For simplicity, we treat input as radians; you could add a degree toggle later.
       const result = eval(expr);
       previewEl.textContent = `= ${result}`;
     } catch (e) {
@@ -314,10 +527,21 @@ themeToggle.addEventListener('click', () => {
             .replace(/tan/g, 'Math.tan')
             .replace(/log/g, 'Math.log10')
             .replace(/ln/g, 'Math.log');
+
           const result = eval(expr);
-          current = result.toString();
-          expressionInput.value = current;
-          previewEl.textContent = `= ${result}`;
+          
+          // FINAL FIX: Ab = dabane par hamesha result dikhega, Error nahi
+          if (!isNaN(result) && isFinite(result)) {
+            if (current.trim() !== '') {
+              addToHistory(current, result);
+            }
+            current = result.toString();           // Final result current mein
+            expressionInput.value = current;       // Bada result display par
+            previewEl.textContent = `= ${result}`; // Preview mein bhi dikhe
+          } else {
+            expressionInput.value = 'Error';
+            previewEl.textContent = '';
+          }
         } catch (e) {
           expressionInput.value = 'Error';
           previewEl.textContent = '';
@@ -330,13 +554,13 @@ themeToggle.addEventListener('click', () => {
     });
   });
 
-  // Live preview on input change (for keyboard or programmatic changes)
+  // Live preview on input change
   expressionInput.addEventListener('input', () => {
     current = expressionInput.value;
     updatePreview();
   });
 
-  // Optional: keyboard support
+  // Keyboard support
   document.addEventListener('keydown', e => {
     const key = e.key;
     if (/[0-9+\-*/.()]/.test(key)) {
@@ -353,6 +577,9 @@ themeToggle.addEventListener('click', () => {
       document.querySelector('[data-key="C"]').click();
     }
   });
+
+  // Load history when page loads
+  loadHistory();
 </script>
 </body>
 </html>
