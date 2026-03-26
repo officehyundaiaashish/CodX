@@ -3456,7 +3456,7 @@
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
-        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 30000); // Increased timeout to prevent 0 byte file issue on Android
         showToast('Saved: ' + fileName, 'check_circle');
     }
     // ── Nav hide/restore for modals (find, agent) ──
