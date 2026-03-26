@@ -9748,7 +9748,7 @@ _codx_stderr = None
         body.appendChild(line);
     }
 
-    // ── NEW: Save button — Android + PC dono pe prompt aayega ──
+    // ── NEW: Save button ka kaam (localStorage mein save) ──
     function saveCurrentFile() {
         const activeTab = fileTabs.find(t => t.id === activeTabId);
         if (!activeTab) {
@@ -9767,38 +9767,11 @@ _codx_stderr = None
             return;
         }
 
-        // User se poochho — kahan save karna hai
-        let newName = window.prompt("Kahan save karna hai?\nFilename daalo:", activeTab.name);
-        if (newName === null) return;                    // Cancel → kuch mat karo
-        if (newName.trim() === '') newName = activeTab.name;
-
-        // Naam change kiya to tab ka naam bhi update
-        if (newName !== activeTab.name) {
-            activeTab.name = newName.trim();
-            renderFileTabs();
-        }
-
-        // LocalStorage mein save
+        // Session save kar do (localStorage mein permanent)
         saveSession();
 
         showToast(activeTab.name + ' saved successfully', 'save');
     }
-
-    // Android + Mobile ke liye robust auto-connect (button late load hota hai)
-    function overrideSaveButton() {
-        document.querySelectorAll('.toolbar-btn').forEach(btn => {
-            const icon = btn.querySelector('.material-icons-round');
-            if (icon && icon.textContent.trim() === 'save') {
-                btn.onclick = saveCurrentFile;   // purana download onclick hata diya
-                btn.title = 'Save to localStorage';
-            }
-        });
-    }
-
-    // Multiple tries — Android pe toolbar late aata hai
-    setTimeout(overrideSaveButton, 800);
-    setTimeout(overrideSaveButton, 1800);
-    setTimeout(overrideSaveButton, 3000);
 
     // ── NEW: Save button ka kaam (localStorage mein save) ──
     function saveCurrentFile() {
