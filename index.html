@@ -9748,7 +9748,7 @@ _codx_stderr = None
         body.appendChild(line);
     }
 
-    // ── NEW: Save button ka kaam (localStorage mein save) ──
+    // ── NEW: Save button ka kaam (localStorage mein save — NO DOWNLOAD) ──
     function saveCurrentFile() {
         const activeTab = fileTabs.find(t => t.id === activeTabId);
         if (!activeTab) {
@@ -9770,8 +9770,20 @@ _codx_stderr = None
         // Session save kar do (localStorage mein permanent)
         saveSession();
 
-        showToast(activeTab.name + ' saved successfully', 'save');
+        showToast(activeTab.name + ' saved successfully in localStorage', 'save');
     }
+
+    // Auto-connect Save button to local save (download band kar diya)
+    setTimeout(() => {
+        const allBtns = document.querySelectorAll('.toolbar-btn');
+        allBtns.forEach(btn => {
+            const icon = btn.querySelector('.material-icons-round');
+            if (icon && (icon.textContent === 'save' || icon.textContent.includes('save'))) {
+                btn.onclick = saveCurrentFile;        // purana download wala onclick hata diya
+                btn.title = 'Save to localStorage';
+            }
+        });
+    }, 800);
 
     // ── NEW: Save button ka kaam (localStorage mein save) ──
     function saveCurrentFile() {
