@@ -9748,6 +9748,131 @@ _codx_stderr = None
         body.appendChild(line);
     }
 
+    // ── NEW: Save button ka kaam (localStorage mein save) ──
+    function saveCurrentFile() {
+        const activeTab = fileTabs.find(t => t.id === activeTabId);
+        if (!activeTab) {
+            showToast('Koi file nahi khuli', 'error_outline');
+            return;
+        }
+
+        // Editor se latest content le lo
+        if (activeTab.id === activeTabId) {
+            activeTab.content = editor.getValue();
+        }
+
+        // Zero bytes condition rok di
+        if (!activeTab.content || activeTab.content.trim() === '') {
+            showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
+            return;
+        }
+
+        // Session save kar do (localStorage mein permanent)
+        saveSession();
+
+        showToast(activeTab.name + ' saved successfully', 'save');
+    }
+
+    // ── NEW: Save button ka kaam (localStorage mein save) ──
+    function saveCurrentFile() {
+        const activeTab = fileTabs.find(t => t.id === activeTabId);
+        if (!activeTab) {
+            showToast('Koi file nahi khuli', 'error_outline');
+            return;
+        }
+
+        // Editor se latest content le lo
+        if (activeTab.id === activeTabId) {
+            activeTab.content = editor.getValue();
+        }
+
+        // Zero bytes condition rok di
+        if (!activeTab.content || activeTab.content.trim() === '') {
+            showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
+            return;
+        }
+
+        // Session save kar do (localStorage mein permanent)
+        saveSession();
+
+        showToast(activeTab.name + ' saved successfully', 'save');
+    }
+
+    // ── NEW: Save button ka kaam (localStorage mein save) ──
+    function saveCurrentFile() {
+        const activeTab = fileTabs.find(t => t.id === activeTabId);
+        if (!activeTab) {
+            showToast('Koi file nahi khuli', 'error_outline');
+            return;
+        }
+
+        // Editor se latest content le lo
+        if (activeTab.id === activeTabId) {
+            activeTab.content = editor.getValue();
+        }
+
+        // Zero bytes condition rok di
+        if (!activeTab.content || activeTab.content.trim() === '') {
+            showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
+            return;
+        }
+
+        // Session save kar do (localStorage mein permanent)
+        saveSession();
+
+        showToast(activeTab.name + ' saved successfully', 'save');
+    }
+
+    // ── NEW: Save button ka kaam (localStorage mein save) ──
+    function saveCurrentFile() {
+        const activeTab = fileTabs.find(t => t.id === activeTabId);
+        if (!activeTab) {
+            showToast('Koi file nahi khuli', 'error_outline');
+            return;
+        }
+
+        // Editor se latest content le lo
+        if (activeTab.id === activeTabId) {
+            activeTab.content = editor.getValue();
+        }
+
+        // Zero bytes condition rok di
+        if (!activeTab.content || activeTab.content.trim() === '') {
+            showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
+            return;
+        }
+
+        // Session save kar do (localStorage mein permanent)
+        saveSession();
+
+        showToast(activeTab.name + ' saved successfully', 'save');
+    }
+
+    // ── NEW: Save button ka kaam (localStorage mein save) ──
+    function saveCurrentFile() {
+        const activeTab = fileTabs.find(t => t.id === activeTabId);
+        if (!activeTab) {
+            showToast('Koi file nahi khuli', 'error_outline');
+            return;
+        }
+
+        // Editor se latest content le lo
+        if (activeTab.id === activeTabId) {
+            activeTab.content = editor.getValue();
+        }
+
+        // Zero bytes condition rok di
+        if (!activeTab.content || activeTab.content.trim() === '') {
+            showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
+            return;
+        }
+
+        // Session save kar do (localStorage mein permanent)
+        saveSession();
+
+        showToast(activeTab.name + ' saved successfully', 'save');
+    }
+
 
 </script>
 </body>
