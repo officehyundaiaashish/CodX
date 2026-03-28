@@ -1469,8 +1469,13 @@
            bottom-panel becomes a left sidebar
         ══════════════════════════════════════════ */
         @media (min-width: 768px) {
+            #bottom-outer {
+                display: none !important;
+            }
+            body.chat-is-open #bottom-outer {
+                display: block !important;
+            }
 
-            /* Sidebar fixed on left */
             #bottom-panel {
                 position: fixed !important;
                 left: 0; top: 0; bottom: 0;
@@ -1623,9 +1628,13 @@
             /* Desktop zoom buttons — sidebar (hide, moved to header) */
             #desktop-zoom-btns { display: none !important; }
 
-            /* Nav hide button in header — on desktop toggles sidebar */
-            /* (JS already calls toggleNavVisibility which uses translateY,
-                we override that with CSS transform for desktop) */
+            /* Adjustments for hidden sidebar */
+            body.nav-hidden-desktop .app-layout {
+                padding-left: 0;
+            }
+            body.nav-hidden-desktop #inline-chat-panel {
+                left: 0 !important;
+            }
         }
 
         /* ── Editor placeholder overlay — centered, shown when editor is empty ── */
@@ -2002,9 +2011,9 @@
                 </button>
             </div>
         </div>
+        </div> </div> <!-- Corrected: Closed .bottom-area and #bottom-outer -->
 
-            <!-- AGENT BAR — legacy compat, hidden -->
-
+    <!-- Agent Fixed Bottom Bar (Toolbar) -->
     <div class="bottom-wrapper no-select" id="bottom-panel">
         <!-- Arrow pill sits on top border of bottom-area: half outside half inside -->
         <div style="position:relative;height:0;overflow:visible;display:flex;justify-content:center;z-index:51;">
@@ -6943,6 +6952,10 @@ No markdown, no backticks, no explanation outside the array.`;
         chatPanel.classList.add('chat-open');
         if (aiBtn) aiBtn.classList.add('chat-active');
         document.body.classList.add('chat-is-open');
+
+        // Reset bottom-outer transform if it was hidden by toggleNavVisibility
+        const bo = document.getElementById('bottom-outer');
+        if (bo) bo.style.transform = '';
 
         const inner = document.getElementById('bottom-panel');
         if(inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
