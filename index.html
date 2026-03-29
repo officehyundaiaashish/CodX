@@ -1193,6 +1193,16 @@
             transition: none !important;
         }
 
+        /* Desktop specific: hide sidebar on X-axis and reset app padding */
+        @media (min-width: 768px) {
+            body.in-preview #bottom-panel {
+                transform: translateX(-100%) !important;
+            }
+            body.in-preview .app-layout {
+                padding-left: 0 !important;
+            }
+        }
+
         body.in-preview #inline-chat-panel {
             transform: translateY(100%) !important;
             pointer-events: none !important;
