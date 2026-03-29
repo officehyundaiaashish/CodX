@@ -247,25 +247,161 @@
             contain: size layout;
         }
 
-        #preview {
+        /* ──────────────────────── Preview Area ──────────────────────── */
+        #preview-area {
             position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            background: #fdfdfe;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateZ(0);
+        }
+
+        body:not(.light-theme) #preview-area {
+            background: #0d0d0f;
+        }
+
+        #preview-area.active-pane {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .pv-navbar {
+            height: 42px;
+            background: var(--glass-bg);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .pv-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pv-url {
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: var(--text-color);
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 1px solid var(--glass-border);
+            max-width: 240px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        }
+        
+        body.light-theme .pv-url {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .pv-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pv-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            border-radius: 8px;
+            cursor: pointer;
+            opacity: 0.55;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .pv-btn:active {
+            transform: scale(0.9);
+        }
+
+        .pv-btn:hover, .pv-btn.active {
+            opacity: 1;
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .pv-btn .material-icons-round {
+            font-size: 18px;
+        }
+
+        .pv-spacer {
+            width: 1px;
+            height: 20px;
+            background: var(--glass-border);
+            margin: 0 4px;
+        }
+
+        .pv-frame-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow: auto;
+            position: relative;
+            background: radial-gradient(circle at center, rgba(16, 185, 129, 0.03) 0%, transparent 70%);
+            transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #preview {
             width: 100%;
             height: 100%;
             border: none;
             background: white;
-            visibility: hidden;
-            opacity: 0;
-            z-index: 20;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            transition: all 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
             transform: translateZ(0);
         }
 
-        #preview.active-pane {
-            visibility: visible;
-            opacity: 1;
+        /* Device Modes */
+        .pv-frame-container.mode-phone #preview {
+            width: 375px;
+            height: 667px;
+            border: 10px solid #1a1a1c;
+            border-radius: 32px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+        }
+
+        .pv-frame-container.mode-tablet #preview {
+            width: 768px;
+            height: 1024px;
+            border: 10px solid #1a1a1c;
+            border-radius: 20px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+            max-width: 95%;
+            max-height: 95%;
+        }
+
+        .pv-frame-container.mode-desktop #preview {
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            border: none;
+        }
+
+        .pv-frame-container.mode-desktop {
+            padding: 0;
         }
 
         .ace_mobile-menu,
@@ -362,26 +498,7 @@
             contain: size layout;
         }
 
-        #preview {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: white;
-            visibility: hidden;
-            opacity: 0;
-            z-index: 20;
-            transform: translateZ(0);
-        }
 
-        #preview.active-pane {
-            visibility: visible;
-            opacity: 1;
-        }
 
         .ace_mobile-menu,
         .ace_tooltip,
@@ -4350,8 +4467,36 @@
                 <div class="ep-title" id="ep-title">Start coding</div>
                 <div class="ep-sub" id="ep-sub">Your code will appear here</div>
             </div>
-            <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
-                allow="geolocation; microphone; camera; fullscreen; payment; clipboard-read; clipboard-write"></iframe>
+            <div id="preview-area">
+                <div class="pv-navbar">
+                    <div class="pv-left">
+                        <span class="material-icons-round pv-icon" style="font-size:16px; color:var(--accent); opacity:0.8;">language</span>
+                        <div class="pv-url" id="pv-url">preview.local/index.html</div>
+                        <button class="pv-btn refresh" onclick="_refreshPreview()" title="Refresh preview">
+                            <span class="material-icons-round">refresh</span>
+                        </button>
+                    </div>
+                    <div class="pv-controls">
+                        <button class="pv-btn device-btn" id="btn-phone" onclick="setPreviewDevice('phone')" title="Mobile View">
+                            <span class="material-icons-round">phone_iphone</span>
+                        </button>
+                        <button class="pv-btn device-btn" id="btn-tablet" onclick="setPreviewDevice('tablet')" title="Tablet View">
+                            <span class="material-icons-round">tablet_mac</span>
+                        </button>
+                        <button class="pv-btn device-btn active" id="btn-desktop" onclick="setPreviewDevice('desktop')" title="Desktop View">
+                            <span class="material-icons-round">desktop_windows</span>
+                        </button>
+                        <div class="pv-spacer"></div>
+                        <button class="pv-btn popout" onclick="_popoutPreview()" title="Open in new window">
+                            <span class="material-icons-round">open_in_new</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="pv-frame-container mode-desktop" id="pv-frame-container">
+                    <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+                        allow="geolocation; microphone; camera; fullscreen; payment; clipboard-read; clipboard-write"></iframe>
+                </div>
+            </div>
 
             <!-- Python output terminal -->
             <div id="python-output" style="
@@ -6022,7 +6167,6 @@
             }
             setTimeout(() => editor.resize(), 380);
         }
-
         // Legacy stubs — kept so existing calls dont break
         function _expandNav() { }
 
@@ -6031,7 +6175,7 @@
             let isDark = document.body.classList.contains('dark-theme');
             document.body.className = isDark ? 'light-theme no-select' : 'dark-theme no-select';
             editor.setTheme(isDark ? "ace/theme/textmate" : "ace/theme/tomorrow_night_eighties");
-            const iconName = isDark ? 'dark_mode' : 'light_mode';
+            const iconName = isDark ? 'light_mode' : 'dark_mode';
             document.getElementById('theme-icon').innerText = iconName;
             const tbIcon = document.getElementById('theme-icon-tb');
             if (tbIcon) tbIcon.innerText = iconName;
@@ -6057,17 +6201,48 @@
                 const resetCSS = '<style>*{box-sizing:border-box;}body{margin:0;padding:0;}</style>';
                 code = code.replace('<head>', '<head>' + resetCSS);
             }
-            // Use Blob URL instead of srcdoc — gives iframe a real origin so
+            // Use Blob URL instead of srcdoc - gives iframe a real origin so
             // internet requests, CDN scripts, fetch/XHR, APIs all work
             if (_previewBlobUrl) { URL.revokeObjectURL(_previewBlobUrl); }
             const blob = new Blob([code], { type: 'text/html' });
             _previewBlobUrl = URL.createObjectURL(blob);
             document.getElementById('preview').src = _previewBlobUrl;
+            
+            // Update URL display in navbar
+            const urlEl = document.getElementById('pv-url');
+            if (urlEl) {
+                const activeTab = fileTabs.find(t => t.id === activeTabId);
+                const fileName = (activeTab ? activeTab.name : 'index.html');
+                urlEl.innerText = 'preview.local/' + fileName;
+            }
+        }
+
+        function setPreviewDevice(device) {
+            const container = document.getElementById('pv-frame-container');
+            if (!container) return;
+            
+            container.classList.remove('mode-phone', 'mode-tablet', 'mode-desktop');
+            container.classList.add('mode-' + device);
+            
+            document.querySelectorAll('.device-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById('btn-' + (device === 'phone' ? 'phone' : device));
+            if (activeBtn) activeBtn.classList.add('active');
+            
+            // Refresh editor resize to be safe though doesn't affect iframe usually
+            if (window.navigator.vibrate) window.navigator.vibrate(5);
+        }
+
+        function _popoutPreview() {
+            if (_previewBlobUrl) {
+                window.open(_previewBlobUrl, '_blank');
+            } else {
+                toast('No preview available', 'error');
+            }
         }
 
         function switchTab(tabName, fromBtn) {
             const edEl = document.getElementById('editor');
-            const prvEl = document.getElementById('preview');
+            const prvEl = document.getElementById('preview-area');
             const outerEl = document.getElementById('bottom-outer');
             const innerEl = document.getElementById('bottom-panel');
 
@@ -12432,9 +12607,9 @@ Use only line numbers visible in the context. Be precise.`;
 
         // ── Show python output panel ──
         function _pyShowOutputPanel() {
-            const iframe = document.getElementById('preview');
+            const pa = document.getElementById('preview-area');
             const po = document.getElementById('python-output');
-            if (iframe) iframe.classList.remove('active-pane');
+            if (pa) pa.classList.remove('active-pane');
             if (po) { po.style.visibility = 'visible'; po.style.opacity = '1'; }
         }
 
