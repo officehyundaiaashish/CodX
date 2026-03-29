@@ -5852,6 +5852,32 @@
             s.addEventListener('touchstart', () => { }, { passive: true });
             s.addEventListener('touchmove', () => { }, { passive: true });
         } catch (e) { }
+
+        // ── STEP 3: Handle Home/End keys (desktop navigation) ──
+        // Ensure standard desktop behavior: line-start/end, ctrl+document-start/end
+        editor.commands.addCommand({
+            name: "homeToLineStart",
+            bindKey: { win: "Home", mac: "Home" },
+            exec: (ed) => ed.navigateLineStart()
+        });
+        editor.commands.addCommand({
+            name: "endToLineEnd",
+            bindKey: { win: "End", mac: "End" },
+            exec: (ed) => ed.navigateLineEnd()
+        });
+        editor.commands.addCommand({
+            name: "docTop",
+            bindKey: { win: "Ctrl-Home", mac: "Command-Home" },
+            exec: (ed) => { ed.gotoLine(1); ed.scrollToLine(1, true, true, function () { }); }
+        });
+        editor.commands.addCommand({
+            name: "docBottom",
+            bindKey: { win: "Ctrl-End", mac: "Command-End" },
+            exec: (ed) => {
+                const last = ed.session.getLength();
+                ed.gotoLine(last); ed.scrollToLine(last, true, true, function () { });
+            }
+        });
         // Kill cursor layer animation entirely
         try {
             const cl = editor.renderer.$cursorLayer;
