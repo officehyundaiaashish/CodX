@@ -3789,7 +3789,7 @@
                 bottom: 0;
                 width: var(--sidebar-width) !important;
                 height: 100% !important;
-                transform: none !important;
+                transform: none;
                 transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
                 z-index: 40;
                 display: flex !important;
@@ -3952,10 +3952,10 @@
 
             /* Tools row — override inline styles for desktop */
             #bottom-panel .toolbar-rows>div[style*="justify-content: center"] {
-                flex-direction: column !important;
-                width: 100% !important;
-                margin-top: 0 !important;
-                padding: 0 10px !important;
+                flex-direction: column;
+                width: 100%;
+                margin-top: 0;
+                padding: 0 10px;
             }
 
             #bottom-panel .toolbar-rows>div[style*="justify-content: center"] .toolbar-btn {
@@ -3985,8 +3985,8 @@
 
             /* Find modal — account for sidebar */
             #find-modal {
-                left: calc(var(--sidebar-width) + 2%) !important;
-                width: calc(96% - var(--sidebar-width)) !important;
+                left: calc(var(--sidebar-width) + (100% - var(--sidebar-width)) / 2) !important;
+                width: calc(92% - var(--sidebar-width)) !important;
             }
 
             /* Editor default font size — larger on desktop */
@@ -4968,7 +4968,7 @@
         </div>
 
         <!-- Thin divider -->
-        <div style="height:1px;background:var(--glass-border);mx:12px;"></div>
+        <div style="height:1px;background:var(--glass-border);margin:0 12px;"></div>
 
         <!-- Fields block -->
         <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
