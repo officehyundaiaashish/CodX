@@ -177,6 +177,7 @@
                     rgba(52, 211, 153, 0.3) 357deg,
                     transparent 360deg);
             -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
             -webkit-mask-composite: xor;
             mask-composite: exclude;
             animation: pillSnake 3.5s linear infinite;
@@ -3848,6 +3849,43 @@
             body.nav-hidden-desktop #inline-chat-panel {
                 left: 0 !important;
             }
+
+            /* Modern & Auto-hide Ace Scrollbars (Desktop) */
+            .ace_scrollbar {
+                transition: opacity 0.3s ease !important;
+                opacity: 0;
+            }
+
+            .ace_editor:hover .ace_scrollbar {
+                opacity: 1;
+            }
+
+            .ace_scrollbar-v,
+            .ace_scrollbar-h {
+                background: transparent !important;
+            }
+
+            .ace_scrollbar::-webkit-scrollbar {
+                width: 5px !important;
+                height: 5px !important;
+            }
+
+            .ace_scrollbar::-webkit-scrollbar-track {
+                background: transparent !important;
+            }
+
+            .ace_scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(128, 128, 128, 0.25) !important;
+                border-radius: 10px !important;
+            }
+
+            .ace_scrollbar::-webkit-scrollbar-thumb:hover {
+                background: var(--accent) !important;
+            }
+
+            body.light-theme .ace_scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(0, 0, 0, 0.12) !important;
+            }
         }
 
         /* ── Editor placeholder overlay — centered, shown when editor is empty ── */
@@ -5580,6 +5618,8 @@
             tabSize: 2,
             fixedWidthGutter: true,
             scrollPastEnd: false,
+            vScrollBarAlwaysVisible: false,
+            hScrollBarAlwaysVisible: false,
             copyWithEmptySelection: false,
             mergeUndoDeltas: "always",
             behavioursEnabled: false,
@@ -12538,129 +12578,15 @@ _codx_stderr = None
             body.appendChild(line);
         }
 
-        // ── NEW: Save button ka kaam (localStorage mein save) ──
         function saveCurrentFile() {
             const activeTab = fileTabs.find(t => t.id === activeTabId);
             if (!activeTab) {
-                showToast('Koi file nahi khuli', 'error_outline');
+                showToast('No file open', 'error_outline');
                 return;
             }
-
-            // Editor se latest content le lo
-            if (activeTab.id === activeTabId) {
-                activeTab.content = editor.getValue();
-            }
-
-            // Zero bytes condition rok di
-            if (!activeTab.content || activeTab.content.trim() === '') {
-                showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
-                return;
-            }
-
-            // Session save kar do (localStorage mein permanent)
+            activeTab.content = editor.getValue();
             saveSession();
-
-            showToast(activeTab.name + ' saved successfully', 'save');
-        }
-
-        // ── NEW: Save button ka kaam (localStorage mein save) ──
-        function saveCurrentFile() {
-            const activeTab = fileTabs.find(t => t.id === activeTabId);
-            if (!activeTab) {
-                showToast('Koi file nahi khuli', 'error_outline');
-                return;
-            }
-
-            // Editor se latest content le lo
-            if (activeTab.id === activeTabId) {
-                activeTab.content = editor.getValue();
-            }
-
-            // Zero bytes condition rok di
-            if (!activeTab.content || activeTab.content.trim() === '') {
-                showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
-                return;
-            }
-
-            // Session save kar do (localStorage mein permanent)
-            saveSession();
-
-            showToast(activeTab.name + ' saved successfully', 'save');
-        }
-
-        // ── NEW: Save button ka kaam (localStorage mein save) ──
-        function saveCurrentFile() {
-            const activeTab = fileTabs.find(t => t.id === activeTabId);
-            if (!activeTab) {
-                showToast('Koi file nahi khuli', 'error_outline');
-                return;
-            }
-
-            // Editor se latest content le lo
-            if (activeTab.id === activeTabId) {
-                activeTab.content = editor.getValue();
-            }
-
-            // Zero bytes condition rok di
-            if (!activeTab.content || activeTab.content.trim() === '') {
-                showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
-                return;
-            }
-
-            // Session save kar do (localStorage mein permanent)
-            saveSession();
-
-            showToast(activeTab.name + ' saved successfully', 'save');
-        }
-
-        // ── NEW: Save button ka kaam (localStorage mein save) ──
-        function saveCurrentFile() {
-            const activeTab = fileTabs.find(t => t.id === activeTabId);
-            if (!activeTab) {
-                showToast('Koi file nahi khuli', 'error_outline');
-                return;
-            }
-
-            // Editor se latest content le lo
-            if (activeTab.id === activeTabId) {
-                activeTab.content = editor.getValue();
-            }
-
-            // Zero bytes condition rok di
-            if (!activeTab.content || activeTab.content.trim() === '') {
-                showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
-                return;
-            }
-
-            // Session save kar do (localStorage mein permanent)
-            saveSession();
-
-            showToast(activeTab.name + ' saved successfully', 'save');
-        }
-
-        // ── NEW: Save button ka kaam (localStorage mein save) ──
-        function saveCurrentFile() {
-            const activeTab = fileTabs.find(t => t.id === activeTabId);
-            if (!activeTab) {
-                showToast('Koi file nahi khuli', 'error_outline');
-                return;
-            }
-
-            // Editor se latest content le lo
-            if (activeTab.id === activeTabId) {
-                activeTab.content = editor.getValue();
-            }
-
-            // Zero bytes condition rok di
-            if (!activeTab.content || activeTab.content.trim() === '') {
-                showToast('Empty file save nahi kar sakte (zero bytes prevented)', 'info');
-                return;
-            }
-
-            // Session save kar do (localStorage mein permanent)
-            saveSession();
-
-            showToast(activeTab.name + ' saved successfully', 'save');
+            showToast(activeTab.name + ' saved', 'save');
         }
 
 
