@@ -12312,10 +12312,17 @@ Rules:
                         failReasons.push(`Line ${edit.line_start} is out of range (file has ${lines.length} lines)`);
                         return;
                     }
-                    const newLines = (edit.replace || '').split('\n').map(l =>
-                        l.replace(/\t/g, '  ')      // all tabs → 2 spaces
-                            .replace(/\s+$/, '')        // trailing whitespace per line
-                    );
+                    
+                    // Capture leading indentation of the first line in target block to preserve alignment
+                    const targetIndent = (lines[s].match(/^([ \t]*)/) || ['', ''])[1];
+                    const newLines = (edit.replace || '').split('\n').map((l, idx) => {
+                        const cleanLine = l.replace(/\t/g, '  ').replace(/\s+$/, '');
+                        // If it's not the first line and doesn't start with indentation, align it to target block indent
+                        if (idx > 0 && !cleanLine.startsWith(' ') && !cleanLine.startsWith('\t') && cleanLine.trim().length > 0) {
+                            return targetIndent + cleanLine;
+                        }
+                        return cleanLine;
+                    });
                     lines.splice(s, e - s + 1, ...newLines);
                     applied++;
 
