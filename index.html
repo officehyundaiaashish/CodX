@@ -11152,6 +11152,131 @@ STRICT FORMAT RULES:
                 }
             }
 
+            // Fallback parsing for corrupted JSON (e.g. unescaped quotes or formatting issues in edits)
+            if (str.includes('"type"') && (str.includes('"edit"') || str.includes('edit'))) {
+                const edits = [];
+                let pos = 0;
+                while (true) {
+                    const startIdx = str.indexOf('"line_start"', pos);
+                    if (startIdx === -1) break;
+                    
+                    const lineStartMatch = str.slice(startIdx, startIdx + 100).match(/"line_start"\s*:\s*(\d+)/);
+                    if (!lineStartMatch) { pos = startIdx + 12; continue; }
+                    const line_start = parseInt(lineStartMatch[1]);
+                    
+                    const lineEndMatch = str.slice(startIdx, startIdx + 150).match(/"line_end"\s*:\s*(\d+)/);
+                    const line_end = lineEndMatch ? parseInt(lineEndMatch[1]) : line_start;
+                    
+                    const replaceKeyIdx = str.indexOf('"replace"', startIdx);
+                    if (replaceKeyIdx === -1) { pos = startIdx + 12; continue; }
+                    
+                    const colonIdx = str.indexOf(':', replaceKeyIdx);
+                    if (colonIdx === -1) { pos = startIdx + 12; continue; }
+                    
+                    const openQuoteIdx = str.indexOf('"', colonIdx);
+                    if (openQuoteIdx === -1) { pos = startIdx + 12; continue; }
+                    
+                    let content = '';
+                    let endQuoteIdx = -1;
+                    for (let i = openQuoteIdx + 1; i < str.length; i++) {
+                        const c = str[i];
+                        if (c === '\\') {
+                            if (i + 1 < str.length) {
+                                const next = str[i + 1];
+                                if (next === '"') { content += '"'; i++; }
+                                else if (next === 'n') { content += '\n'; i++; }
+                                else if (next === 't') { content += '\t'; i++; }
+                                else if (next === '\\') { content += '\\'; i++; }
+                                else { content += '\\' + next; i++; }
+                            } else {
+                                content += '\\';
+                            }
+                        } else if (c === '"') {
+                            let nextNonWs = '';
+                            let j = i + 1;
+                            while (j < str.length && /\s/.test(str[j])) { j++; }
+                            if (j < str.length) nextNonWs = str[j];
+                            if (nextNonWs === ',' || nextNonWs === '}' || nextNonWs === ']') {
+                                endQuoteIdx = i;
+                                break;
+                            } else {
+                                content += '"';
+                            }
+                        } else {
+                            content += c;
+                        }
+                    }
+                    
+                    if (endQuoteIdx !== -1) {
+                        edits.push({ line_start, line_end, replace: content });
+                        pos = endQuoteIdx + 1;
+                    } else {
+                        pos = startIdx + 12;
+                    }
+                }
+                
+                if (edits.length > 0) {
+                    let explanation = '';
+                    const expMatch = str.match(/"explanation"\s*:\s*"([^"]+)"/);
+                    if (expMatch) explanation = expMatch[1];
+                    return { type: 'edit', explanation, edits };
+                }
+            }
+
+            // Fallback parsing for new_file and reorganize
+            if (str.includes('"type"') && (str.includes('"new_file"') || str.includes('"reorganize"'))) {
+                const type = str.includes('"new_file"') ? 'new_file' : 'reorganize';
+                
+                let filename = '';
+                if (type === 'new_file') {
+                    const fnMatch = str.match(/"filename"\s*:\s*"([^"]+)"/);
+                    if (fnMatch) filename = fnMatch[1];
+                }
+                
+                const contentKeyIdx = str.indexOf('"content"');
+                if (contentKeyIdx !== -1) {
+                    const colonIdx = str.indexOf(':', contentKeyIdx);
+                    if (colonIdx !== -1) {
+                        const openQuoteIdx = str.indexOf('"', colonIdx);
+                        if (openQuoteIdx !== -1) {
+                            let content = '';
+                            let endQuoteIdx = -1;
+                            for (let i = openQuoteIdx + 1; i < str.length; i++) {
+                                const c = str[i];
+                                if (c === '\\') {
+                                    if (i + 1 < str.length) {
+                                        const next = str[i + 1];
+                                        if (next === '"') { content += '"'; i++; }
+                                        else if (next === 'n') { content += '\n'; i++; }
+                                        else if (next === 't') { content += '\t'; i++; }
+                                        else if (next === '\\') { content += '\\'; i++; }
+                                        else { content += '\\' + next; i++; }
+                                    } else {
+                                        content += '\\';
+                                    }
+                                } else if (c === '"') {
+                                    let nextNonWs = '';
+                                    let j = i + 1;
+                                    while (j < str.length && /\s/.test(str[j])) { j++; }
+                                    if (j < str.length) nextNonWs = str[j];
+                                    if (nextNonWs === ',' || nextNonWs === '}') {
+                                        endQuoteIdx = i;
+                                        break;
+                                    } else {
+                                        content += '"';
+                                    }
+                                } else {
+                                    content += c;
+                                }
+                            }
+                            if (endQuoteIdx !== -1) {
+                                return { type, filename, content };
+                            }
+                        }
+                    }
+                }
+            }
+
             return null;
         }
 
