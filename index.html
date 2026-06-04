@@ -5553,6 +5553,48 @@
         </div>
     </div>
 
+    <!-- Diff Review Modal Overlay -->
+    <div id="diff-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:99999;backdrop-filter:blur(3px);transition:opacity 0.25s ease;opacity:0;"></div>
+    <div id="diff-review-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.95);width:90%;max-width:850px;height:85vh;background:var(--glass-bg);border:1.5px solid var(--glass-border);border-radius:24px;box-shadow:0 20px 50px rgba(0,0,0,0.5);z-index:100000;display:flex;flex-direction:column;overflow:hidden;transition:opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);opacity:0;pointer-events:none;">
+        <!-- Header -->
+        <div style="padding:16px 20px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;color:var(--accent);">
+                    <span class="material-icons-round" style="font-size:20px;">difference</span>
+                </div>
+                <div>
+                    <div style="font-size:14px;font-weight:800;color:var(--text-color);font-family:'Poppins',sans-serif;">Review Proposed Changes</div>
+                    <div id="diff-modal-subtitle" style="font-size:11px;color:var(--text-color);opacity:0.5;font-family:'Poppins',sans-serif;margin-top:1px;">index.html</div>
+                </div>
+            </div>
+            <button onclick="closeDiffReviewModal()" style="background:none;border:none;color:var(--text-color);opacity:0.5;cursor:pointer;padding:4px;display:flex;align-items:center;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.5">
+                <span class="material-icons-round" style="font-size:22px;">close</span>
+            </button>
+        </div>
+        
+        <!-- Legend Bar -->
+        <div style="padding:8px 20px;background:rgba(0,0,0,0.12);border-bottom:1px solid var(--glass-border);display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:600;font-family:'Poppins',sans-serif;color:var(--text-color);opacity:0.65;flex-shrink:0;">
+            <span>Line comparisons below</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="color:#ef4444;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;"></span>Removed</span>
+                <span style="color:#10b981;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>Added</span>
+            </div>
+        </div>
+
+        <!-- Scrollable Diff Area -->
+        <div id="diff-modal-body" style="flex:1;overflow-y:auto;padding:16px 20px;background:rgba(0,0,0,0.18);">
+            <!-- Diffs will be dynamically populated here -->
+        </div>
+
+        <!-- Footer Actions -->
+        <div style="padding:16px 20px;border-top:1px solid var(--glass-border);display:flex;gap:10px;justify-content:flex-end;background:rgba(0,0,0,0.08);flex-shrink:0;">
+            <button onclick="closeDiffReviewModal()" style="padding:10px 20px;border-radius:12px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(128,128,128,0.06)'" onmouseleave="this.style.background='none'">Cancel</button>
+            <button id="diff-modal-apply-btn" style="padding:10px 24px;border-radius:12px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity 0.15s;" onmouseenter="this.style.opacity=0.9" onmouseleave="this.style.opacity=1">
+                <span class="material-icons-round" style="font-size:16px;pointer-events:none;">check_circle</span>Apply Changes
+            </button>
+        </div>
+    </div>
+
     <script>
         // Use dynamic viewport height to avoid Chrome bottom bar clipping
         // GitHub modal refs — declared early so closeGithubModal() never hits TDZ
@@ -11516,45 +11558,25 @@ Rules:
                 if (!parsed || !parsed.type) {
                     _inlineAppendMsg('agent', raw.trim());
 
-                    // ── Edit ──
                 } else if (parsed.type === 'edit') {
                     if (!Array.isArray(parsed.edits) || parsed.edits.length === 0) {
                         _inlineAppendMsg('agent', parsed.explanation || 'No changes needed.');
                     } else {
                         if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
                         
-                        const res = _autoApplyEditsDirectly(parsed.edits, targetTab);
-                        if (res.success) {
-                            // Update editor value
-                            if (targetTab) targetTab.content = res.cleaned;
-                            if (!targetTab || targetTab.id === activeTabId) {
-                                editor.setValue(res.cleaned, -1);
-                            } else {
-                                switchFileTab(targetTab.id);
-                                editor.setValue(res.cleaned, -1);
-                            }
-                            // Save to undo stack
-                            _agentUndoStack.push({ type: 'edit_content', tab: targetTab, content: res.original });
-                            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
-                            
-                            // Highlight in editor
-                            _showEditorDiffMarkers(parsed.edits, targetTab);
-                            
-                            // Show auto-applied card in chat
-                            _inlineAppendMsg('agent', '', _buildAutoAppliedCard(parsed.edits, res.original, targetTab));
-                            
-                            if (parsed.next_step_prompt) {
-                                setTimeout(() => {
-                                    const ta = document.getElementById('inline-chat-textarea');
-                                    if (ta) {
-                                        ta.value = parsed.next_step_prompt;
-                                        _inlineAppendMsg('agent', `🔄 *Agent follow-up step:* "${parsed.next_step_prompt}"`);
-                                        sendInlineChat();
-                                    }
-                                }, 2200);
-                            }
-                        } else {
-                            _inlineAppendMsg('agent', `<div style="color:#ef4444;font-size:11px;font-family:Poppins,sans-serif;">Failed to auto-apply edits: ${res.error}</div>`);
+                        // Show review card in chat instead of auto-applying immediately
+                        const reviewCard = _buildInlineEditCard(parsed.edits, targetTab);
+                        _inlineAppendMsg('agent', '', reviewCard);
+                        
+                        if (parsed.next_step_prompt) {
+                            setTimeout(() => {
+                                const ta = document.getElementById('inline-chat-textarea');
+                                if (ta) {
+                                    ta.value = parsed.next_step_prompt;
+                                    _inlineAppendMsg('agent', `🔄 *Agent follow-up step:* "${parsed.next_step_prompt}"`);
+                                    sendInlineChat();
+                                }
+                            }, 2200);
                         }
                     }
 
@@ -11866,6 +11888,92 @@ Rules:
         // ── Editor diff markers — store IDs so we can remove them later ──
         let _editorDiffMarkers = [];
 
+        function openDiffReviewModal(edits, targetTab) {
+            const modal = document.getElementById('diff-review-modal');
+            const overlay = document.getElementById('diff-overlay');
+            const body = document.getElementById('diff-modal-body');
+            const subtitle = document.getElementById('diff-modal-subtitle');
+            const applyBtn = document.getElementById('diff-modal-apply-btn');
+
+            if (!modal || !overlay || !body) return;
+
+            const snapTab = targetTab || fileTabs.find(t => t.id === activeTabId);
+            const filename = snapTab ? snapTab.name : 'index.html';
+            if (subtitle) subtitle.textContent = filename;
+
+            // Generate Diff HTML
+            const currentCode = (snapTab ? snapTab.content : editor.getValue()).split('\n');
+            let diffHTML = '';
+            const count = edits ? edits.length : 0;
+
+            (edits || []).forEach((edit, idx) => {
+                let oldLines = [], newLines = [];
+                if (edit.line_start != null) {
+                    const s = Math.max(0, (edit.line_start || 1) - 1);
+                    const e = Math.min(currentCode.length - 1, (edit.line_end || edit.line_start || 1) - 1);
+                    const ctxBefore = currentCode.slice(Math.max(0, s - 3), s);
+                    const ctxAfter = currentCode.slice(e + 1, Math.min(currentCode.length, e + 4));
+                    oldLines = [...ctxBefore, ...currentCode.slice(s, e + 1), ...ctxAfter];
+                    newLines = [...ctxBefore, ...(edit.replace || '').split('\n'), ...ctxAfter];
+                } else if (edit.find) {
+                    oldLines = edit.find.split('\n');
+                    newLines = (edit.replace || '').split('\n');
+                }
+                const { html, hasChanges } = _buildDiffHTML(oldLines, newLines);
+                if (hasChanges) {
+                    diffHTML += `<div style="margin-bottom: 12px; border:1px solid var(--glass-border); border-radius:12px; overflow:hidden; background:rgba(0,0,0,0.2);">
+                        <div style="font-size:10px; font-weight:700; color:var(--accent); padding:8px 12px; background:rgba(16,185,129,0.06); border-bottom:1px solid var(--glass-border); font-family:'Poppins',sans-serif; text-transform:uppercase; letter-spacing:0.5px;">Edit Block ${idx + 1}</div>
+                        <div style="max-height: 350px; overflow-y: auto; overflow-x: hidden;">${html}</div>
+                    </div>`;
+                }
+            });
+
+            body.innerHTML = diffHTML || '<div style="padding:20px; text-align:center; font-size:13px; opacity:0.6; font-family:Poppins,sans-serif;">No changes detected.</div>';
+
+            // Show diff highlight markers in editor
+            _showEditorDiffMarkers(edits, snapTab);
+
+            // Bind Apply Button click
+            applyBtn.onclick = () => {
+                closeDiffReviewModal();
+                // Find card apply button and click it to perform the actual apply
+                const activeCards = document.querySelectorAll('.inline-edit-card-active');
+                activeCards.forEach(c => {
+                    const btn = c.querySelector('.card-apply-btn');
+                    if (btn && btn.dataset.editsJson) {
+                        const cardEdits = JSON.parse(btn.dataset.editsJson);
+                        if (JSON.stringify(cardEdits) === JSON.stringify(edits)) {
+                            _applyInlineEdits(btn, cardEdits, snapTab ? snapTab.id : null);
+                        }
+                    }
+                });
+            };
+
+            overlay.style.display = 'block';
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                overlay.style.opacity = '1';
+                modal.style.opacity = '1';
+                modal.style.transform = 'translate(-50%,-50%) scale(1)';
+                modal.style.pointerEvents = 'auto';
+            }, 10);
+        }
+
+        function closeDiffReviewModal() {
+            const modal = document.getElementById('diff-review-modal');
+            const overlay = document.getElementById('diff-overlay');
+            if (!modal || !overlay) return;
+
+            overlay.style.opacity = '0';
+            modal.style.opacity = '0';
+            modal.style.transform = 'translate(-50%,-50%) scale(0.95)';
+            modal.style.pointerEvents = 'none';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                modal.style.display = 'none';
+            }, 250);
+        }
+
         function _clearEditorDiffMarkers() {
             const session = editor.getSession();
             _editorDiffMarkers.forEach(id => session.removeMarker(id));
@@ -12093,6 +12201,7 @@ Rules:
 
         function _buildInlineEditCard(edits, targetTab) {
             const card = document.createElement('div');
+            card.className = 'inline-edit-card-active';
             card.style.cssText = 'border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;margin-top:4px;max-width:100%;';
             const count = edits ? edits.length : 0;
 
@@ -12140,8 +12249,11 @@ Rules:
             </div>
             <div style="max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
             <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button onclick="_clearEditorDiffMarkers();_applyInlineEdits(this, ${editsJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button class="card-apply-btn" data-edits-json="${editsJson}" onclick="_clearEditorDiffMarkers();_applyInlineEdits(this, ${editsJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply
+                </button>
+                <button onclick="_clearEditorDiffMarkers();openDiffReviewModal(${editsJson}, fileTabs.find(t => t.id === ${tabId}))" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                    <span class="material-icons-round" style="font-size:14px;pointer-events:none;">open_in_new</span>Review in Window
                 </button>
                 <button onclick="_clearEditorDiffMarkers();this.closest('div').parentElement.remove()" style="padding:8px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;">
                     Cancel
