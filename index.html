@@ -10502,7 +10502,7 @@ No markdown, no backticks, no explanation outside the array.`;
             showToast('Opened in editor', 'open_in_new');
         }
 
-        function _inlineAppendMsg(role, text, extraEl) {
+        function _inlineAppendMsg(role, text, extraEl, snapshot = null) {
             const box = document.getElementById('inline-chat-messages');
             const empty = document.getElementById('inline-chat-empty');
             if (empty) empty.remove();
@@ -10566,6 +10566,44 @@ No markdown, no backticks, no explanation outside the array.`;
                 editBtn.innerHTML = '<span class="material-icons-round">edit</span>';
                 editBtn.onclick = () => _inlineEditMsg(wrap, text);
                 footer.appendChild(editBtn);
+
+                if (snapshot) {
+                    const undoBtn = document.createElement('button');
+                    undoBtn.className = 'chat-copy-btn';
+                    undoBtn.title = 'Undo changes up to this prompt';
+                    undoBtn.innerHTML = '<span class="material-icons-round" style="font-size:14px;">undo</span>';
+                    undoBtn.style.marginLeft = '6px';
+                    undoBtn.onclick = () => {
+                        const snapIds = new Set(snapshot.map(s => s.id));
+                        const tabsToRemove = fileTabs.filter(t => !snapIds.has(t.id));
+                        
+                        tabsToRemove.forEach(tab => {
+                            closeFileTab(tab.id);
+                        });
+                        
+                        snapshot.forEach(snap => {
+                            const tab = fileTabs.find(t => t.id === snap.id);
+                            if (tab) {
+                                tab.content = snap.content;
+                            } else {
+                                openFileInTab(snap.name, snap.content, false);
+                            }
+                        });
+                        
+                        const activeTab = fileTabs.find(t => t.id === activeTabId);
+                        if (activeTab) {
+                            editor.setValue(activeTab.content, -1);
+                        }
+                        
+                        showToast('Reverted workspace to prompt state', 'undo');
+                        
+                        undoBtn.innerHTML = '<span class="material-icons-round" style="font-size:14px;color:var(--accent);">check</span>';
+                        setTimeout(() => {
+                            undoBtn.innerHTML = '<span class="material-icons-round" style="font-size:14px;">undo</span>';
+                        }, 1500);
+                    };
+                    footer.appendChild(undoBtn);
+                }
             }
 
             wrap.appendChild(bubble);
@@ -11319,7 +11357,8 @@ STRICT FORMAT RULES:
 
             // ── Edit mode mein user message already DOM mein hai — append mat karo ──
             if (!window._inlineEditMode) {
-                _inlineAppendMsg('user', userRequest);
+                const workspaceSnapshot = fileTabs.map(t => ({ id: t.id, name: t.name, content: t.content }));
+                _inlineAppendMsg('user', userRequest, null, workspaceSnapshot);
                 if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
                 _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
                 _chSaveCurrentSession();
