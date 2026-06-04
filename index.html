@@ -1197,6 +1197,10 @@
             transition: none !important;
         }
 
+        body.in-preview #agent-step-panel {
+            display: none !important;
+        }
+
         /* Desktop specific: hide sidebar on X-axis and reset app padding */
         @media (min-width: 768px) {
             body.in-preview #bottom-panel {
@@ -5570,6 +5574,54 @@
         let _inPreview = false;
         let _navHidden = false;
 
+        function _isAnyToolOpen() {
+            return (
+                document.getElementById('github-modal')?.classList.contains('active') ||
+                document.getElementById('agent-modal')?.classList.contains('active') ||
+                document.getElementById('find-modal')?.classList.contains('active') ||
+                document.getElementById('new-project-overlay')?.classList.contains('active') ||
+                _inlineChatOpen
+            );
+        }
+
+        function _getBottomNavHeight() {
+            const isDesktop = window.innerWidth >= 768;
+            if (isDesktop) return 0;
+            if (_isAnyToolOpen() || _navHidden || _inPreview) return 0;
+            const bp = document.getElementById('bottom-panel');
+            return bp ? bp.offsetHeight : 0;
+        }
+
+        function _syncBottomLayout() {
+            if (_inPreview) return;
+            const anyToolOpen = _isAnyToolOpen();
+            const inner = document.getElementById('bottom-panel');
+            const outer = document.getElementById('bottom-outer');
+            const toggleBtn = document.getElementById('nav-toggle-btn');
+            const t = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
+            const isDesktop = window.innerWidth >= 768;
+
+            if (outer) {
+                outer.style.transition = t;
+                if (_inlineChatOpen || !_navHidden) {
+                    outer.style.transform = '';
+                } else {
+                    outer.style.transform = 'translateY(100%)';
+                }
+            }
+
+            if (inner) {
+                inner.style.transition = t;
+                if (!_navHidden && !anyToolOpen) {
+                    inner.style.transform = '';
+                    if (toggleBtn) toggleBtn.style.display = 'flex';
+                } else {
+                    inner.style.transform = isDesktop ? 'translateX(-100%)' : 'translateY(100%)';
+                    if (toggleBtn) toggleBtn.style.display = 'none';
+                }
+            }
+        }
+
         function _setBodyHeight() {
             if (_inPreview) return; // preview handles its own sizing via CSS
             document.body.style.height = window.innerHeight + 'px';
@@ -6237,22 +6289,20 @@
         // _navHidden declared early at top
         function toggleNavVisibility() {
             _navHidden = !_navHidden;
-            const outer = document.getElementById('bottom-outer');
-            const inner = document.getElementById('bottom-panel');
             const icon = document.getElementById('nav-hide-icon');
-            const t = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
-            const isDesktop = window.innerWidth >= 768;
-            if (_navHidden) {
-                if (outer) { outer.style.transition = t; outer.style.transform = 'translateY(100%)'; }
-                if (inner) { inner.style.transition = t; inner.style.transform = isDesktop ? 'translateX(-100%)' : 'translateY(100%)'; }
-                if (icon) { icon.style.opacity = '0.4'; icon.style.transform = 'scale(0.85)'; }
-                if (isDesktop) document.querySelector('.app-layout').style.paddingLeft = '0';
-            } else {
-                if (outer) { outer.style.transition = t; outer.style.transform = ''; }
-                if (inner) { inner.style.transition = t; inner.style.transform = ''; }
-                if (icon) { icon.style.opacity = '1'; icon.style.transform = 'scale(1)'; }
-                if (isDesktop) document.querySelector('.app-layout').style.paddingLeft = '';
+            if (icon) {
+                if (_navHidden) {
+                    icon.style.opacity = '0.4'; icon.style.transform = 'scale(0.85)';
+                } else {
+                    icon.style.opacity = '1'; icon.style.transform = 'scale(1)';
+                }
             }
+            const isDesktop = window.innerWidth >= 768;
+            if (isDesktop) {
+                const layout = document.querySelector('.app-layout');
+                if (layout) layout.style.paddingLeft = _navHidden ? '0' : '';
+            }
+            _syncBottomLayout();
             setTimeout(() => editor.resize(), 380);
         }
         // Legacy stubs — kept so existing calls dont break
@@ -6375,24 +6425,8 @@
                 edEl.style.opacity = '1';
                 edEl.style.pointerEvents = 'auto';
                 
-                const anyToolOpen = 
-                    document.getElementById('github-modal')?.classList.contains('active') ||
-                    document.getElementById('agent-modal')?.classList.contains('active') ||
-                    document.getElementById('find-modal')?.classList.contains('active') ||
-                    document.getElementById('new-project-overlay')?.classList.contains('active') ||
-                    _inlineChatOpen;
+                _syncBottomLayout();
 
-                // Restore nav panel if user hasn't hidden it and no tools are open
-                if (!_navHidden && !anyToolOpen) {
-                    const t = 'transform 0.3s cubic-bezier(0.4,0,0.2,1)';
-                    if (outerEl) { outerEl.style.transition = t; outerEl.style.transform = ''; }
-                    if (innerEl) { innerEl.style.transition = t; innerEl.style.transform = ''; }
-                    const toggleBtn = document.getElementById('nav-toggle-btn');
-                    if (toggleBtn) toggleBtn.style.display = 'flex';
-                } else {
-                    const toggleBtn = document.getElementById('nav-toggle-btn');
-                    if (toggleBtn) toggleBtn.style.display = 'none';
-                }
                 // Restore chat panel if it was open
                 const chatPanel = document.getElementById('inline-chat-panel');
                 if (chatPanel && _inlineChatOpen) {
@@ -6625,10 +6659,7 @@
             if (isActive) {
                 findModal.classList.add('active');
                 document.getElementById('editor').style.zIndex = '1';
-                const inner = document.getElementById('bottom-panel');
-                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
-                const toggleBtn = document.getElementById('nav-toggle-btn');
-                if (toggleBtn) toggleBtn.style.display = 'none';
+                _syncBottomLayout();
                 requestAnimationFrame(() => {
                     const fi = document.getElementById('find-input');
                     fi.focus();
@@ -6641,12 +6672,7 @@
                 findModal.style.top = '';
                 findModal.style.bottom = '';
                 document.getElementById('editor').style.zIndex = '10';
-                if (!_inlineChatOpen && !_navHidden && !_inPreview) {
-                    const inner = document.getElementById('bottom-panel');
-                    if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
-                    const toggleBtn = document.getElementById('nav-toggle-btn');
-                    if (toggleBtn) toggleBtn.style.display = 'flex';
-                }
+                _syncBottomLayout();
             }
         }
         function findText(showErrorAlert = true) {
@@ -6707,10 +6733,7 @@
             ghOverlay.classList.add('active');
             ghModal.classList.add('active');
             checkGhLogin();
-            const inner = document.getElementById('bottom-panel');
-            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
-            const toggleBtn = document.getElementById('nav-toggle-btn');
-            if (toggleBtn) toggleBtn.style.display = 'none';
+            _syncBottomLayout();
         }
         function closeGithubModal() {
             ghModal.classList.remove('active');
@@ -6719,12 +6742,7 @@
             ghOverlay.style.display = 'none';
             const hist = document.getElementById('gh-commit-history');
             if (hist) hist.style.display = 'none';
-            if (!_inlineChatOpen && !_navHidden && !_inPreview) {
-                const inner = document.getElementById('bottom-panel');
-                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
-                const toggleBtn = document.getElementById('nav-toggle-btn');
-                if (toggleBtn) toggleBtn.style.display = 'flex';
-            }
+            _syncBottomLayout();
         }
 
         let _ghReposLoaded = false;
@@ -8028,21 +8046,13 @@
             document.getElementById('agent-overlay').classList.add('active');
             document.getElementById('agent-modal').classList.add('active');
             _renderConnectedAgents();
-            const inner = document.getElementById('bottom-panel');
-            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
-            const toggleBtn = document.getElementById('nav-toggle-btn');
-            if (toggleBtn) toggleBtn.style.display = 'none';
+            _syncBottomLayout();
         }
 
         function closeAgentModal() {
             document.getElementById('agent-overlay').classList.remove('active');
             document.getElementById('agent-modal').classList.remove('active');
-            if (!_inlineChatOpen && !_navHidden && !_inPreview) {
-                const inner = document.getElementById('bottom-panel');
-                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
-                const toggleBtn = document.getElementById('nav-toggle-btn');
-                if (toggleBtn) toggleBtn.style.display = 'flex';
-            }
+            _syncBottomLayout();
         }
 
         function disconnectAgent() {
@@ -8226,7 +8236,9 @@
                     return text.trim();
                 }
             } catch (e) {
-                if (e.name === 'AbortError') throw new Error('__USER_ABORTED__');
+                if (e.name === 'AbortError' || e.message?.toLowerCase().includes('abort') || (controller && controller.signal.aborted)) {
+                    throw new Error('__USER_ABORTED__');
+                }
                 throw e;
             } finally {
                 if (timeoutId) clearTimeout(timeoutId);
@@ -8609,7 +8621,7 @@ Rules:
                                     if (existing) existing.remove();
                                     const panel = document.createElement('div');
                                     panel.id = 'agent-step-panel';
-                                    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:' + (document.getElementById('bottom-panel').offsetHeight + 8) + 'px;z-index:42;padding:0 10px;max-height:55vh;overflow-y:auto;';
+                                    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:' + (_getBottomNavHeight() + 8) + 'px;z-index:42;padding:0 10px;max-height:55vh;overflow-y:auto;';
                                     panel.appendChild(card);
                                     document.body.appendChild(panel);
                                 }
@@ -8938,19 +8950,11 @@ Rules:
             const warn = document.getElementById('np-repo-login-warn');
             if (warn) warn.style.display = token ? 'none' : 'block';
             if (token) { _npLoadReposForSelect(); }
-            const inner = document.getElementById('bottom-panel');
-            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
-            const toggleBtn = document.getElementById('nav-toggle-btn');
-            if (toggleBtn) toggleBtn.style.display = 'none';
+            _syncBottomLayout();
         }
         function closeNewProjectModal() {
             document.getElementById('new-project-overlay').classList.remove('active');
-            if (!_inlineChatOpen && !_navHidden && !_inPreview) {
-                const inner = document.getElementById('bottom-panel');
-                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
-                const toggleBtn = document.getElementById('nav-toggle-btn');
-                if (toggleBtn) toggleBtn.style.display = 'flex';
-            }
+            _syncBottomLayout();
         }
         function npSwitchTab(tab) {
             _npCurrentTab = tab;
@@ -10131,14 +10135,7 @@ No markdown, no backticks, no explanation outside the array.`;
             if (aiBtn) aiBtn.classList.add('chat-active');
             document.body.classList.add('chat-is-open');
 
-            // Reset bottom-outer transform if it was hidden by toggleNavVisibility
-            const bo = document.getElementById('bottom-outer');
-            if (bo) bo.style.transform = '';
-
-            const inner = document.getElementById('bottom-panel');
-            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
-            const toggleBtn = document.getElementById('nav-toggle-btn');
-            if (toggleBtn) toggleBtn.style.display = 'none';
+            _syncBottomLayout();
 
             const ag = _activeAgent();
             if (ag) document.getElementById('inline-chat-name').textContent = ag.providerName;
@@ -10205,13 +10202,7 @@ No markdown, no backticks, no explanation outside the array.`;
                 const _mc = document.getElementById('editor-wrapper');
                 if (_mc) { _mc.style.maxHeight = ''; _mc.style.height = ''; _mc.style.minHeight = ''; }
                 _setBodyHeight();
-                const inner = document.getElementById('bottom-panel');
-                if (inner && !_navHidden) {
-                    inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
-                    inner.style.transform = '';
-                    const toggleBtn = document.getElementById('nav-toggle-btn');
-                    if (toggleBtn) toggleBtn.style.display = 'flex';
-                }
+                _syncBottomLayout();
             }
         }
 
@@ -11025,20 +11016,21 @@ Reply in plain text. Same language as user (English/Hindi/Hinglish).
 
 ─── EDIT (fix / change / add / remove / improve in existing code) ───
 Return ONLY this JSON, nothing else:
-{"type":"edit","explanation":"what changed","edits":[{"line_start":N,"line_end":N,"replace":"new code here"}]}
+{"type":"edit","explanation":"what changed","edits":[{"line_start":N,"line_end":N,"replace":"new code here"}],"next_step_prompt":"brief instruction for next turn (optional)"}
 Use exact line numbers shown. replace = complete replacement lines.
+Note: If the task requires step-by-step implementation, do the first logical step, and if there are remaining steps, include the optional "next_step_prompt" string (e.g. "Now edit function Y to integrate with X") so the editor can automatically trigger the next step.
 
 ─── NEW FILE (create a new file from scratch) ───
 Return ONLY this JSON, nothing else:
-{"type":"new_file","explanation":"what it does","filename":"name.ext","content":"complete file content"}
+{"type":"new_file","explanation":"what it does","filename":"name.ext","content":"complete file content","next_step_prompt":"brief instruction for next turn (optional)"}
 
 ─── SPLIT (break one file into multiple files) ───
 Return ONLY this JSON, nothing else:
-{"type":"split","explanation":"what was split","files":[{"filename":"name.ext","content":"complete file content","reason":"why"}]}
+{"type":"split","explanation":"what was split","files":[{"filename":"name.ext","content":"complete file content","reason":"why"}],"next_step_prompt":"brief instruction for next turn (optional)"}
 
 ─── REORGANIZE (restructure / reorder the whole file) ───
 Return ONLY this JSON with COMPLETE file content:
-{"type":"reorganize","explanation":"what changed","content":"entire file content here"}
+{"type":"reorganize","explanation":"what changed","content":"entire file content here","next_step_prompt":"brief instruction for next turn (optional)"}
 
 STRICT FORMAT RULES:
 - Return ONLY JSON for edit/new_file/split/reorganize — no markdown fences, no text outside JSON
@@ -11111,6 +11103,20 @@ STRICT FORMAT RULES:
             const ta = document.getElementById('inline-chat-textarea');
             const userRequest = ta.value.trim();
             if (!userRequest) return;
+
+            const cmd = userRequest.toLowerCase();
+            if (cmd === 'undo' || cmd === 'revert' || cmd === '/undo') {
+                _inlineAppendMsg('user', userRequest);
+                requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
+                if (_agentUndoStack.length === 0) {
+                    _inlineAppendMsg('agent', 'Nothing to undo.');
+                    showToast('Nothing to undo', 'info');
+                    return;
+                }
+                _agentUndoLast(null);
+                _inlineAppendMsg('agent', '↩️ Undone the last agent edit successfully.');
+                return;
+            }
 
             // ── Edit mode mein user message already DOM mein hai — append mat karo ──
             if (!window._inlineEditMode) {
@@ -11278,7 +11284,40 @@ Rules:
                         _inlineAppendMsg('agent', parsed.explanation || 'No changes needed.');
                     } else {
                         if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
-                        _inlineAppendMsg('agent', '', _buildInlineEditCard(parsed.edits, targetTab));
+                        
+                        const res = _autoApplyEditsDirectly(parsed.edits, targetTab);
+                        if (res.success) {
+                            // Update editor value
+                            if (targetTab) targetTab.content = res.cleaned;
+                            if (!targetTab || targetTab.id === activeTabId) {
+                                editor.setValue(res.cleaned, -1);
+                            } else {
+                                switchFileTab(targetTab.id);
+                                editor.setValue(res.cleaned, -1);
+                            }
+                            // Save to undo stack
+                            _agentUndoStack.push({ type: 'edit_content', tab: targetTab, content: res.original });
+                            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
+                            
+                            // Highlight in editor
+                            _showEditorDiffMarkers(parsed.edits, targetTab);
+                            
+                            // Show auto-applied card in chat
+                            _inlineAppendMsg('agent', '', _buildAutoAppliedCard(parsed.edits, res.original, targetTab));
+                            
+                            if (parsed.next_step_prompt) {
+                                setTimeout(() => {
+                                    const ta = document.getElementById('inline-chat-textarea');
+                                    if (ta) {
+                                        ta.value = parsed.next_step_prompt;
+                                        _inlineAppendMsg('agent', `🔄 *Agent follow-up step:* "${parsed.next_step_prompt}"`);
+                                        sendInlineChat();
+                                    }
+                                }, 2200);
+                            }
+                        } else {
+                            _inlineAppendMsg('agent', `<div style="color:#ef4444;font-size:11px;font-family:Poppins,sans-serif;">Failed to auto-apply edits: ${res.error}</div>`);
+                        }
                     }
 
                     // ── New file ──
@@ -11298,6 +11337,17 @@ Rules:
                             _inlineSelectedTabId = activeTabId; _agentTargetTabId = activeTabId;
                             _inlineRenderFileDropdown();
                             showToast(`${fname} created`, 'add_circle');
+                            
+                            if (parsed.next_step_prompt) {
+                                setTimeout(() => {
+                                    const ta = document.getElementById('inline-chat-textarea');
+                                    if (ta) {
+                                        ta.value = parsed.next_step_prompt;
+                                        _inlineAppendMsg('agent', `🔄 *Agent follow-up step:* "${parsed.next_step_prompt}"`);
+                                        sendInlineChat();
+                                    }
+                                }, 1500);
+                            }
                         }
                     }));
 
@@ -11316,6 +11366,17 @@ Rules:
                                 files.forEach(f => openFileInTab(f.filename, f.content || '', true));
                                 _inlineChatHistory.push({ role: 'assistant', content: `[SPLIT INTO ${files.length} FILES: ${files.map(f => f.filename).join(', ')}]` });
                                 showToast(`${files.length} files created`, 'call_split');
+                                
+                                if (parsed.next_step_prompt) {
+                                    setTimeout(() => {
+                                        const ta = document.getElementById('inline-chat-textarea');
+                                        if (ta) {
+                                            ta.value = parsed.next_step_prompt;
+                                            _inlineAppendMsg('agent', `🔄 *Agent follow-up step:* "${parsed.next_step_prompt}"`);
+                                            sendInlineChat();
+                                        }
+                                    }, 1500);
+                                }
                             }
                         }));
                     }
@@ -11342,6 +11403,17 @@ Rules:
                                 else { switchFileTab(rTab.id); editor.setValue(cleaned, -1); }
                                 _inlineChatHistory.push({ role: 'assistant', content: `[REORGANIZED FILE — ${cleaned.split('\n').length} lines]` });
                                 showToast('File reorganized', 'reorder');
+                                
+                                if (parsed.next_step_prompt) {
+                                    setTimeout(() => {
+                                        const ta = document.getElementById('inline-chat-textarea');
+                                        if (ta) {
+                                            ta.value = parsed.next_step_prompt;
+                                            _inlineAppendMsg('agent', `🔄 *Agent follow-up step:* "${parsed.next_step_prompt}"`);
+                                            sendInlineChat();
+                                        }
+                                    }, 1500);
+                                }
                             }
                         }));
                     }
@@ -11355,7 +11427,7 @@ Rules:
                 _inlineHideTyping();
                 const msg = err.message || '';
                 if (msg === '__RATE_LIMIT_SHOWN__') return;
-                if (msg === '__USER_ABORTED__') {
+                if (msg === '__USER_ABORTED__' || _inlineAbortCtrl.signal.aborted) {
                     _inlineAppendMsg('agent', '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline;vertical-align:middle;pointer-events:none;"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Stopped.');
                     return;
                 }
@@ -11621,10 +11693,163 @@ Rules:
                 }
             });
 
-            // Scroll editor to first changed line
-            if (edits && edits[0] && edits[0].line_start != null) {
-                editor.scrollToLine(Math.max(0, edits[0].line_start - 3), true, true);
+        function _autoApplyEditsDirectly(edits, targetTab) {
+            if (!edits || !edits.length) return { success: false, error: 'No edits provided.' };
+            const original = targetTab ? targetTab.content : editor.getValue();
+            const lines = original.split('\n');
+            let applied = 0;
+            const failedEdits = [];
+            const failReasons = [];
+            const sorted = [...edits].sort((a, b) => (b.line_start || 0) - (a.line_start || 0));
+
+            sorted.forEach(edit => {
+                if (edit.line_start != null) {
+                    const s = Math.max(0, (edit.line_start || 1) - 1);
+                    const e = Math.min(lines.length - 1, (edit.line_end || edit.line_start || 1) - 1);
+                    if (s > lines.length - 1) {
+                        failedEdits.push(edit);
+                        failReasons.push(`Line ${edit.line_start} is out of range`);
+                        return;
+                    }
+                    const newLines = (edit.replace || '').split('\n').map(l =>
+                        l.replace(/\t/g, '  ').replace(/\s+$/, '')
+                    );
+                    lines.splice(s, e - s + 1, ...newLines);
+                    applied++;
+                } else if (edit.find != null) {
+                    const fullContent = lines.join('\n');
+                    if (fullContent.includes(edit.find)) {
+                        const updated = fullContent.replace(edit.find, edit.replace || '');
+                        lines.splice(0, lines.length, ...updated.split('\n'));
+                        applied++;
+                    } else {
+                        const escaped = edit.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+                        try {
+                            const rx = new RegExp(escaped);
+                            if (rx.test(fullContent)) {
+                                const updated = fullContent.replace(rx, edit.replace || '');
+                                lines.splice(0, lines.length, ...updated.split('\n'));
+                                applied++;
+                            } else {
+                                failedEdits.push(edit);
+                                failReasons.push(`Text not found`);
+                            }
+                        } catch (regexErr) {
+                            failedEdits.push(edit);
+                            failReasons.push(`Regex error: ${regexErr.message}`);
+                        }
+                    }
+                }
+            });
+
+            if (applied === 0 && failedEdits.length > 0) {
+                return { success: false, error: failReasons.join(', ') };
             }
+
+            const cleaned = lines
+                .map(l => l.replace(/\s+$/, ''))
+                .join('\n')
+                .replace(/\n{3,}/g, '\n\n')
+                .trimEnd();
+
+            return { success: true, original, cleaned };
+        }
+
+        function _buildAutoAppliedCard(edits, originalCode, targetTab) {
+            const card = document.createElement('div');
+            card.style.cssText = 'border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;margin-top:4px;max-width:100%;';
+            const count = edits ? edits.length : 0;
+            const tabId = targetTab ? targetTab.id : 'null';
+
+            // Build diff HTML (hidden by default)
+            const currentCode = originalCode.split('\n');
+            let diffHTML = '';
+            (edits || []).forEach((edit, idx) => {
+                let oldLines = [], newLines = [];
+                if (edit.line_start != null) {
+                    const s = Math.max(0, (edit.line_start || 1) - 1);
+                    const e = Math.min(currentCode.length - 1, (edit.line_end || edit.line_start || 1) - 1);
+                    const ctxBefore = currentCode.slice(Math.max(0, s - 2), s);
+                    const ctxAfter = currentCode.slice(e + 1, Math.min(currentCode.length, e + 3));
+                    oldLines = [...ctxBefore, ...currentCode.slice(s, e + 1), ...ctxAfter];
+                    newLines = [...ctxBefore, ...(edit.replace || '').split('\n'), ...ctxAfter];
+                } else if (edit.find) {
+                    oldLines = edit.find.split('\n');
+                    newLines = (edit.replace || '').split('\n');
+                }
+                const { html, hasChanges } = _buildDiffHTML(oldLines, newLines);
+                if (hasChanges) {
+                    if (count > 1) diffHTML += `<div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;padding:4px 8px 2px;font-family:'Poppins',sans-serif;text-transform:uppercase;letter-spacing:0.4px;">Edit ${idx + 1}</div>`;
+                    diffHTML += html;
+                    if (idx < count - 1) diffHTML += `<div style="height:1px;background:var(--glass-border);margin:2px 0;"></div>`;
+                }
+            });
+
+            card.innerHTML = `
+            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
+                <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
+                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Auto-Applied ${count} change${count !== 1 ? 's' : ''} to Editor</span>
+            </div>
+            <div style="padding:10px 12px;font-size:11px;font-family:Poppins,sans-serif;opacity:0.8;line-height:1.4;background:rgba(0,0,0,0.08);display:flex;justify-content:space-between;align-items:center;">
+                <span>AI edits have been directly applied.</span>
+                <button class="review-diff-btn" style="background:rgba(128,128,128,0.1);border:1px solid var(--glass-border);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;color:var(--text-color);cursor:pointer;font-family:Poppins,sans-serif;">Review Changes</button>
+            </div>
+            <div class="diff-preview-container" style="display:none;max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);border-bottom:1px solid var(--glass-border);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
+            <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
+                <button class="auto-apply-accept-btn" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                    <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Accept
+                </button>
+                <button class="auto-apply-undo-btn" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:#ef4444;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                    <span class="material-icons-round" style="font-size:14px;pointer-events:none;">undo</span>Undo
+                </button>
+            </div>`;
+
+            const acceptBtn = card.querySelector('.auto-apply-accept-btn');
+            const undoBtn = card.querySelector('.auto-apply-undo-btn');
+            const reviewBtn = card.querySelector('.review-diff-btn');
+            const diffContainer = card.querySelector('.diff-preview-container');
+
+            reviewBtn.onclick = () => {
+                const isHidden = diffContainer.style.display === 'none';
+                diffContainer.style.display = isHidden ? 'block' : 'none';
+                reviewBtn.textContent = isHidden ? 'Hide Review' : 'Review Changes';
+            };
+
+            acceptBtn.onclick = () => {
+                _clearEditorDiffMarkers();
+                acceptBtn.disabled = true;
+                undoBtn.disabled = true;
+                acceptBtn.innerHTML = '<span class="material-icons-round" style="font-size:14px;">done_all</span>Accepted';
+                undoBtn.style.display = 'none';
+                reviewBtn.style.display = 'none';
+                diffContainer.style.display = 'none';
+                showToast('Edits accepted', 'check_circle');
+                _inlineChatHistory.push({ role: 'assistant', content: `[USER CONFIRMED changes]` });
+            };
+
+            undoBtn.onclick = () => {
+                _clearEditorDiffMarkers();
+                acceptBtn.disabled = true;
+                undoBtn.disabled = true;
+                
+                const snapTab = fileTabs.find(t => t.id === (tabId || activeTabId)) || fileTabs.find(t => t.id === activeTabId);
+                if (snapTab) snapTab.content = originalCode;
+                if (!tabId || tabId === activeTabId) {
+                    editor.setValue(originalCode, -1);
+                } else {
+                    switchFileTab(tabId);
+                    editor.setValue(originalCode, -1);
+                }
+                
+                undoBtn.innerHTML = '<span class="material-icons-round" style="font-size:14px;">undo</span>Undone';
+                acceptBtn.style.display = 'none';
+                reviewBtn.style.display = 'none';
+                diffContainer.style.display = 'none';
+                showToast('Edits undone', 'undo');
+                _inlineChatHistory.push({ role: 'assistant', content: `[USER DECLINED changes]` });
+            };
+
+            return card;
         }
 
         function _buildInlineEditCard(edits, targetTab) {
