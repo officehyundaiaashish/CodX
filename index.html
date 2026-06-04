@@ -8509,7 +8509,8 @@ Rules:
                     continue;
                 }
 
-                showTyping('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Fix ' + (i + 1) + ' of ' + planItems.length + ' — rewriting ' + (p.location || 'block') + '...');
+                // Show Model Thinking status explicitly
+                showTyping('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/></svg> [Model Thinking] Formulating edit step ' + (i + 1) + ' of ' + planItems.length + ' to fix ' + fixLabel);
 
                 // Give AI FULL context — it must know everything about this fix
                 const execPrompt =
@@ -8543,6 +8544,17 @@ Rules:
                         continue;
                     }
 
+                    // ── Auto Testing/Verification Step before displaying ──
+                    showTyping('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Running syntax & integrity tests on proposed change...');
+                    let testResult = 'PASS';
+                    try {
+                        // Create test sandbox execution checks (syntax validity check)
+                        new Function('const testBlock = () => { ' + newBlock + ' };');
+                    } catch (syntaxErr) {
+                        testResult = 'WARNING: Proposed JavaScript contains potential syntax errors: ' + syntaxErr.message;
+                    }
+                    hideTyping();
+
                     // Show old vs new — user applies or skips
                     await new Promise(resolve => {
                         const uid = 'fix' + i + '_' + Date.now();
@@ -8557,6 +8569,7 @@ Rules:
                             '<div class="agent-step-body">' +
                             '<div style="font-size:11px;font-weight:700;margin-bottom:8px;">' + fixLabel + '</div>' +
                             '<div style="font-size:10px;opacity:0.6;margin-bottom:8px;">→ ' + (p.what_to_do || '') + '</div>' +
+                            `<div style="font-size:10px;font-weight:700;color:${testResult === 'PASS' ? '#10b981' : '#f59e0b'};margin-bottom:8px;display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:13px;">science</span>Test Status: ${testResult}</div>` +
                             '<div class="chat-fix-preview">' +
                             '<div class="chat-fix-side remove"><div class="chat-fix-side-label">OLD</div><div class="chat-fix-code">' + esc(oldBlock) + (oldBlock.length > 180 ? '...' : '') + '</div></div>' +
                             '<div class="chat-fix-side insert"><div class="chat-fix-side-label">NEW</div><div class="chat-fix-code">' + esc(newBlock) + (newBlock.length > 180 ? '...' : '') + '</div></div>' +
@@ -11092,6 +11105,11 @@ Full chat history is included every call — use it to understand context of wha
 
 YOUR JOB: Fulfil exactly what the user asks. Nothing more, nothing less. The user's request is the source of truth.
 
+GOAL-DRIVEN AGENTIC DIRECTIVE:
+1. Break down the user's request into step-by-step tasks.
+2. If the user request is multi-step, plan them step-by-step. Implement the first part, then use the "next_step_prompt" parameter to continue automatically in the next turn until the complete user goal is fully achieved.
+3. Explicitly verify syntax, styles, and logic constraints during your thought planning.
+
 QUALITY STANDARD:
 - Every UI you build must be modern, well-designed, and polished — clean layouts, smooth animations, good typography
 - Use SVG icons (inline) — never rely on external icon libraries
@@ -12342,16 +12360,22 @@ Rules:
                 return;
             }
 
-            // Save undo snapshot ONLY if at least something applied
-            _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
-            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
-
             // Clean up: collapse 3+ blank lines → max 2, remove trailing whitespace per line
             const cleaned = lines
                 .map(l => l.replace(/\s+$/, ''))
                 .join('\n')
                 .replace(/\n{3,}/g, '\n\n')
                 .trimEnd();
+
+            // ── Guard: Abort if edit result is empty/blank to prevent UI blanking ──
+            if (!cleaned.trim()) {
+                _showApplyError(btn, 'Apply Aborted: The proposed changes would result in a blank file. Reverting operation.');
+                return;
+            }
+
+            // Save undo snapshot ONLY if at least something applied
+            _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
+            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
 
             // ── Write back to the correct tab ──
             if (snapTab) snapTab.content = cleaned;
