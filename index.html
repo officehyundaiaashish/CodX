@@ -959,7 +959,8 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s ease;
+            visibility: hidden;
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
         }
 
         #github-modal::-webkit-scrollbar {
@@ -969,6 +970,7 @@
         #github-modal.active {
             opacity: 1;
             pointer-events: auto;
+            visibility: visible;
             transform: translate(-50%, -50%) scale(1);
         }
 
@@ -989,10 +991,12 @@
 
         #github-modal {
             pointer-events: none;
+            visibility: hidden;
         }
 
         #github-modal.active {
             pointer-events: auto;
+            visibility: visible;
         }
 
         .gh-select-wrap {
@@ -1943,7 +1947,8 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1);
+            visibility: hidden;
+            transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1), visibility 0.22s ease;
             font-family: 'Poppins', sans-serif;
             overflow: hidden;
         }
@@ -1951,6 +1956,7 @@
         #agent-modal.active {
             opacity: 1;
             pointer-events: auto;
+            visibility: visible;
             transform: translate(-50%, -50%) scale(1);
         }
 
@@ -6606,6 +6612,8 @@
             if (isActive) {
                 findModal.classList.add('active');
                 document.getElementById('editor').style.zIndex = '1';
+                const inner = document.getElementById('bottom-panel');
+                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
                 requestAnimationFrame(() => {
                     const fi = document.getElementById('find-input');
                     fi.focus();
@@ -6618,6 +6626,10 @@
                 findModal.style.top = '';
                 findModal.style.bottom = '';
                 document.getElementById('editor').style.zIndex = '10';
+                if (!_inlineChatOpen && !_navHidden) {
+                    const inner = document.getElementById('bottom-panel');
+                    if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+                }
             }
         }
         function findText(showErrorAlert = true) {
@@ -6678,14 +6690,20 @@
             ghOverlay.classList.add('active');
             ghModal.classList.add('active');
             checkGhLogin();
+            const inner = document.getElementById('bottom-panel');
+            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
         }
         function closeGithubModal() {
             ghModal.classList.remove('active');
-            // Immediately remove display — no transition delay, no invisible intercepts
+            // Immediately remove display - no transition delay, no invisible intercepts
             ghOverlay.classList.remove('active');
             ghOverlay.style.display = 'none';
             const hist = document.getElementById('gh-commit-history');
             if (hist) hist.style.display = 'none';
+            if (!_inlineChatOpen && !_navHidden) {
+                const inner = document.getElementById('bottom-panel');
+                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+            }
         }
 
         let _ghReposLoaded = false;
@@ -7806,6 +7824,8 @@
             });
             activeAgentIdx = agentList.findIndex(a => a.model === lastEntry.model);
             _saveAgentList();
+            _updateAgentBarLabel();
+            _inlinePopulateModels();
             keyInp.value = '';
             const list = document.getElementById('agent-model-list');
             const inner = document.getElementById('agent-model-list-inner');
@@ -7848,7 +7868,13 @@
                     <span class="material-icons-round">delete</span>
                 </button>
             `;
-                row.onclick = () => { activeAgentIdx = i; _saveAgentList(); _renderConnectedAgents(); };
+                row.onclick = () => {
+                    activeAgentIdx = i;
+                    _saveAgentList();
+                    _renderConnectedAgents();
+                    _updateAgentBarLabel();
+                    _inlinePopulateModels();
+                };
                 list.appendChild(row);
             });
         }
@@ -7861,16 +7887,20 @@
                 if (activeAgentIdx >= agentList.length) activeAgentIdx = Math.max(0, agentList.length - 1);
                 _saveAgentList();
                 _renderConnectedAgents();
-                if (agentList.length === 0) closeAgentBar();
-                else _updateAgentBarLabel();
+                if (agentList.length === 0) {
+                    closeAgentBar();
+                } else {
+                    _updateAgentBarLabel();
+                }
+                _inlinePopulateModels();
             });
         }
 
         function _updateAgentBarLabel() {
             const ag = _activeAgent();
-            if (!ag) return;
-            document.getElementById('agent-bar-label').textContent = ag.providerName;
-            _pingAgentModel();
+            const label = document.getElementById('agent-bar-label');
+            if (label) label.textContent = ag ? ag.providerName : 'AI';
+            if (ag) _pingAgentModel();
         }
 
         // ── Custom Model Dialog ──
@@ -7965,6 +7995,8 @@
             if (exists !== -1) { agentList[exists] = entry; }
             else { agentList.push(entry); activeAgentIdx = agentList.length - 1; }
             _saveAgentList();
+            _updateAgentBarLabel();
+            _inlinePopulateModels();
             closeCustomModelDialog();
             _renderConnectedAgents();
             cdAlert('Agent', `"${displayName}" added.`, 'success');
@@ -7975,11 +8007,17 @@
             document.getElementById('agent-overlay').classList.add('active');
             document.getElementById('agent-modal').classList.add('active');
             _renderConnectedAgents();
+            const inner = document.getElementById('bottom-panel');
+            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
         }
 
         function closeAgentModal() {
             document.getElementById('agent-overlay').classList.remove('active');
             document.getElementById('agent-modal').classList.remove('active');
+            if (!_inlineChatOpen && !_navHidden) {
+                const inner = document.getElementById('bottom-panel');
+                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+            }
         }
 
         function disconnectAgent() {
@@ -7990,6 +8028,8 @@
                 localStorage.removeItem('agent_active_idx');
                 localStorage.removeItem('agent_config');
                 closeAgentModal(); closeAgentBar();
+                _updateAgentBarLabel();
+                _inlinePopulateModels();
                 _renderConnectedAgents();
             });
         }
@@ -8873,9 +8913,15 @@ Rules:
             const warn = document.getElementById('np-repo-login-warn');
             if (warn) warn.style.display = token ? 'none' : 'block';
             if (token) { _npLoadReposForSelect(); }
+            const inner = document.getElementById('bottom-panel');
+            if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
         }
         function closeNewProjectModal() {
             document.getElementById('new-project-overlay').classList.remove('active');
+            if (!_inlineChatOpen && !_navHidden) {
+                const inner = document.getElementById('bottom-panel');
+                if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+            }
         }
         function npSwitchTab(tab) {
             _npCurrentTab = tab;
@@ -12037,6 +12083,8 @@ Use only line numbers visible in the context. Be precise.`;
             const activeAg = _activeAgent();
             const modelLabel = document.getElementById('inline-model-label');
             if (modelLabel) modelLabel.textContent = activeAg ? activeAg.providerName : 'Select Model';
+            const chatName = document.getElementById('inline-chat-name');
+            if (chatName) chatName.textContent = activeAg ? activeAg.providerName : 'AI Agent';
             // Remove no-agent banner if showing
             if (activeAg) { const b = document.getElementById('inline-no-agent-banner'); if (b) b.remove(); }
         }
