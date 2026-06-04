@@ -4020,11 +4020,13 @@
 
 
             /* Adjustments for hidden sidebar */
-            body.nav-hidden-desktop .app-layout {
-                padding-left: 0;
+            body.nav-hidden-desktop .app-layout,
+            body.chat-is-open .app-layout {
+                padding-left: 0 !important;
             }
 
-            body.nav-hidden-desktop #inline-chat-panel {
+            body.nav-hidden-desktop #inline-chat-panel,
+            body.chat-is-open #inline-chat-panel {
                 left: 0 !important;
             }
 
@@ -5618,6 +5620,13 @@
                 } else {
                     inner.style.transform = isDesktop ? 'translateX(-100%)' : 'translateY(100%)';
                     if (toggleBtn) toggleBtn.style.display = 'none';
+                }
+            }
+
+            if (isDesktop) {
+                const layout = document.querySelector('.app-layout');
+                if (layout) {
+                    layout.style.paddingLeft = (_navHidden || anyToolOpen) ? '0' : '';
                 }
             }
         }
