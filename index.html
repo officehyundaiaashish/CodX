@@ -11050,42 +11050,107 @@ STRICT FORMAT RULES:
         // ── Robust JSON parser — shared across all agent response handlers ──
         function _tryParseJSON(str) {
             if (!str) return null;
-            // Quick guard — if no "type" key, this is not an agent JSON response
             if (!str.includes('"type"')) return null;
 
-            // Strategy 1: strip markdown fences then parse whole string
-            let clean = str.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-            try { const p = JSON.parse(clean); if (p && p.type) return p; } catch (_) { }
-
-            // Strategy 2: extract outermost { } block using brace matching
-            const start = str.indexOf('{');
-            if (start !== -1) {
-                let depth = 0, end = -1;
-                for (let i = start; i < str.length; i++) {
-                    if (str[i] === '{') depth++;
-                    else if (str[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+            // Helper to escape raw newlines inside string literals in JSON
+            function escapeRawNewlines(s) {
+                let res = '';
+                let inStr = false;
+                let strChar = null;
+                for (let i = 0; i < s.length; i++) {
+                    const c = s[i];
+                    if (inStr) {
+                        if (c === '\\') {
+                            res += c;
+                            if (i + 1 < s.length) { res += s[i + 1]; i++; }
+                        } else if (c === strChar) {
+                            inStr = false;
+                            res += c;
+                        } else if (c === '\n') {
+                            res += '\\n';
+                        } else if (c === '\r') {
+                            res += '\\r';
+                        } else {
+                            res += c;
+                        }
+                    } else {
+                        if (c === '"' || c === "'") {
+                            inStr = true;
+                            strChar = c;
+                        }
+                        res += c;
+                    }
                 }
-                if (end !== -1) {
-                    try { const p = JSON.parse(str.slice(start, end + 1)); if (p && p.type) return p; } catch (_) { }
-                }
+                return res;
             }
 
-            // Strategy 3: only fix trailing commas — no other replacements (they corrupt HTML/CSS content)
+            // Strategy 1: strip markdown fences and parse
+            let clean = str.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
             try {
-                const s3 = str.indexOf('{');
-                if (s3 !== -1) {
-                    let d3 = 0, e3 = -1;
-                    for (let i = s3; i < str.length; i++) {
-                        if (str[i] === '{') d3++;
-                        else if (str[i] === '}') { d3--; if (d3 === 0) { e3 = i; break; } }
-                    }
-                    if (e3 !== -1) {
-                        const fixed = str.slice(s3, e3 + 1).replace(/,(\s*[}\]])/g, '$1');
-                        const p = JSON.parse(fixed);
-                        if (p && p.type) return p;
+                const parsed = JSON.parse(clean);
+                if (parsed && parsed.type) return parsed;
+            } catch (_) {}
+            try {
+                const parsed = JSON.parse(escapeRawNewlines(clean));
+                if (parsed && parsed.type) return parsed;
+            } catch (_) {}
+
+            // Strategy 2: extract outermost block using string-aware brace matching
+            const start = str.indexOf('{');
+            if (start !== -1) {
+                let depth = 0;
+                let end = -1;
+                let inStr = false;
+                let strChar = null;
+
+                for (let i = start; i < str.length; i++) {
+                    const c = str[i];
+                    if (inStr) {
+                        if (c === '\\') {
+                            i++; // skip escaped char
+                        } else if (c === strChar) {
+                            inStr = false;
+                        }
+                    } else {
+                        if (c === '"' || c === "'" || c === '`') {
+                            inStr = true;
+                            strChar = c;
+                        } else if (c === '{') {
+                            depth++;
+                        } else if (c === '}') {
+                            depth--;
+                            if (depth === 0) {
+                                end = i;
+                                break;
+                            }
+                        }
                     }
                 }
-            } catch (_) { }
+
+                if (end !== -1) {
+                    const sliced = str.slice(start, end + 1);
+                    try {
+                        const parsed = JSON.parse(sliced);
+                        if (parsed && parsed.type) return parsed;
+                    } catch (_) {}
+                    try {
+                        const parsed = JSON.parse(escapeRawNewlines(sliced));
+                        if (parsed && parsed.type) return parsed;
+                    } catch (_) {}
+
+                    // Strategy 3: fix trailing commas
+                    try {
+                        const fixed = sliced.replace(/,(\s*[}\]])/g, '$1');
+                        const parsed = JSON.parse(fixed);
+                        if (parsed && parsed.type) return parsed;
+                    } catch (_) {}
+                    try {
+                        const fixed = escapeRawNewlines(sliced).replace(/,(\s*[}\]])/g, '$1');
+                        const parsed = JSON.parse(fixed);
+                        if (parsed && parsed.type) return parsed;
+                    } catch (_) {}
+                }
+            }
 
             return null;
         }
