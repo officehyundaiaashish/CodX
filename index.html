@@ -6614,6 +6614,8 @@
                 document.getElementById('editor').style.zIndex = '1';
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
+                const toggleBtn = document.getElementById('nav-toggle-btn');
+                if (toggleBtn) toggleBtn.style.display = 'none';
                 requestAnimationFrame(() => {
                     const fi = document.getElementById('find-input');
                     fi.focus();
@@ -6629,6 +6631,8 @@
                 if (!_inlineChatOpen && !_navHidden) {
                     const inner = document.getElementById('bottom-panel');
                     if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+                    const toggleBtn = document.getElementById('nav-toggle-btn');
+                    if (toggleBtn) toggleBtn.style.display = 'flex';
                 }
             }
         }
@@ -6692,6 +6696,8 @@
             checkGhLogin();
             const inner = document.getElementById('bottom-panel');
             if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
+            const toggleBtn = document.getElementById('nav-toggle-btn');
+            if (toggleBtn) toggleBtn.style.display = 'none';
         }
         function closeGithubModal() {
             ghModal.classList.remove('active');
@@ -6703,6 +6709,8 @@
             if (!_inlineChatOpen && !_navHidden) {
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+                const toggleBtn = document.getElementById('nav-toggle-btn');
+                if (toggleBtn) toggleBtn.style.display = 'flex';
             }
         }
 
@@ -8009,6 +8017,8 @@
             _renderConnectedAgents();
             const inner = document.getElementById('bottom-panel');
             if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
+            const toggleBtn = document.getElementById('nav-toggle-btn');
+            if (toggleBtn) toggleBtn.style.display = 'none';
         }
 
         function closeAgentModal() {
@@ -8017,6 +8027,8 @@
             if (!_inlineChatOpen && !_navHidden) {
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+                const toggleBtn = document.getElementById('nav-toggle-btn');
+                if (toggleBtn) toggleBtn.style.display = 'flex';
             }
         }
 
@@ -8915,12 +8927,16 @@ Rules:
             if (token) { _npLoadReposForSelect(); }
             const inner = document.getElementById('bottom-panel');
             if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
+            const toggleBtn = document.getElementById('nav-toggle-btn');
+            if (toggleBtn) toggleBtn.style.display = 'none';
         }
         function closeNewProjectModal() {
             document.getElementById('new-project-overlay').classList.remove('active');
             if (!_inlineChatOpen && !_navHidden) {
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+                const toggleBtn = document.getElementById('nav-toggle-btn');
+                if (toggleBtn) toggleBtn.style.display = 'flex';
             }
         }
         function npSwitchTab(tab) {
@@ -9886,9 +9902,22 @@ No markdown, no backticks, no explanation outside the array.`;
             }
             const groups = {};
             sessions.forEach(s => {
-                const d = new Date(s.date), now = new Date();
-                const dd = Math.floor((now - d) / 86400000);
-                const label = dd === 0 ? 'Today' : dd === 1 ? 'Yesterday' : dd < 7 ? d.toLocaleDateString([], { weekday: 'long' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                const d = new Date(s.date), today = new Date();
+                const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const diffDays = Math.round((todayDate - dDate) / 86400000);
+                
+                let label = '';
+                if (diffDays === 0) {
+                    label = 'Today';
+                } else if (diffDays === 1) {
+                    label = 'Yesterday';
+                } else if (diffDays < 7 && diffDays > 0) {
+                    label = d.toLocaleDateString([], { weekday: 'long' });
+                } else {
+                    label = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                }
+                
                 if (!groups[label]) groups[label] = [];
                 groups[label].push(s);
             });
@@ -10095,21 +10124,26 @@ No markdown, no backticks, no explanation outside the array.`;
 
             const inner = document.getElementById('bottom-panel');
             if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = 'translateY(100%)'; }
+            const toggleBtn = document.getElementById('nav-toggle-btn');
+            if (toggleBtn) toggleBtn.style.display = 'none';
 
             const ag = _activeAgent();
             if (ag) document.getElementById('inline-chat-name').textContent = ag.providerName;
 
             // Sync chat mode button to current state (default ON)
             const modeBtn = document.getElementById('inline-chat-mode-btn');
-            const modeIcon = document.getElementById('chat-mode-icon');
             const ta2 = document.getElementById('inline-chat-textarea');
+            const accessBtn = document.getElementById('chat-code-access-btn');
             if (_inlineChatModeOn) {
                 if (modeBtn) { modeBtn.classList.add('mode-on'); modeBtn.style.background = ''; modeBtn.style.color = ''; }
-                if (modeIcon) { modeIcon.setAttribute('stroke', 'white'); modeIcon.setAttribute('fill', 'rgba(255,255,255,0.15)'); }
                 if (ta2) ta2.placeholder = 'Chat only — no edits...';
-                const accessBtn = document.getElementById('chat-code-access-btn');
                 if (accessBtn) accessBtn.style.display = 'flex';
+            } else {
+                if (modeBtn) { modeBtn.classList.remove('mode-on'); modeBtn.style.background = 'rgba(128,128,128,0.12)'; modeBtn.style.color = 'var(--text-color)'; }
+                if (ta2) ta2.placeholder = 'Ask agent...';
+                if (accessBtn) { accessBtn.style.display = 'none'; accessBtn.classList.remove('access-on'); }
             }
+            _updateChatModeIcon();
 
             _inlinePopulateModels();
             _inlinePopulateTabs();
@@ -10159,7 +10193,12 @@ No markdown, no backticks, no explanation outside the array.`;
                 if (_mc) { _mc.style.maxHeight = ''; _mc.style.height = ''; _mc.style.minHeight = ''; }
                 _setBodyHeight();
                 const inner = document.getElementById('bottom-panel');
-                if (inner && !_navHidden) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
+                if (inner && !_navHidden) {
+                    inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
+                    inner.style.transform = '';
+                    const toggleBtn = document.getElementById('nav-toggle-btn');
+                    if (toggleBtn) toggleBtn.style.display = 'flex';
+                }
             }
         }
 
@@ -12500,27 +12539,40 @@ Use only line numbers visible in the context. Be precise.`;
             }, 1800);
         }
 
+        function _updateChatModeIcon() {
+            const icon = document.getElementById('chat-mode-icon');
+            if (!icon) return;
+            if (_inlineChatModeOn) {
+                icon.innerHTML = '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />';
+                icon.setAttribute('stroke', 'white');
+                icon.setAttribute('fill', 'rgba(255,255,255,0.15)');
+            } else {
+                icon.innerHTML = '<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />';
+                icon.setAttribute('stroke', 'currentColor');
+                icon.setAttribute('fill', 'none');
+            }
+        }
+
         function _toggleChatMode() {
             _inlineChatModeOn = !_inlineChatModeOn;
             const btn = document.getElementById('inline-chat-mode-btn');
-            const icon = document.getElementById('chat-mode-icon');
             const ta = document.getElementById('inline-chat-textarea');
             const accessBtn = document.getElementById('chat-code-access-btn');
 
             if (_inlineChatModeOn) {
                 if (btn) { btn.classList.add('mode-on'); btn.style.background = ''; btn.style.color = ''; }
-                if (icon) { icon.setAttribute('stroke', 'white'); icon.setAttribute('fill', 'rgba(255,255,255,0.15)'); }
                 if (ta) ta.placeholder = 'Chat only — no edits...';
                 // Show code access toggle button
                 if (accessBtn) accessBtn.style.display = 'flex';
             } else {
                 if (btn) { btn.classList.remove('mode-on'); btn.style.background = 'rgba(128,128,128,0.12)'; btn.style.color = 'var(--text-color)'; }
-                if (icon) { icon.setAttribute('stroke', 'currentColor'); icon.setAttribute('fill', 'none'); }
                 if (ta) ta.placeholder = 'Ask agent...';
                 // Hide code access button and reset its state
                 if (accessBtn) { accessBtn.style.display = 'none'; accessBtn.classList.remove('access-on'); }
                 _chatCodeAccessOn = false;
             }
+
+            _updateChatModeIcon();
 
             // Show centered mode-switch toast
             _showChatModeToast(_inlineChatModeOn);
