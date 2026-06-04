@@ -6374,11 +6374,24 @@
                 prvEl.classList.remove('active-pane');
                 edEl.style.opacity = '1';
                 edEl.style.pointerEvents = 'auto';
-                // Restore nav panel if user hasn't hidden it
-                if (!_navHidden) {
+                
+                const anyToolOpen = 
+                    document.getElementById('github-modal')?.classList.contains('active') ||
+                    document.getElementById('agent-modal')?.classList.contains('active') ||
+                    document.getElementById('find-modal')?.classList.contains('active') ||
+                    document.getElementById('new-project-overlay')?.classList.contains('active') ||
+                    _inlineChatOpen;
+
+                // Restore nav panel if user hasn't hidden it and no tools are open
+                if (!_navHidden && !anyToolOpen) {
                     const t = 'transform 0.3s cubic-bezier(0.4,0,0.2,1)';
                     if (outerEl) { outerEl.style.transition = t; outerEl.style.transform = ''; }
                     if (innerEl) { innerEl.style.transition = t; innerEl.style.transform = ''; }
+                    const toggleBtn = document.getElementById('nav-toggle-btn');
+                    if (toggleBtn) toggleBtn.style.display = 'flex';
+                } else {
+                    const toggleBtn = document.getElementById('nav-toggle-btn');
+                    if (toggleBtn) toggleBtn.style.display = 'none';
                 }
                 // Restore chat panel if it was open
                 const chatPanel = document.getElementById('inline-chat-panel');
@@ -6628,7 +6641,7 @@
                 findModal.style.top = '';
                 findModal.style.bottom = '';
                 document.getElementById('editor').style.zIndex = '10';
-                if (!_inlineChatOpen && !_navHidden) {
+                if (!_inlineChatOpen && !_navHidden && !_inPreview) {
                     const inner = document.getElementById('bottom-panel');
                     if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
                     const toggleBtn = document.getElementById('nav-toggle-btn');
@@ -6706,7 +6719,7 @@
             ghOverlay.style.display = 'none';
             const hist = document.getElementById('gh-commit-history');
             if (hist) hist.style.display = 'none';
-            if (!_inlineChatOpen && !_navHidden) {
+            if (!_inlineChatOpen && !_navHidden && !_inPreview) {
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
                 const toggleBtn = document.getElementById('nav-toggle-btn');
@@ -8024,7 +8037,7 @@
         function closeAgentModal() {
             document.getElementById('agent-overlay').classList.remove('active');
             document.getElementById('agent-modal').classList.remove('active');
-            if (!_inlineChatOpen && !_navHidden) {
+            if (!_inlineChatOpen && !_navHidden && !_inPreview) {
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
                 const toggleBtn = document.getElementById('nav-toggle-btn');
@@ -8932,7 +8945,7 @@ Rules:
         }
         function closeNewProjectModal() {
             document.getElementById('new-project-overlay').classList.remove('active');
-            if (!_inlineChatOpen && !_navHidden) {
+            if (!_inlineChatOpen && !_navHidden && !_inPreview) {
                 const inner = document.getElementById('bottom-panel');
                 if (inner) { inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)'; inner.style.transform = ''; }
                 const toggleBtn = document.getElementById('nav-toggle-btn');
