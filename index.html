@@ -10943,7 +10943,9 @@ No markdown, no backticks, no explanation outside the array.`;
             clearInterval(_statusTimer);
 
             const statuses = window._inlineChatModeOn 
-                ? ["Thinking...", "Analyzing request...", "Formulating response...", "Refining answer..."]
+                ? (window._chatCodeAccessOn 
+                    ? ["Thinking...", "Analyzing request...", "Formulating response...", "Refining answer..."]
+                    : ["Thinking...", "Formulating response...", "Refining answer..."])
                 : ["Scanning codebase...", "Analyzing context...", "Engineering solutions...", "Drafting edits...", "Validating changes..."];
 
             let currentStatusIndex = 0;
