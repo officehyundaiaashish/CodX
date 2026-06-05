@@ -11378,6 +11378,9 @@ STRICT FORMAT RULES:
                     if (endQuoteIdx !== -1) {
                         edits.push({ line_start, line_end, replace: content });
                         pos = endQuoteIdx + 1;
+                    } else if (content.length > 0) {
+                        edits.push({ line_start, line_end, replace: content });
+                        break;
                     } else {
                         pos = startIdx + 12;
                     }
@@ -11437,7 +11440,7 @@ STRICT FORMAT RULES:
                                     content += c;
                                 }
                             }
-                            if (endQuoteIdx !== -1) {
+                            if (endQuoteIdx !== -1 || content.length > 0) {
                                 return { type, filename, content };
                             }
                         }
