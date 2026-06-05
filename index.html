@@ -10957,8 +10957,8 @@ No markdown, no backticks, no explanation outside the array.`;
                 const timerEl = document.getElementById('inline-status-timer');
                 if (timerEl) timerEl.textContent = elapsed + 's';
 
-                // Change status randomly every 2 seconds
-                if (Date.now() - lastStatusChange > 2200) {
+                // Change status randomly every 5 seconds
+                if (Date.now() - lastStatusChange > 5000) {
                     const remaining = statuses.filter(s => s !== currentStatus);
                     currentStatus = remaining[Math.floor(Math.random() * remaining.length)];
                     const txtEl = document.getElementById('inline-status-text');
@@ -11738,9 +11738,16 @@ Rules:
                     } else {
                         if (parsed.explanation?.trim()) _inlineAppendMsg('agent', parsed.explanation.trim());
                         
-                        // Show review card in chat instead of auto-applying immediately
-                        const reviewCard = _buildInlineEditCard(parsed.edits, targetTab);
-                        _inlineAppendMsg('agent', '', reviewCard);
+                        // Save original content before applying
+                        const snapTab = targetTab || fileTabs.find(t => t.id === activeTabId);
+                        const originalContent = snapTab ? snapTab.content : editor.getValue();
+                        
+                        // Auto-apply immediately
+                        _autoApplyInlineEdits(parsed.edits, snapTab ? snapTab.id : null);
+                        
+                        // Show the auto-applied review card with Diff and Undo button
+                        const autoCard = _buildAutoAppliedEditCard(parsed.edits, snapTab, originalContent);
+                        _inlineAppendMsg('agent', '', autoCard);
                         
                         if (parsed.next_step_prompt) {
                             setTimeout(() => {
@@ -12371,6 +12378,146 @@ Rules:
             };
 
             return card;
+        }
+
+        function _autoApplyInlineEdits(edits, tabId) {
+            if (!edits || !edits.length) return;
+
+            const snapTab = fileTabs.find(t => t.id === (tabId || activeTabId)) || fileTabs.find(t => t.id === activeTabId);
+            if (!snapTab && !editor) return;
+            const original = snapTab ? snapTab.content : editor.getValue();
+
+            const lines = original.split('\n');
+            let applied = 0;
+
+            // Sort edits bottom-to-top so line numbers stay valid after each replacement
+            const sorted = [...edits].sort((a, b) => (b.line_start || 0) - (a.line_start || 0));
+
+            sorted.forEach(edit => {
+                if (edit.line_start != null) {
+                    const s = Math.max(0, (edit.line_start || 1) - 1);
+                    const e = Math.min(lines.length - 1, (edit.line_end || edit.line_start || 1) - 1);
+                    if (s <= lines.length - 1) {
+                        const newLines = (edit.replace || '').split('\n').map(l =>
+                            l.replace(/\t/g, '  ').replace(/\s+$/, '')
+                        );
+                        lines.splice(s, e - s + 1, ...newLines);
+                        applied++;
+                    }
+                } else if (edit.find != null) {
+                    const fullContent = lines.join('\n');
+                    if (fullContent.includes(edit.find)) {
+                        const updated = fullContent.replace(edit.find, edit.replace || '');
+                        lines.splice(0, lines.length, ...updated.split('\n'));
+                        applied++;
+                    } else {
+                        const escaped = edit.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+                        try {
+                            const rx = new RegExp(escaped);
+                            if (rx.test(fullContent)) {
+                                const updated = fullContent.replace(rx, edit.replace || '');
+                                lines.splice(0, lines.length, ...updated.split('\n'));
+                                applied++;
+                            }
+                        } catch (e) {}
+                    }
+                }
+            });
+
+            if (applied > 0) {
+                _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
+                if (_agentUndoStack.length > 5) _agentUndoStack.shift();
+
+                const cleaned = lines
+                    .map(l => l.replace(/\s+$/, ''))
+                    .join('\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trimEnd();
+
+                if (snapTab) snapTab.content = cleaned;
+                if (!tabId || tabId === activeTabId) {
+                    editor.setValue(cleaned, -1);
+                } else {
+                    switchFileTab(tabId);
+                    editor.setValue(cleaned, -1);
+                }
+                showToast(`Auto-applied ${applied} edit(s) ✓`, 'auto_fix_high');
+                _inlineChatHistory.push({ role: 'assistant', content: `[APPLIED edits automatically]` });
+            }
+        }
+
+        function _buildAutoAppliedEditCard(edits, targetTab, originalContent) {
+            const card = document.createElement('div');
+            card.className = 'inline-edit-card-applied';
+            card.style.cssText = 'border:1px solid rgba(16,185,129,0.3);border-radius:12px;overflow:hidden;margin-top:4px;max-width:100%;';
+            const count = edits ? edits.length : 0;
+
+            const currentCode = originalContent.split('\n');
+            let diffHTML = '';
+
+            (edits || []).forEach((edit, idx) => {
+                let oldLines = [], newLines = [];
+                if (edit.line_start != null) {
+                    const s = Math.max(0, (edit.line_start || 1) - 1);
+                    const e = Math.min(currentCode.length - 1, (edit.line_end || edit.line_start || 1) - 1);
+                    const ctxBefore = currentCode.slice(Math.max(0, s - 2), s);
+                    const ctxAfter = currentCode.slice(e + 1, Math.min(currentCode.length, e + 3));
+                    oldLines = [...ctxBefore, ...currentCode.slice(s, e + 1), ...ctxAfter];
+                    newLines = [...ctxBefore, ...(edit.replace || '').split('\n'), ...ctxAfter];
+                } else if (edit.find) {
+                    oldLines = edit.find.split('\n');
+                    newLines = (edit.replace || '').split('\n');
+                }
+
+                const { html, hasChanges } = _buildDiffHTML(oldLines, newLines);
+                if (hasChanges) {
+                    if (count > 1) diffHTML += `<div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.4;padding:4px 8px 2px;font-family:'Poppins',sans-serif;text-transform:uppercase;letter-spacing:0.4px;">Edit ${idx + 1}</div>`;
+                    diffHTML += html;
+                    if (idx < count - 1) diffHTML += `<div style="height:1px;background:var(--glass-border);margin:2px 0;"></div>`;
+                }
+            });
+
+            const tabId = targetTab ? targetTab.id : 'null';
+            const b64Original = btoa(unescape(encodeURIComponent(originalContent)));
+
+            card.innerHTML = `
+            <div style="background:rgba(16,185,129,0.12);padding:9px 12px;border-bottom:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;gap:8px;">
+                <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
+                <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Auto-applied ${count} edit${count !== 1 ? 's' : ''}</span>
+                <button onclick="_undoAutoAppliedEdits(this, '${b64Original}', ${tabId})" style="padding:4px 10px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                    <span class="material-icons-round" style="font-size:12px;">undo</span>Undo
+                </button>
+            </div>
+            <div style="max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
+            `;
+            return card;
+        }
+
+        function _undoAutoAppliedEdits(btn, b64Original, tabId) {
+            const originalContent = decodeURIComponent(escape(atob(b64Original)));
+            const targetTab = fileTabs.find(t => t.id === tabId) || fileTabs.find(t => t.id === activeTabId);
+            
+            if (targetTab) {
+                targetTab.content = originalContent;
+                if (targetTab.id === activeTabId) {
+                    editor.setValue(originalContent, -1);
+                } else {
+                    switchFileTab(targetTab.id);
+                    editor.setValue(originalContent, -1);
+                }
+            } else {
+                editor.setValue(originalContent, -1);
+            }
+            
+            showToast('Changes reverted ✓', 'undo');
+            _inlineChatHistory.push({ role: 'assistant', content: `[USER REVERTED edits automatically]` });
+
+            // Update button visual state
+            btn.disabled = true;
+            btn.style.background = 'rgba(128,128,128,0.2)';
+            btn.style.color = 'var(--text-color)';
+            btn.style.opacity = '0.5';
+            btn.innerHTML = '<span class="material-icons-round" style="font-size:12px;">done</span>Undone';
         }
 
         function _buildInlineEditCard(edits, targetTab) {
