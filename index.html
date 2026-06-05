@@ -10905,6 +10905,7 @@ No markdown, no backticks, no explanation outside the array.`;
 
         // ── Typing indicator + live activity log ──
         let _statusTimer = null;
+        let _statusStart = 0;
 
         function _inlineShowTyping() {
             const box = document.getElementById('inline-chat-messages');
@@ -10926,13 +10927,45 @@ No markdown, no backticks, no explanation outside the array.`;
                         <div class="codx-loader-dot"></div>
                     </div>
                     <div class="codx-loader-info">
-                        <div class="codx-loader-title" id="codx-loader-title">Agent</div>
-                        <div class="codx-loader-status" id="inline-status-text">Thinking...</div>
+                        <div class="codx-loader-title" id="codx-loader-title">${window._inlineChatModeOn ? 'Chat Agent' : 'Edit Agent'}</div>
+                        <div class="codx-loader-status">
+                            <span id="inline-status-text">Thinking...</span>
+                            <span id="inline-status-timer" style="opacity:0.5;font-size:8.5px;margin-left:5px;font-family:monospace;">0.0s</span>
+                        </div>
                     </div>
                 </div>
             `;
             box.appendChild(wrap);
             _inlineChatScroll();
+
+            // Start timer
+            _statusStart = Date.now();
+            clearInterval(_statusTimer);
+
+            const statuses = window._inlineChatModeOn 
+                ? ["Thinking...", "Analyzing request...", "Processing query...", "Generating thoughts...", "Formulating response...", "Refining answer..."]
+                : ["Scanning codebase...", "Analyzing context...", "Engineering solutions...", "Drafting edits...", "Synthesizing code...", "Validating AST...", "Refining changes..."];
+
+            let lastStatusChange = Date.now();
+            let currentStatus = statuses[0];
+
+            const txtEl = document.getElementById('inline-status-text');
+            if (txtEl) txtEl.textContent = currentStatus;
+
+            _statusTimer = setInterval(() => {
+                const elapsed = ((Date.now() - _statusStart) / 1000).toFixed(1);
+                const timerEl = document.getElementById('inline-status-timer');
+                if (timerEl) timerEl.textContent = elapsed + 's';
+
+                // Change status randomly every 2 seconds
+                if (Date.now() - lastStatusChange > 2200) {
+                    const remaining = statuses.filter(s => s !== currentStatus);
+                    currentStatus = remaining[Math.floor(Math.random() * remaining.length)];
+                    const txtEl = document.getElementById('inline-status-text');
+                    if (txtEl) txtEl.textContent = currentStatus;
+                    lastStatusChange = Date.now();
+                }
+            }, 100);
         }
 
         // Push a timestamped line to dev console only (technical logs hidden from UI)
@@ -10942,9 +10975,7 @@ No markdown, no backticks, no explanation outside the array.`;
 
         function _inlineUpdateTypingStatus(titleText, statusText) {
             const titleEl = document.getElementById('codx-loader-title');
-            const statusEl = document.getElementById('inline-status-text');
             if (titleEl && titleText) titleEl.textContent = titleText;
-            if (statusEl && statusText) statusEl.textContent = statusText;
         }
 
         function _inlineHideTyping() {
