@@ -11813,10 +11813,13 @@ STRICT FORMAT RULES:
 
             // ── GenA Mode: route to autonomous agent loop ──
             if (_genAModeOn && !_genARunning) {
-                _inlineAppendMsg('user', userRequest);
-                if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
-                _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
-                _chSaveCurrentSession();
+                if (!window._inlineEditMode) {
+                    _inlineAppendMsg('user', userRequest);
+                    if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
+                    _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
+                    _chSaveCurrentSession();
+                }
+                window._inlineEditMode = false; // reset
                 requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
                 const sendBtn = document.getElementById('inline-chat-send-btn');
                 if (sendBtn) {
