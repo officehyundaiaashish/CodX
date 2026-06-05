@@ -10943,27 +10943,24 @@ No markdown, no backticks, no explanation outside the array.`;
             clearInterval(_statusTimer);
 
             const statuses = window._inlineChatModeOn 
-                ? ["Thinking...", "Analyzing request...", "Processing query...", "Generating thoughts...", "Formulating response...", "Refining answer..."]
-                : ["Scanning codebase...", "Analyzing context...", "Engineering solutions...", "Drafting edits...", "Synthesizing code...", "Validating AST...", "Refining changes..."];
+                ? ["Thinking...", "Analyzing request...", "Formulating response...", "Refining answer..."]
+                : ["Scanning codebase...", "Analyzing context...", "Engineering solutions...", "Drafting edits...", "Validating changes..."];
 
-            let lastStatusChange = Date.now();
-            let currentStatus = statuses[0];
-
+            let currentStatusIndex = 0;
             const txtEl = document.getElementById('inline-status-text');
-            if (txtEl) txtEl.textContent = currentStatus;
+            if (txtEl) txtEl.textContent = statuses[0];
 
             _statusTimer = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - _statusStart) / 1000);
                 const timerEl = document.getElementById('inline-status-timer');
                 if (timerEl) timerEl.textContent = elapsed + 's';
 
-                // Change status randomly every 6 seconds
-                if (Date.now() - lastStatusChange > 6000) {
-                    const remaining = statuses.filter(s => s !== currentStatus);
-                    currentStatus = remaining[Math.floor(Math.random() * remaining.length)];
+                // Progress to next status sequentially every 3 seconds (maxing out at last status)
+                const nextIndex = Math.min(Math.floor(elapsed / 3), statuses.length - 1);
+                if (nextIndex !== currentStatusIndex) {
+                    currentStatusIndex = nextIndex;
                     const txtEl = document.getElementById('inline-status-text');
-                    if (txtEl) txtEl.textContent = currentStatus;
-                    lastStatusChange = Date.now();
+                    if (txtEl) txtEl.textContent = statuses[currentStatusIndex];
                 }
             }, 500);
         }
@@ -10975,7 +10972,9 @@ No markdown, no backticks, no explanation outside the array.`;
 
         function _inlineUpdateTypingStatus(titleText, statusText) {
             const titleEl = document.getElementById('codx-loader-title');
+            const statusEl = document.getElementById('inline-status-text');
             if (titleEl && titleText) titleEl.textContent = titleText;
+            if (statusEl && statusText) statusEl.textContent = statusText;
         }
 
         function _inlineHideTyping() {
