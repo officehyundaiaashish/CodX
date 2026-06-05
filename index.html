@@ -11171,6 +11171,7 @@ STRICT FORMAT RULES:
         // ── Robust JSON parser — shared across all agent response handlers ──
         function _tryParseJSON(str) {
             if (!str) return null;
+            if (!str.includes('"type"')) return null;
 
             // Try using jsonrepair first if available
             if (typeof jsonrepair !== 'undefined') {
@@ -11186,8 +11187,6 @@ STRICT FORMAT RULES:
                     if (parsed && parsed.type) return parsed;
                 } catch (_) {}
             }
-
-            if (!str.includes('"type"')) return null;
 
             // Helper to escape raw newlines inside string literals in JSON
             function escapeRawNewlines(s) {
