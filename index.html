@@ -10324,7 +10324,9 @@ No markdown, no backticks, no explanation outside the array.`;
                         ? `<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)" data-old="${btoa(unescape(encodeURIComponent(prevCodePart.content.replace(/^\d+\| ?/gm, ''))))}" data-new="${b64}" data-b64="1" style="background:var(--accent);color:white;">
                         <span class="material-icons-round">auto_fix_high</span>Apply
                        </button>`
-                        : '';
+                        : `<button class="code-canvas-btn" onclick="_canvasInsertOrReplace(this)" data-new="${b64}" data-b64="1" style="background:var(--accent-dim);color:var(--accent);">
+                        <span class="material-icons-round">edit</span>Insert / Replace
+                       </button>`;
 
                     const labelStyle = isOld ? 'color:#f87171;' : isNew ? 'color:#4ade80;' : '';
 
@@ -10506,6 +10508,28 @@ No markdown, no backticks, no explanation outside the array.`;
                 retryBtn.innerHTML = '<span class="material-icons-round">replay</span>Retry AI';
                 retryBtn.onclick = () => _canvasRetryMatch(oldCode, newCode, retryBtn);
                 btn.parentNode.insertBefore(retryBtn, btn.nextSibling);
+            }
+        }
+
+        // ── Insert or Replace code block directly at selection or cursor ──
+        function _canvasInsertOrReplace(btn) {
+            let newCode = decodeURIComponent(escape(atob(btn.dataset.new || '')));
+            // Strip line numbers if present
+            newCode = newCode.replace(/^[ \t]*\d+\|[ \t]?/gm, '');
+
+            const selectedText = editor.getSelectedText();
+            if (selectedText) {
+                editor.replace(newCode);
+                showToast('Selection replaced in editor', 'check_circle');
+            } else {
+                editor.insert(newCode);
+                showToast('Inserted at cursor', 'check_circle');
+            }
+
+            // Sync editor code back to active tab
+            const curTab = fileTabs.find(t => t.id === activeTabId);
+            if (curTab) {
+                curTab.content = editor.getValue();
             }
         }
 
