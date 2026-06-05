@@ -10099,15 +10099,18 @@ No markdown, no backticks, no explanation outside the array.`;
                         // Agent message — _renderMsgHTML se render karo
                         // JSON type responses ko clean summary ke roop mein dikhao
                         let displayText = msg.text || '';
-                        // Agar pure JSON tha (edit/reorganize) to explanation dikhao
-                        if (displayText.trim().startsWith('{') && displayText.includes('"type"')) {
-                            try {
-                                const parsed = JSON.parse(displayText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim());
-                                if (parsed.explanation) displayText = '✅ ' + parsed.explanation;
-                                else if (parsed.type === 'edit') displayText = '✅ Code edit applied';
-                                else if (parsed.type === 'reorganize') displayText = '✅ File reorganized';
-                                else if (parsed.type === 'new_file') displayText = '✅ New file: ' + (parsed.filename || '');
-                            } catch (e) { }
+                        // Try to parse using our robust tryParseJSON first
+                        const parsed = _tryParseJSON(displayText);
+                        if (parsed) {
+                            if (parsed.explanation) displayText = '✅ ' + parsed.explanation;
+                            else if (parsed.type === 'edit') displayText = '✅ Code edit applied';
+                            else if (parsed.type === 'reorganize') displayText = '✅ File reorganized';
+                            else if (parsed.type === 'new_file') displayText = '✅ New file: ' + (parsed.filename || '');
+                        } else if (displayText.trim().startsWith('{') || displayText.trim().startsWith('[')) {
+                            // Wrap raw JSON blocks in code fences to prevent markdown regex performance hangs
+                            if (!displayText.includes('```')) {
+                                displayText = '```json\n' + displayText + '\n```';
+                            }
                         }
                         _inlineAppendMsg('agent', displayText, null);
                     }
