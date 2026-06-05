@@ -17,6 +17,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-searchbox.min.js"></script>
+    <script src="https://unpkg.com/jsonrepair/lib/umd/jsonrepair.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -8509,8 +8510,7 @@ Rules:
                     continue;
                 }
 
-                // Show Model Thinking status explicitly
-                showTyping('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/></svg> [Model Thinking] Formulating edit step ' + (i + 1) + ' of ' + planItems.length + ' to fix ' + fixLabel);
+                showTyping('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Fix ' + (i + 1) + ' of ' + planItems.length + ' — rewriting ' + (p.location || 'block') + '...');
 
                 // Give AI FULL context — it must know everything about this fix
                 const execPrompt =
@@ -8544,17 +8544,6 @@ Rules:
                         continue;
                     }
 
-                    // ── Auto Testing/Verification Step before displaying ──
-                    showTyping('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Running syntax & integrity tests on proposed change...');
-                    let testResult = 'PASS';
-                    try {
-                        // Create test sandbox execution checks (syntax validity check)
-                        new Function('const testBlock = () => { ' + newBlock + ' };');
-                    } catch (syntaxErr) {
-                        testResult = 'WARNING: Proposed JavaScript contains potential syntax errors: ' + syntaxErr.message;
-                    }
-                    hideTyping();
-
                     // Show old vs new — user applies or skips
                     await new Promise(resolve => {
                         const uid = 'fix' + i + '_' + Date.now();
@@ -8569,7 +8558,6 @@ Rules:
                             '<div class="agent-step-body">' +
                             '<div style="font-size:11px;font-weight:700;margin-bottom:8px;">' + fixLabel + '</div>' +
                             '<div style="font-size:10px;opacity:0.6;margin-bottom:8px;">→ ' + (p.what_to_do || '') + '</div>' +
-                            `<div style="font-size:10px;font-weight:700;color:${testResult === 'PASS' ? '#10b981' : '#f59e0b'};margin-bottom:8px;display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:13px;">science</span>Test Status: ${testResult}</div>` +
                             '<div class="chat-fix-preview">' +
                             '<div class="chat-fix-side remove"><div class="chat-fix-side-label">OLD</div><div class="chat-fix-code">' + esc(oldBlock) + (oldBlock.length > 180 ? '...' : '') + '</div></div>' +
                             '<div class="chat-fix-side insert"><div class="chat-fix-side-label">NEW</div><div class="chat-fix-code">' + esc(newBlock) + (newBlock.length > 180 ? '...' : '') + '</div></div>' +
@@ -11099,20 +11087,11 @@ No markdown, no backticks, no explanation outside the array.`;
         //  NEW AGENT WORKFLOW — Single API call, AI decides
         //  No regex intent detection — AI handles everything
 
-        // ── Global edit store: keyed by unique card ID — avoids serialising JSON into onclick ──
-        const _inlineEditStore = new Map();
-        let _inlineEditStoreCounter = 0;
-
         const _AGENT_SYSTEM_PROMPT = `You are CodX Assistant, an expert AI coding assistant built into the CodX editor. If the user asks your name, you are "CodX Assistant".
 You receive code with LINE NUMBERS like "42| code here".
 Full chat history is included every call — use it to understand context of what has been done before.
 
 YOUR JOB: Fulfil exactly what the user asks. Nothing more, nothing less. The user's request is the source of truth.
-
-GOAL-DRIVEN AGENTIC DIRECTIVE:
-1. Break down the user's request into step-by-step tasks.
-2. If the user request is multi-step, plan them step-by-step. Implement the first part, then use the "next_step_prompt" parameter to continue automatically in the next turn until the complete user goal is fully achieved.
-3. Explicitly verify syntax, styles, and logic constraints during your thought planning.
 
 QUALITY STANDARD:
 - Every UI you build must be modern, well-designed, and polished — clean layouts, smooth animations, good typography
@@ -11152,6 +11131,22 @@ STRICT FORMAT RULES:
         // ── Robust JSON parser — shared across all agent response handlers ──
         function _tryParseJSON(str) {
             if (!str) return null;
+
+            // Try using jsonrepair first if available
+            if (typeof jsonrepair !== 'undefined') {
+                try {
+                    let candidate = str;
+                    const firstBrace = str.indexOf('{');
+                    const lastBrace = str.lastIndexOf('}');
+                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                        candidate = str.slice(firstBrace, lastBrace + 1);
+                    }
+                    const repaired = jsonrepair(candidate);
+                    const parsed = JSON.parse(repaired);
+                    if (parsed && parsed.type) return parsed;
+                } catch (_) {}
+            }
+
             if (!str.includes('"type"')) return null;
 
             // Helper to escape raw newlines inside string literals in JSON
@@ -11186,8 +11181,53 @@ STRICT FORMAT RULES:
                 return res;
             }
 
-            // Strategy 1: strip markdown fences and parse
+            // Helper to strip JS/JSON comments (// or /* ... */) safely, avoiding strings
+            function stripComments(s) {
+                let res = '';
+                let inStr = false;
+                let strChar = null;
+                for (let i = 0; i < s.length; i++) {
+                    const c = s[i];
+                    if (inStr) {
+                        if (c === '\\') {
+                            res += c;
+                            if (i + 1 < s.length) { res += s[i + 1]; i++; }
+                        } else if (c === strChar) {
+                            inStr = false;
+                            res += c;
+                        } else {
+                            res += c;
+                        }
+                    } else {
+                        if (c === '"' || c === "'" || c === '`') {
+                            inStr = true;
+                            strChar = c;
+                            res += c;
+                        } else if (c === '/' && s[i + 1] === '/') {
+                            // Skip until newline
+                            while (i < s.length && s[i] !== '\n') {
+                                i++;
+                            }
+                            if (i < s.length) res += s[i];
+                        } else if (c === '/' && s[i + 1] === '*') {
+                            // Skip until */
+                            i += 2;
+                            while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) {
+                                if (s[i] === '\n') res += '\n';
+                                i++;
+                            }
+                            i++; // skip /
+                        } else {
+                            res += c;
+                        }
+                    }
+                }
+                return res;
+            }
+
+            // Strategy 1: strip markdown fences, comments and parse
             let clean = str.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+            clean = stripComments(clean);
             try {
                 const parsed = JSON.parse(clean);
                 if (parsed && parsed.type) return parsed;
@@ -11198,22 +11238,7 @@ STRICT FORMAT RULES:
             } catch (_) {}
 
             // Strategy 2: extract outermost block using string-aware brace matching
-            // Locate the first '{' that represents the JSON payload
-            let start = -1;
-            let currentSearchPos = 0;
-            while (true) {
-                const idx = str.indexOf('{', currentSearchPos);
-                if (idx === -1) break;
-                // If it is followed by structural JSON keys, prioritize it
-                const nextChunk = str.slice(idx, idx + 100);
-                if (nextChunk.includes('"type"') || nextChunk.includes('"explanation"') || nextChunk.includes('"edits"')) {
-                    start = idx;
-                    break;
-                }
-                currentSearchPos = idx + 1;
-            }
-            if (start === -1) start = str.indexOf('{');
-
+            const start = str.indexOf('{');
             if (start !== -1) {
                 let depth = 0;
                 let end = -1;
@@ -11245,7 +11270,8 @@ STRICT FORMAT RULES:
                 }
 
                 if (end !== -1) {
-                    const sliced = str.slice(start, end + 1);
+                    let sliced = str.slice(start, end + 1);
+                    sliced = stripComments(sliced);
                     try {
                         const parsed = JSON.parse(sliced);
                         if (parsed && parsed.type) return parsed;
@@ -11270,141 +11296,130 @@ STRICT FORMAT RULES:
             }
 
             // Fallback parsing for corrupted JSON (e.g. unescaped quotes or formatting issues in edits)
-            if (str.includes('"type"') && (str.includes('edit') || str.includes('new_file') || str.includes('reorganize') || str.includes('split'))) {
-                // Determine type
-                let type = 'edit';
-                if (str.includes('"new_file"') || str.includes('new_file')) type = 'new_file';
-                else if (str.includes('"reorganize"') || str.includes('reorganize')) type = 'reorganize';
-                else if (str.includes('"split"') || str.includes('split')) type = 'split';
-
-                // Helper to extract a field's string value (handles unescaped quotes and truncation)
-                function extractStringValue(objStr, key) {
-                    const keyRegex = new RegExp('["\']?' + key + '["\']?\\s*:');
-                    const keyIdx = objStr.search(keyRegex);
-                    if (keyIdx === -1) return null;
-                    const colonIdx = objStr.indexOf(':', keyIdx);
-                    if (colonIdx === -1) return null;
+            if (str.includes('"type"') && (str.includes('"edit"') || str.includes('edit'))) {
+                const edits = [];
+                let pos = 0;
+                while (true) {
+                    const startIdx = str.indexOf('"line_start"', pos);
+                    if (startIdx === -1) break;
                     
-                    let quoteChar = null;
-                    let startPos = -1;
-                    for (let i = colonIdx + 1; i < objStr.length; i++) {
-                        const c = objStr[i];
-                        if (c === '"' || c === "'" || c === '`') {
-                            quoteChar = c;
-                            startPos = i;
-                            break;
-                        }
-                    }
-                    if (startPos === -1) return null;
+                    const lineStartMatch = str.slice(startIdx, startIdx + 100).match(/"line_start"\s*:\s*(\d+)/);
+                    if (!lineStartMatch) { pos = startIdx + 12; continue; }
+                    const line_start = parseInt(lineStartMatch[1]);
                     
-                    let val = '';
-                    for (let i = startPos + 1; i < objStr.length; i++) {
-                        const c = objStr[i];
+                    const lineEndMatch = str.slice(startIdx, startIdx + 150).match(/"line_end"\s*:\s*(\d+)/);
+                    const line_end = lineEndMatch ? parseInt(lineEndMatch[1]) : line_start;
+                    
+                    const replaceKeyIdx = str.indexOf('"replace"', startIdx);
+                    if (replaceKeyIdx === -1) { pos = startIdx + 12; continue; }
+                    
+                    const colonIdx = str.indexOf(':', replaceKeyIdx);
+                    if (colonIdx === -1) { pos = startIdx + 12; continue; }
+                    
+                    const openQuoteIdx = str.indexOf('"', colonIdx);
+                    if (openQuoteIdx === -1) { pos = startIdx + 12; continue; }
+                    
+                    let content = '';
+                    let endQuoteIdx = -1;
+                    for (let i = openQuoteIdx + 1; i < str.length; i++) {
+                        const c = str[i];
                         if (c === '\\') {
-                            if (i + 1 < objStr.length) {
-                                const next = objStr[i + 1];
-                                if (next === 'n') val += '\n';
-                                else if (next === 't') val += '\t';
-                                else if (next === 'r') val += '\r';
-                                else val += next;
-                                i++;
+                            if (i + 1 < str.length) {
+                                const next = str[i + 1];
+                                if (next === '"') { content += '"'; i++; }
+                                else if (next === 'n') { content += '\n'; i++; }
+                                else if (next === 't') { content += '\t'; i++; }
+                                else if (next === '\\') { content += '\\'; i++; }
+                                else { content += '\\' + next; i++; }
                             } else {
-                                val += '\\';
+                                content += '\\';
                             }
-                        } else if (c === quoteChar) {
+                        } else if (c === '"') {
                             let nextNonWs = '';
                             let j = i + 1;
-                            while (j < objStr.length && /\s/.test(objStr[j])) { j++; }
-                            if (j < objStr.length) nextNonWs = objStr[j];
-                            if (nextNonWs === ',' || nextNonWs === '}' || nextNonWs === ']' || nextNonWs === '') {
-                                return val;
+                            while (j < str.length && /\s/.test(str[j])) { j++; }
+                            if (j < str.length) nextNonWs = str[j];
+                            if (nextNonWs === ',' || nextNonWs === '}' || nextNonWs === ']') {
+                                endQuoteIdx = i;
+                                break;
                             } else {
-                                val += c;
+                                content += '"';
                             }
                         } else {
-                            val += c;
+                            content += c;
                         }
                     }
-                    return val;
+                    
+                    if (endQuoteIdx !== -1) {
+                        edits.push({ line_start, line_end, replace: content });
+                        pos = endQuoteIdx + 1;
+                    } else {
+                        pos = startIdx + 12;
+                    }
                 }
+                
+                if (edits.length > 0) {
+                    let explanation = '';
+                    const expMatch = str.match(/"explanation"\s*:\s*"([^"]+)"/);
+                    if (expMatch) explanation = expMatch[1];
+                    return { type: 'edit', explanation, edits };
+                }
+            }
 
-                // If it is edit:
-                if (type === 'edit') {
-                    const edits = [];
-                    // Find all blocks matching line_start / find
-                    let pos = 0;
-                    while (true) {
-                        const nextStart = str.slice(pos).search(/["']?(?:line_start|find)["']?/);
-                        if (nextStart === -1) break;
-                        const absoluteStart = pos + nextStart;
-                        
-                        // Find opening brace '{' backwards from absoluteStart
-                        let braceStart = -1;
-                        for (let i = absoluteStart; i >= 0; i--) {
-                            if (str[i] === '{') { braceStart = i; break; }
-                        }
-                        if (braceStart === -1) { pos = absoluteStart + 10; continue; }
-                        
-                        // Find closing brace '}' using brace matching
-                        let depth = 0;
-                        let braceEnd = -1;
-                        let inStr = false;
-                        let strChar = null;
-                        for (let i = braceStart; i < str.length; i++) {
-                            const c = str[i];
-                            if (inStr) {
-                                if (c === '\\') i++;
-                                else if (c === strChar) inStr = false;
-                            } else {
-                                if (c === '"' || c === "'" || c === '`') { inStr = true; strChar = c; }
-                                else if (c === '{') depth++;
-                                else if (c === '}') {
-                                    depth--;
-                                    if (depth === 0) { braceEnd = i; break; }
+            // Fallback parsing for new_file and reorganize
+            if (str.includes('"type"') && (str.includes('"new_file"') || str.includes('"reorganize"'))) {
+                const type = str.includes('"new_file"') ? 'new_file' : 'reorganize';
+                
+                let filename = '';
+                if (type === 'new_file') {
+                    const fnMatch = str.match(/"filename"\s*:\s*"([^"]+)"/);
+                    if (fnMatch) filename = fnMatch[1];
+                }
+                
+                const contentKeyIdx = str.indexOf('"content"');
+                if (contentKeyIdx !== -1) {
+                    const colonIdx = str.indexOf(':', contentKeyIdx);
+                    if (colonIdx !== -1) {
+                        const openQuoteIdx = str.indexOf('"', colonIdx);
+                        if (openQuoteIdx !== -1) {
+                            let content = '';
+                            let endQuoteIdx = -1;
+                            for (let i = openQuoteIdx + 1; i < str.length; i++) {
+                                const c = str[i];
+                                if (c === '\\') {
+                                    if (i + 1 < str.length) {
+                                        const next = str[i + 1];
+                                        if (next === '"') { content += '"'; i++; }
+                                        else if (next === 'n') { content += '\n'; i++; }
+                                        else if (next === 't') { content += '\t'; i++; }
+                                        else if (next === '\\') { content += '\\'; i++; }
+                                        else { content += '\\' + next; i++; }
+                                    } else {
+                                        content += '\\';
+                                    }
+                                } else if (c === '"') {
+                                    let nextNonWs = '';
+                                    let j = i + 1;
+                                    while (j < str.length && /\s/.test(str[j])) { j++; }
+                                    if (j < str.length) nextNonWs = str[j];
+                                    if (nextNonWs === ',' || nextNonWs === '}') {
+                                        endQuoteIdx = i;
+                                        break;
+                                    } else {
+                                        content += '"';
+                                    }
+                                } else {
+                                    content += c;
                                 }
                             }
+                            if (endQuoteIdx !== -1) {
+                                return { type, filename, content };
+                            }
                         }
-                        
-                        // If matching brace not found (truncated), go to end of string
-                        const objStr = str.slice(braceStart, braceEnd !== -1 ? braceEnd + 1 : str.length);
-                        
-                        const lineStartMatch = objStr.match(/["']?line_start["']?\s*:\s*(\d+)/i);
-                        const lineEndMatch = objStr.match(/["']?line_end["']?\s*:\s*(\d+)/i);
-                        const line_start = lineStartMatch ? parseInt(lineStartMatch[1]) : null;
-                        const line_end = lineEndMatch ? parseInt(lineEndMatch[1]) : line_start;
-                        
-                        const find = extractStringValue(objStr, 'find');
-                        const replace = extractStringValue(objStr, 'replace') || '';
-                        
-                        if (line_start !== null || find !== null) {
-                            edits.push({ line_start, line_end, find, replace });
-                        }
-                        
-                        pos = braceEnd !== -1 ? braceEnd + 1 : str.length;
-                        if (braceEnd === -1) break;
-                    }
-                    
-                    if (edits.length > 0) {
-                        let explanation = '';
-                        const expMatch = str.match(/"explanation"\s*:\s*"([^"]+)"/i);
-                        if (expMatch) explanation = expMatch[1];
-                        return { type: 'edit', explanation, edits };
-                    }
-                }
-
-                // If it is new_file or reorganize:
-                if (type === 'new_file' || type === 'reorganize') {
-                    let filename = '';
-                    const fnMatch = str.match(/"filename"\s*:\s*"([^"]+)"/i);
-                    if (fnMatch) filename = fnMatch[1];
-                    
-                    // Match the content block brace/string
-                    const content = extractStringValue(str, 'content');
-                    if (content !== null) {
-                        return { type, filename, content };
                     }
                 }
             }
+
             return null;
         }
 
@@ -11577,7 +11592,7 @@ Rules:
    - Line numbers go in the chat text ONLY, never inside the code blocks.
    - The app will show an Apply button on the NEW block to auto-replace.
 5. Keep responses clear, helpful, and to the point. Match the user's language (English or Hindi/Hinglish).`
-                    : `STRICT REQUIREMENT: You are in EDIT MODE. You MUST output ONLY valid JSON matching one of the schemas (edit, new_file, split, reorganize). Conversational descriptions and explanation text outside the JSON payload is strictly forbidden. Always prioritize outputting JSON directly.\n\n` + _AGENT_SYSTEM_PROMPT + _modeCtx;
+                    : _AGENT_SYSTEM_PROMPT + _modeCtx;
                 const raw = await _callAgentAPI(activeSystemPrompt, userMsg, historyForAPI, _inlineAbortCtrl);
                 _inlineLogActivity('Response: ' + (raw.length / 1024).toFixed(1) + 'k received');
                 _inlineHideTyping();
@@ -11984,24 +11999,17 @@ Rules:
             // Bind Apply Button click
             applyBtn.onclick = () => {
                 closeDiffReviewModal();
-                // Find matching card via _inlineEditStore and trigger its apply
-                let applied = false;
+                // Find card apply button and click it to perform the actual apply
                 const activeCards = document.querySelectorAll('.inline-edit-card-active');
                 activeCards.forEach(c => {
-                    const btn = c.querySelector('.card-apply-btn[data-store-key]');
-                    if (btn && !applied) {
-                        const key = btn.dataset.storeKey;
-                        const stored = key && _inlineEditStore.get(key);
-                        if (stored && JSON.stringify(stored.edits) === JSON.stringify(edits)) {
-                            btn.click(); // triggers the wired event handler which also cleans up the store
-                            applied = true;
+                    const btn = c.querySelector('.card-apply-btn');
+                    if (btn && btn.dataset.editsJson) {
+                        const cardEdits = JSON.parse(btn.dataset.editsJson);
+                        if (JSON.stringify(cardEdits) === JSON.stringify(edits)) {
+                            _applyInlineEdits(btn, cardEdits, snapTab ? snapTab.id : null);
                         }
                     }
                 });
-                // Fallback: apply directly if no matching card (e.g. called from agent-bar flow)
-                if (!applied) {
-                    _applyInlineEdits(applyBtn, edits, snapTab ? snapTab.id : null);
-                }
             };
 
             overlay.style.display = 'block';
@@ -12263,10 +12271,6 @@ Rules:
             // ── Show live diff highlights in the editor immediately ──
             _showEditorDiffMarkers(edits, targetTab);
 
-            // Store edits safely in a Map — avoids JSON-in-onclick breakage with SVG/HTML content
-            const storeKey = 'iec_' + (++_inlineEditStoreCounter);
-            _inlineEditStore.set(storeKey, { edits, targetTab });
-
             // Build diff preview for each edit
             const currentCode = (targetTab ? targetTab.content : editor.getValue()).split('\n');
             let diffHTML = '';
@@ -12294,7 +12298,8 @@ Rules:
                 }
             });
 
-            const tabId = targetTab ? targetTab.id : null;
+            const editsJson = JSON.stringify(edits).replace(/"/g, '&quot;');
+            const tabId = targetTab ? targetTab.id : 'null';
 
             card.innerHTML = `
             <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
@@ -12307,37 +12312,16 @@ Rules:
             </div>
             <div style="max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
             <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button class="card-apply-btn" data-store-key="${storeKey}" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button class="card-apply-btn" data-edits-json="${editsJson}" onclick="_clearEditorDiffMarkers();_applyInlineEdits(this, ${editsJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply
                 </button>
-                <button class="card-review-btn" data-store-key="${storeKey}" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button onclick="_clearEditorDiffMarkers();openDiffReviewModal(${editsJson}, fileTabs.find(t => t.id === ${tabId}))" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">open_in_new</span>Review in Window
                 </button>
-                <button class="card-cancel-btn" style="padding:8px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;">
+                <button onclick="_clearEditorDiffMarkers();this.closest('div').parentElement.remove()" style="padding:8px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;">
                     Cancel
                 </button>
             </div>`;
-
-            // ── Wire event handlers safely via JS (no inline onclick with raw JSON) ──
-            card.querySelector('.card-apply-btn').addEventListener('click', function() {
-                const stored = _inlineEditStore.get(storeKey);
-                if (!stored) return;
-                _clearEditorDiffMarkers();
-                _applyInlineEdits(this, stored.edits, stored.targetTab ? stored.targetTab.id : null);
-                _inlineEditStore.delete(storeKey);
-            });
-            card.querySelector('.card-review-btn').addEventListener('click', function() {
-                const stored = _inlineEditStore.get(storeKey);
-                if (!stored) return;
-                _clearEditorDiffMarkers();
-                openDiffReviewModal(stored.edits, stored.targetTab || fileTabs.find(t => t.id === tabId));
-            });
-            card.querySelector('.card-cancel-btn').addEventListener('click', function() {
-                _clearEditorDiffMarkers();
-                _inlineEditStore.delete(storeKey);
-                this.closest('.inline-edit-card-active').remove();
-            });
-
             return card;
         }
 
@@ -12373,17 +12357,10 @@ Rules:
                         failReasons.push(`Line ${edit.line_start} is out of range (file has ${lines.length} lines)`);
                         return;
                     }
-                    
-                    // Capture leading indentation of the first line in target block to preserve alignment
-                    const targetIndent = (lines[s].match(/^([ \t]*)/) || ['', ''])[1];
-                    const newLines = (edit.replace || '').split('\n').map((l, idx) => {
-                        const cleanLine = l.replace(/\t/g, '  ').replace(/\s+$/, '');
-                        // If it's not the first line and doesn't start with indentation, align it to target block indent
-                        if (idx > 0 && !cleanLine.startsWith(' ') && !cleanLine.startsWith('\t') && cleanLine.trim().length > 0) {
-                            return targetIndent + cleanLine;
-                        }
-                        return cleanLine;
-                    });
+                    const newLines = (edit.replace || '').split('\n').map(l =>
+                        l.replace(/\t/g, '  ')      // all tabs → 2 spaces
+                            .replace(/\s+$/, '')        // trailing whitespace per line
+                    );
                     lines.splice(s, e - s + 1, ...newLines);
                     applied++;
 
@@ -12428,22 +12405,16 @@ Rules:
                 return;
             }
 
+            // Save undo snapshot ONLY if at least something applied
+            _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
+            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
+
             // Clean up: collapse 3+ blank lines → max 2, remove trailing whitespace per line
             const cleaned = lines
                 .map(l => l.replace(/\s+$/, ''))
                 .join('\n')
                 .replace(/\n{3,}/g, '\n\n')
                 .trimEnd();
-
-            // ── Guard: Abort if edit result is empty/blank to prevent UI blanking ──
-            if (!cleaned.trim()) {
-                _showApplyError(btn, 'Apply Aborted: The proposed changes would result in a blank file. Reverting operation.');
-                return;
-            }
-
-            // Save undo snapshot ONLY if at least something applied
-            _agentUndoStack.push({ type: 'edit_content', tab: snapTab, content: original });
-            if (_agentUndoStack.length > 5) _agentUndoStack.shift();
 
             // ── Write back to the correct tab ──
             if (snapTab) snapTab.content = cleaned;
