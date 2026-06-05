@@ -6644,6 +6644,15 @@
                 const icon = document.getElementById('nav-toggle-icon');
                 if (icon) icon.style.transform = 'rotate(180deg)';
             }
+
+            // Auto-scroll chat panel to bottom when content changes or is appended
+            const chatMessagesBox = document.getElementById('inline-chat-messages');
+            if (chatMessagesBox) {
+                const observer = new MutationObserver(() => {
+                    chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
+                });
+                observer.observe(chatMessagesBox, { childList: true, subtree: true, characterData: true });
+            }
         });
 
         // ── NAV TOGGLE: full ↔ mini (single cursor row) ──
@@ -10428,10 +10437,11 @@ No markdown, no backticks, no explanation outside the array.`;
                         // Try to parse using our robust tryParseJSON first
                         const parsed = _tryParseJSON(displayText);
                         if (parsed) {
-                            if (parsed.explanation) displayText = '✅ ' + parsed.explanation;
-                            else if (parsed.type === 'edit') displayText = '✅ Code edit applied';
-                            else if (parsed.type === 'reorganize') displayText = '✅ File reorganized';
-                            else if (parsed.type === 'new_file') displayText = '✅ New file: ' + (parsed.filename || '');
+                            const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>`;
+                            if (parsed.explanation) displayText = checkSvg + parsed.explanation;
+                            else if (parsed.type === 'edit') displayText = checkSvg + 'Code edit applied';
+                            else if (parsed.type === 'reorganize') displayText = checkSvg + 'File reorganized';
+                            else if (parsed.type === 'new_file') displayText = checkSvg + 'New file: ' + (parsed.filename || '');
                         } else if (displayText.trim().startsWith('{') || displayText.trim().startsWith('[')) {
                             // Wrap raw JSON blocks in code fences to prevent markdown regex performance hangs
                             if (!displayText.includes('```')) {
@@ -10624,12 +10634,7 @@ No markdown, no backticks, no explanation outside the array.`;
         function _inlineChatScroll() {
             const box = document.getElementById('inline-chat-messages');
             if (!box) return;
-            // Double rAF ensures DOM layout is complete before scrolling
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
-                });
-            });
+            box.scrollTop = box.scrollHeight;
         }
 
         // ── Append message bubble ──
@@ -11809,6 +11814,9 @@ STRICT FORMAT RULES:
             // ── GenA Mode: route to autonomous agent loop ──
             if (_genAModeOn && !_genARunning) {
                 _inlineAppendMsg('user', userRequest);
+                if (_chatSessionName === 'New Chat') _chatSessionName = _autoChatName(userRequest);
+                _chatHistory.push({ role: 'user', text: userRequest, time: _chatTime() });
+                _chSaveCurrentSession();
                 requestAnimationFrame(() => { ta.value = ''; ta.style.height = 'auto'; });
                 const sendBtn = document.getElementById('inline-chat-send-btn');
                 if (sendBtn) {
@@ -11831,7 +11839,8 @@ STRICT FORMAT RULES:
                     return;
                 }
                 _agentUndoLast(null);
-                _inlineAppendMsg('agent', '↩️ Undone the last agent edit successfully.');
+                const undoSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><polyline points="1 4 1 10 7 10"></polyline><path d="M16.68 10A9 9 0 0 0 2 12"></path></svg>`;
+                _inlineAppendMsg('agent', undoSvg + 'Undone the last agent edit successfully.');
                 return;
             }
 
@@ -12983,6 +12992,12 @@ Use only line numbers visible in the context. Be precise.`;
                 // Undo new_file = close that tab
                 const tabToClose = fileTabs.find(t => t.name === prev.filename);
                 if (tabToClose) closeFileTab(tabToClose.id);
+            } else if (prev && prev.tabId !== undefined && prev.before !== undefined) {
+                // Undo GenA edit
+                const t = fileTabs.find(tab => tab.id === prev.tabId);
+                if (t) t.content = prev.before;
+                if (!t || t.id === activeTabId) editor.setValue(prev.before, -1);
+                else { switchFileTab(t.id); editor.setValue(prev.before, -1); }
             }
             if (btn) {
                 const remaining = _agentUndoStack.length;
@@ -13633,6 +13648,43 @@ Use only line numbers visible in the context. Be precise.`;
             }
         }
 
+        // Helper to fetch external websites in the browser using a free CORS proxy fallback
+        async function _genaFetchProxy(url) {
+            try {
+                const response = await fetch(url);
+                if (response.ok) return await response.text();
+            } catch (e) {
+                // Ignore and fallback
+            }
+            try {
+                const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url);
+                const res = await fetch(proxyUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.contents || '';
+                }
+            } catch (e) {
+                console.error('[GenA Proxy Fetch Error]', e);
+            }
+            return '';
+        }
+
+        const _genaToolIcons = {
+            read_code: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
+            read_all_files: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`,
+            apply_edit: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`,
+            create_file: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>`,
+            append_memory: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+            read_memory: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+            web_search: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+            fetch_webpage: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`,
+            npm_info: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
+            run_js: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`,
+            search_code: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>`,
+            ask_user: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+            done: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+        };
+
         // ── GenA System Prompt ──
         const _GENA_SYSTEM_PROMPT = `You are GenA, a fully autonomous coding agent inside the CodX editor. You execute tasks step-by-step by calling exactly ONE tool per response.
 
@@ -13643,6 +13695,11 @@ TOOLS AVAILABLE:
 - create_file: Create a new file (args: name, content)
 - append_memory: Save a note for future reference (args: note)
 - read_memory: Read all previously saved notes
+- web_search: Search the web via DuckDuckGo (args: query)
+- fetch_webpage: Read clean text content of a public URL (args: url)
+- npm_info: Get package info (version, dependencies) from npm registry (args: package)
+- run_js: Execute arbitrary sandboxed Javascript code and capture logs/return value (args: code)
+- search_code: Search for a query/pattern across all open tabs/files (args: query)
 - ask_user: Ask the user a clarifying question (args: question) — pauses the loop
 - done: Signal task complete (args: summary — brief final summary for user)
 
@@ -13678,7 +13735,8 @@ RULES:
                     if (!lineStart || !lineEnd || newContent === undefined) return '[apply_edit error: missing args]';
                     const tab = fileTabs && fileTabs.find(t => t.id === activeTabId);
                     if (!tab) return '[No active file to edit]';
-                    const lines = (tab.content || '').split('\n');
+                    const beforeContent = tab.content || '';
+                    const lines = beforeContent.split('\n');
                     const s = Math.max(0, parseInt(lineStart) - 1);
                     const e = Math.min(lines.length, parseInt(lineEnd));
                     lines.splice(s, e - s, ...newContent.split('\n'));
@@ -13690,7 +13748,7 @@ RULES:
                     }
                     // Push to undo stack
                     if (typeof _agentUndoStack !== 'undefined') {
-                        _agentUndoStack.push({ tabId: tab.id, before: tab.content });
+                        _agentUndoStack.push({ tabId: tab.id, before: beforeContent });
                     }
                     return `[Applied edit: lines ${lineStart}–${lineEnd} in ${tab.name} replaced successfully]`;
                 }
@@ -13716,6 +13774,95 @@ RULES:
                 case 'read_memory': {
                     if (_genAMemory.length === 0) return '[No memories saved yet]';
                     return _genAMemory.map((m, i) => `${i+1}. [${m.ts}] ${m.note}`).join('\n');
+                }
+
+                case 'web_search': {
+                    const query = args && args.query;
+                    if (!query) return '[web_search error: missing query]';
+                    try {
+                        const html = await _genaFetchProxy(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`);
+                        if (!html) return '[Search failed: No data returned]';
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const results = [];
+                        doc.querySelectorAll('.result').forEach(el => {
+                            const titleEl = el.querySelector('.result__a');
+                            const snippetEl = el.querySelector('.result__snippet');
+                            if (titleEl && snippetEl) {
+                                results.push({
+                                    title: titleEl.textContent.trim(),
+                                    url: titleEl.getAttribute('href'),
+                                    snippet: snippetEl.textContent.trim()
+                                });
+                            }
+                        });
+                        if (results.length === 0) return '[No search results found]';
+                        return results.slice(0, 5).map(r => `Title: ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet}`).join('\n---\n');
+                    } catch (e) {
+                        return `[Search failed: ${e.message}]`;
+                    }
+                }
+
+                case 'fetch_webpage': {
+                    const url = args && args.url;
+                    if (!url) return '[fetch_webpage error: missing url]';
+                    try {
+                        const html = await _genaFetchProxy(url);
+                        if (!html) return '[Fetch failed: Empty content]';
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        doc.querySelectorAll('script, style, iframe, nav, footer, header').forEach(el => el.remove());
+                        const text = doc.body ? doc.body.textContent : doc.documentElement.textContent;
+                        const cleanText = text.replace(/\s+/g, ' ').trim();
+                        return cleanText.slice(0, 8000);
+                    } catch (e) {
+                        return `[Fetch failed: ${e.message}]`;
+                    }
+                }
+
+                case 'npm_info': {
+                    const pkg = args && args.package;
+                    if (!pkg) return '[npm_info error: missing package]';
+                    try {
+                        const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(pkg)}/latest`);
+                        if (!res.ok) return `[Package not found or registry error for "${pkg}"]`;
+                        const data = await res.json();
+                        return `Package: ${data.name}\nVersion: ${data.version}\nDescription: ${data.description}\nDependencies: ${JSON.stringify(data.dependencies || {})}\nDevDependencies: ${JSON.stringify(data.devDependencies || {})}`;
+                    } catch (e) {
+                        return `[NPM registry lookup failed: ${e.message}]`;
+                    }
+                }
+
+                case 'run_js': {
+                    const code = args && args.code;
+                    if (!code) return '[run_js error: missing code]';
+                    let consoleLogs = [];
+                    const customConsole = {
+                        log: (...m) => consoleLogs.push(m.map(o => typeof o === 'object' ? JSON.stringify(o) : o).join(' ')),
+                        error: (...m) => consoleLogs.push('ERROR: ' + m.join(' ')),
+                        warn: (...m) => consoleLogs.push('WARN: ' + m.join(' '))
+                    };
+                    try {
+                        const fn = new Function('console', `try { ${code} } catch(e) { console.error(e.message); }`);
+                        const result = fn(customConsole);
+                        return `Console output:\n${consoleLogs.join('\n')}\nReturned: ${result}`;
+                    } catch(e) {
+                        return `Error compiling/running code: ${e.message}`;
+                    }
+                }
+
+                case 'search_code': {
+                    const query = args && args.query;
+                    if (!query) return '[search_code error: missing query]';
+                    if (!fileTabs || fileTabs.length === 0) return '[No open files]';
+                    const matches = [];
+                    fileTabs.forEach(t => {
+                        const lines = (t.content || '').split('\n');
+                        lines.forEach((l, i) => {
+                            if (l.toLowerCase().includes(query.toLowerCase())) {
+                                matches.push(`• ${t.name} (Line ${i+1}): ${l.trim()}`);
+                            }
+                        });
+                    });
+                    return matches.length > 0 ? matches.slice(0, 50).join('\n') : '[No matches found]';
                 }
 
                 case 'ask_user': {
@@ -13778,7 +13925,7 @@ RULES:
                 row.className = 'gena-step-row active';
                 const id = 'gena-step-' + Date.now();
                 row.id = id;
-                row.innerHTML = `<span class="gena-step-icon spinning">⚡</span><span class="gena-step-text">${label}</span>`;
+                row.innerHTML = `<span class="gena-step-icon spinning"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span><span class="gena-step-text">${label}</span>`;
                 stepsList.appendChild(row);
                 _inlineChatScroll();
                 return id;
@@ -13790,7 +13937,12 @@ RULES:
                 row.classList.remove('active');
                 row.classList.add(status); // 'done' or 'error'
                 const icon = row.querySelector('.gena-step-icon');
-                if (icon) { icon.classList.remove('spinning'); icon.textContent = status === 'done' ? '✅' : '❌'; }
+                if (icon) {
+                    icon.classList.remove('spinning');
+                    icon.innerHTML = status === 'done'
+                        ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" style="display:block;"><polyline points="20 6 9 17 4 12"/></svg>`
+                        : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" style="display:block;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+                }
                 if (result) {
                     const res = document.createElement('div');
                     res.className = 'gena-step-result';
@@ -13868,17 +14020,24 @@ RULES:
 
                     // Update step label with actual tool name
                     const stepTextEl = document.getElementById(stepId)?.querySelector('.gena-step-text');
-                    const toolLabel = {
+                    const toolNameMap = {
                         read_code: 'Reading file code',
                         read_all_files: 'Scanning all files',
                         apply_edit: 'Applying code edit',
                         create_file: 'Creating new file',
                         append_memory: 'Saving to memory',
                         read_memory: 'Reading memory',
+                        web_search: 'Searching the web',
+                        fetch_webpage: 'Reading webpage',
+                        npm_info: 'Checking npm package',
+                        run_js: 'Running JS calculation',
+                        search_code: 'Searching in files',
                         ask_user: 'Asking for clarification',
                         done: 'Finishing up'
-                    }[parsed.tool] || parsed.tool;
-                    if (stepTextEl) stepTextEl.textContent = toolLabel + (parsed.reasoning ? ` — ${parsed.reasoning}` : '');
+                    };
+                    const iconSvg = _genaToolIcons[parsed.tool] || '';
+                    const toolLabel = iconSvg + (toolNameMap[parsed.tool] || parsed.tool);
+                    if (stepTextEl) stepTextEl.innerHTML = toolLabel + (parsed.reasoning ? ` — ${parsed.reasoning}` : '');
 
                     // Execute tool
                     const toolResult = await _genAExecuteTool(parsed.tool, parsed.args || {}, userGoal);
@@ -13957,11 +14116,16 @@ RULES:
             if (progLine) { progLine.style.animation = 'none'; progLine.style.opacity = '0'; }
 
             const header = runCard.querySelector('.gena-card-title');
-            if (header) header.textContent = _genAAbortCtrl?.signal.aborted ? '⚡ GenA — Cancelled' : '⚡ GenA — Complete';
+            if (header) {
+                const headerText = _genAAbortCtrl?.signal.aborted ? 'GenA — Cancelled' : 'GenA — Complete';
+                header.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ${headerText}`;
+            }
 
             // Show final summary as agent message
             if (finalSummary && !_genAAbortCtrl?.signal.aborted) {
                 _inlineAppendMsg('agent', finalSummary);
+                _chatHistory.push({ role: 'agent', text: finalSummary, time: _chatTime() });
+                _chSaveCurrentSession();
             }
 
             // Restore button
