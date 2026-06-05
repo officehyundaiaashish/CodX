@@ -10065,6 +10065,14 @@ No markdown, no backticks, no explanation outside the array.`;
             _chatMsgCounter = _chatHistory.length;
             _chatPendingEditsMap = {};
             _inlineClearHistory();
+            if (Array.isArray(_chatHistory)) {
+                _chatHistory.forEach(msg => {
+                    _inlineChatHistory.push({
+                        role: msg.role === 'user' ? 'user' : 'assistant',
+                        content: msg.text || msg.content || ''
+                    });
+                });
+            }
 
             // Chat panel open karo agar band ho
             if (!_inlineChatOpen) {
@@ -10245,7 +10253,6 @@ No markdown, no backticks, no explanation outside the array.`;
         function closeInlineChat() {
             _chSaveCurrentSession();
             _inlineChatOpen = false;
-            _inlineClearHistory();
             const chatPanel = document.getElementById('inline-chat-panel');
             const aiBtn = document.getElementById('ai-agent-btn');
             chatPanel.classList.remove('chat-open');
