@@ -11671,7 +11671,7 @@ STRICT FORMAT RULES:
             }
 
             // ── Attachment ──
-            const attachCtx = _inlineAttachment ? `\n\n── ATTACHED FILE (${_inlineAttachment.name}) ──\n${_inlineAttachment.content.slice(0, 2000)}` : '';
+            const attachCtx = _inlineAttachment ? `\n\n── ATTACHED FILE (${_inlineAttachment.name}) ──\n${_inlineAttachment.content.slice(0, 20000)}` : '';
             _inlineClearAttach();
 
             // ── Session events ──
@@ -11707,10 +11707,8 @@ STRICT FORMAT RULES:
             if (historyForAPI.length > 0) _inlineLogActivity('History: ' + historyForAPI.length + ' msgs');
             _inlineLogActivity('Prompt ready: ' + (userMsg.length / 1024).toFixed(1) + 'k chars');
             _inlineShowTyping();
-            _inlineUpdateTypingStatus(_inlineChatModeOn ? 'Chat Mode' : 'Edit Mode', _inlineChatModeOn ? 'Analyzing request...' : 'Scanning codebase...');
 
             try {
-                _inlineUpdateTypingStatus(_inlineChatModeOn ? 'Chat Mode' : 'Edit Mode', _inlineChatModeOn ? 'Formulating response...' : 'Planning edits...');
                 // ── Mode context prefix ──
                 const _modeCtx = _pythonMode
                     ? `\nCURRENT MODE: Python (Pyodide v0.26.2 — CPython 3.12 in browser via WebAssembly).
