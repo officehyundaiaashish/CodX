@@ -8251,10 +8251,15 @@
                         ...mergedHistory,
                         { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userMsg }] }
                     ];
+                    const forceJson = systemPrompt.toLowerCase().includes('json') && !systemPrompt.toLowerCase().includes('never return json');
+                    const genConfig = { maxOutputTokens: _maxTok, temperature: 0.1 };
+                    if (forceJson) {
+                        genConfig.responseMimeType = "application/json";
+                    }
                     res = await fetch(cfg.url + '?key=' + cfg.key, {
                         method: 'POST', signal: controller.signal,
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: _maxTok, temperature: 0.1 } })
+                        body: JSON.stringify({ contents, generationConfig: genConfig })
                     });
                     d = await res.json();
                     if (!res.ok) throw new Error(d.error?.message || d.error?.status || `HTTP ${res.status}`);
