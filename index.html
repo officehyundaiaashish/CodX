@@ -3760,7 +3760,20 @@
         }
 
         #inline-chat-messages::-webkit-scrollbar {
-            display: none;
+            width: 4px;
+        }
+
+        #inline-chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #inline-chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(128, 128, 128, 0.25);
+            border-radius: 4px;
+        }
+
+        #inline-chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(128, 128, 128, 0.45);
         }
 
         /* Reuse existing chat bubble styles */
@@ -10610,7 +10623,13 @@ No markdown, no backticks, no explanation outside the array.`;
         // ── Scroll messages to bottom ──
         function _inlineChatScroll() {
             const box = document.getElementById('inline-chat-messages');
-            if (box) requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+            if (!box) return;
+            // Double rAF ensures DOM layout is complete before scrolling
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+                });
+            });
         }
 
         // ── Append message bubble ──
