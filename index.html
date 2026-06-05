@@ -10076,7 +10076,7 @@ No markdown, no backticks, no explanation outside the array.`;
 
             // Chat panel open karo agar band ho
             if (!_inlineChatOpen) {
-                openInlineChat();
+                openInlineChat(false);
             }
 
             // Messages render karo
@@ -10186,7 +10186,7 @@ No markdown, no backticks, no explanation outside the array.`;
             }
         }
 
-        function openInlineChat() {
+        function openInlineChat(shouldFocus = true) {
             if (_inPreview) return; // Never open chat in preview mode
             if (!_activeAgent()) { openAgentModal(); return; }
             _inlineChatOpen = true;
@@ -10227,10 +10227,12 @@ No markdown, no backticks, no explanation outside the array.`;
             _inlinePopulateModels();
             _inlinePopulateTabs();
 
-            setTimeout(() => {
-                const ta = document.getElementById('inline-chat-textarea');
-                if (ta) ta.focus();
-            }, 150);
+            if (shouldFocus) {
+                setTimeout(() => {
+                    const ta = document.getElementById('inline-chat-textarea');
+                    if (ta) ta.focus();
+                }, 150);
+            }
         }
 
         // ── Clear conversation UI + memory ──
