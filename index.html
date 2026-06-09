@@ -7491,32 +7491,18 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 </div>
                 <div style="margin-bottom:12px;">
                     <div style="font-size:11px;font-weight:700;color:var(--text-color);opacity:0.5;margin-bottom:5px;">Destination Repository</div>
-                    <div class="gh-custom-select" style="position:relative;margin-bottom:0;">
-                        <div class="gh-custom-trigger" id="gh-dest-repo-trigger" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:13px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
-                            <span id="gh-dest-repo-label">Same Repo (${currentRepo.split('/').pop()})</span>
-                            <span class="material-icons-round" style="font-size:18px;color:var(--accent);">expand_more</span>
-                        </div>
-                        <div id="gh-dest-repo-list" class="gh-custom-list" style="max-height:200px;overflow-y:auto;">
-                            <div class="gh-custom-option" data-repo="${currentRepo}" style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                                <span class="material-icons-round" style="font-size:15px;">folder</span>
-                                <span>Same Repo (${currentRepo.split('/').pop()})</span>
-                            </div>
-                            ${reposList.filter(r => r.full_name !== currentRepo).map(r => `
-                                <div class="gh-custom-option" data-repo="${r.full_name}" style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                                    <span class="material-icons-round" style="font-size:15px;">folder</span>
-                                    <span>${r.full_name}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <input type="hidden" id="gh-dest-repo" value="${currentRepo}">
-                    </div>
+                    <select id="gh-dest-repo" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:13px;">
+                        <option value="${currentRepo}">Same Repo (${currentRepo.split('/').pop()})</option>
+                        ${reposList.filter(r => r.full_name !== currentRepo).map(r => `<option value="${r.full_name}">${r.full_name}</option>`).join('')}
+                    </select>
                 </div>
                 <div style="margin-bottom:16px;">
                     <div style="font-size:11px;font-weight:700;color:var(--text-color);opacity:0.5;margin-bottom:5px;">Destination Folder (optional)</div>
                     <div style="display:flex;gap:6px;align-items:center;">
                         <span style="font-size:12px;color:var(--accent);">📁</span>
-                        <input type="text" id="gh-dest-folder" placeholder="Leave empty for root" style="flex:1;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;">
+                        <input type="text" id="gh-dest-folder" placeholder="e.g., src/components or leave empty for root" style="flex:1;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;">
                     </div>
+                    <div style="font-size:9px;color:var(--text-color);opacity:0.4;margin-top:5px;">Current path browse folder structure will be shown below</div>
                 </div>
                 <div id="gh-folder-browser" style="max-height:150px;overflow-y:auto;background:rgba(0,0,0,0.15);border-radius:10px;margin-bottom:16px;padding:5px 0;">
                     <div style="padding:8px 12px;font-size:10px;opacity:0.5;">Loading folder structure...</div>
