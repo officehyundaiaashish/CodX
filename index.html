@@ -921,6 +921,15 @@
             margin-bottom: 8px;
         }
 
+        /* Custom dialog input - taller and adjustable */
+        #custom-dialog-input {
+            min-height: 80px;
+            max-height: 250px;
+            resize: vertical;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+
         .find-check-label {
             display: flex;
             align-items: center;
@@ -7164,19 +7173,8 @@ function parseMagicJson() {
     });
     setTimeout(function() {
         let dialogOverlay = document.getElementById('custom-dialog-overlay');
-        let dialogBox = document.getElementById('custom-dialog-box');
-        let findModal = document.getElementById('find-modal');
-
         if (dialogOverlay) {
             dialogOverlay.style.zIndex = '100005';
-        }
-
-        if (dialogBox && findModal) {
-            const r = findModal.getBoundingClientRect();
-            dialogBox.style.position = 'fixed';
-            dialogBox.style.left = '50%';
-            dialogBox.style.top = (r.top - dialogBox.offsetHeight - 12) + 'px';
-            dialogBox.style.transform = 'translateX(-50%)';
         }
     }, 50);
 }
