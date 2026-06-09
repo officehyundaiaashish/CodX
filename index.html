@@ -7178,8 +7178,8 @@ function parseMagicJson() {
 window.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault();
-        const modal = document.getElementById('find-modal');
-        if (!modal.classList.contains('active')) {
+        const findModal = document.getElementById('find-modal');
+        if (findModal && !findModal.classList.contains('active')) {
             toggleFindReplace();
         }
     }
