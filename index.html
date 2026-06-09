@@ -7836,64 +7836,183 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
         }
 
         // ── Undo last commit for selected file ──
+        let _ghHistoryModalOpen = false;
+        
         async function undoLastCommit() {
             if (!ghCurrentRepo || !ghCurrentFile) {
                 cdAlert('Undo Commit', 'Please select a file first.', 'warn');
                 return;
             }
-            const histBox = document.getElementById('gh-commit-history');
-            if (!histBox) return;
-
-            // Toggle — if already open, close it
-            if (histBox.style.display !== 'none') {
-                histBox.style.display = 'none';
-                return;
-            }
-
+            
             const fname = ghCurrentFile.split('/').pop();
-            histBox.style.display = 'block';
-            histBox.innerHTML = `<div style="padding:10px 12px;font-size:11px;color:var(--accent);font-family:'Poppins',sans-serif;display:flex;align-items:center;gap:6px;">
-            <span class="material-icons-round" style="font-size:14px;animation:commitSpin 0.8s linear infinite;">refresh</span>Loading commits...
-        </div>`;
-
-            try {
-                const commits = await ghApi(`/repos/${ghCurrentRepo}/commits?path=${encodeURIComponent(ghCurrentFile)}&per_page=10`);
-                if (!commits || commits.length === 0) {
-                    histBox.innerHTML = `<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:'Poppins',sans-serif;">No commits found for this file.</div>`;
+            const repoName = ghCurrentRepo.split('/').pop();
+            
+            // Open a well-organized modal dialog
+            const modalId = 'gh-undo-modal';
+            let modal = document.getElementById(modalId);
+            
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = modalId;
+                modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.96);width:90%;max-width:500px;max-height:80vh;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;z-index:100002;display:flex;flex-direction:column;overflow:hidden;opacity:0;transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.2,0.64,1);pointer-events:none;';
+                document.body.appendChild(modal);
+            }
+            
+            const closeModal = () => {
+                modal.style.opacity = '0';
+                modal.style.transform = 'translate(-50%,-50%) scale(0.96)';
+                modal.style.pointerEvents = 'none';
+                _ghHistoryModalOpen = false;
+            };
+            
+            modal.innerHTML = `
+                <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--glass-border);flex-shrink:0;">
+                    <div style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;">
+                        <span class="material-icons-round" style="color:var(--accent);font-size:18px;">history</span>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-weight:700;font-size:14px;color:var(--text-color);font-family:'Poppins',sans-serif;">Commit History — ${repoName}</div>
+                        <div style="font-size:10px;color:var(--accent);font-weight:600;font-family:'Poppins',sans-serif;margin-top:1px;">${fname}</div>
+                    </div>
+                    <button onclick="document.getElementById('gh-undo-modal').style.display='none';this.parentElement.parentElement.remove()" style="background:rgba(128,128,128,0.1);border:none;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-color);opacity:0.6;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div id="gh-undo-list" style="flex:1;overflow-y:auto;padding:8px 0;background:rgba(0,0,0,0.08);">
+                    <div style="padding:20px;text-align:center;font-size:11px;color:var(--text-color);opacity:0.5;font-family:'Poppins',sans-serif;">
+                        <span class="material-icons-round" style="animation:commitSpin 0.8s linear infinite;display:inline-block;">refresh</span> Loading commits...
+                    </div>
+                </div>
+                <div style="padding:12px 16px;border-top:1px solid var(--glass-border);display:flex;gap:8px;flex-shrink:0;">
+                    <button id="gh-undo-load-more" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;">Load More (20)</button>
+                    <button onclick="closeGithubModal();document.getElementById('gh-undo-modal')?.remove()" style="flex:1;padding:8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">Done</button>
+                </div>
+            `;
+            
+            modal.style.display = 'flex';
+            requestAnimationFrame(() => {
+                modal.style.opacity = '1';
+                modal.style.transform = 'translate(-50%,-50%) scale(1)';
+                modal.style.pointerEvents = 'auto';
+            });
+            
+            _ghHistoryModalOpen = true;
+            
+            let currentPage = 1;
+            const commitsPerPage = 20;
+            let allCommits = [];
+            
+            async function loadCommits(page = 1, append = false) {
+                const listContainer = document.getElementById('gh-undo-list');
+                if (!listContainer) return;
+                
+                if (!append) {
+                    listContainer.innerHTML = '<div style="padding:20px;text-align:center;font-size:11px;color:var(--text-color);opacity:0.5;font-family:\'Poppins\',sans-serif;"><span class="material-icons-round" style="animation:commitSpin 0.8s linear infinite;display:inline-block;">refresh</span> Loading commits...</div>';
+                }
+                
+                try {
+                    const commits = await ghApi(`/repos/${ghCurrentRepo}/commits?path=${encodeURIComponent(ghCurrentFile)}&per_page=${commitsPerPage}&page=${page}`);
+                    if (!commits || commits.length === 0) {
+                        if (!append) {
+                            listContainer.innerHTML = '<div style="padding:40px 20px;text-align:center;font-size:12px;opacity:0.5;font-family:\'Poppins\',sans-serif;">No commits found for this file.</div>';
+                        }
+                        const loadMoreBtn = document.getElementById('gh-undo-load-more');
+                        if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+                        return;
+                    }
+                    
+                    if (append) {
+                        allCommits = [...allCommits, ...commits];
+                    } else {
+                        allCommits = commits;
+                    }
+                    
+                    renderCommitsList();
+                    
+                    if (commits.length < commitsPerPage) {
+                        const loadMoreBtn = document.getElementById('gh-undo-load-more');
+                        if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+                    }
+                } catch (e) {
+                    let err = e.message || 'Failed to load commits.';
+                    try { const j = JSON.parse(err); if (j.message) err = j.message; } catch (_) { }
+                    listContainer.innerHTML = `<div style="padding:20px;text-align:center;font-size:11px;color:#f87171;font-family:'Poppins',sans-serif;">${err}</div>`;
+                }
+            }
+            
+            function renderCommitsList() {
+                const listContainer = document.getElementById('gh-undo-list');
+                if (!listContainer) return;
+                
+                if (!allCommits.length) {
+                    listContainer.innerHTML = '<div style="padding:40px 20px;text-align:center;font-size:12px;opacity:0.5;font-family:\'Poppins\',sans-serif;">No commits found.</div>';
                     return;
                 }
-
-                const header = `<div style="padding:6px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;opacity:0.4;font-family:'Poppins',sans-serif;border-bottom:1px solid var(--glass-border);position:sticky;top:0;background:var(--glass-bg);">
-                Last ${commits.length} commits — tap to restore
-            </div>`;
-
-                const rows = commits.map((c, i) => {
-                    const msg = (c.commit.message || '').split('\n')[0].slice(0, 38);
+                
+                let html = '';
+                allCommits.forEach((c, idx) => {
+                    const msg = (c.commit.message || '').split('\n')[0];
                     const d = new Date(c.commit.author.date);
-                    const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-                    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     const sha7 = c.sha.slice(0, 7);
-                    const isCurrent = i === 0;
-                    return `<div onclick="${isCurrent ? '' : `_restoreCommit('${c.sha}','${fname.replace(/'/g, "\\'")}',this)`}"
-                    style="padding:6px 10px;border-bottom:1px solid var(--glass-border);cursor:${isCurrent ? 'default' : 'pointer'};
-                    display:flex;align-items:center;gap:6px;transition:background 0.15s;
-                    ${isCurrent ? 'opacity:0.4;' : ''}"
-                    ${isCurrent ? '' : 'onmouseenter="this.style.background=\'var(--accent-dim)\'" onmouseleave="this.style.background=\'\'"'}>
-                    <span style="font-family:'Courier New',monospace;font-size:9px;color:var(--accent);flex-shrink:0;">${sha7}</span>
-                    <span style="font-size:10px;font-family:'Poppins',sans-serif;color:var(--text-color);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${msg || '(no message)'}</span>
-                    <span style="font-size:9px;opacity:0.4;font-family:'Poppins',sans-serif;flex-shrink:0;text-align:right;line-height:1.3;">${date}<br>${time}</span>
-                    ${isCurrent ? '<span style="font-size:8px;background:var(--accent-dim);color:var(--accent);border-radius:3px;padding:1px 4px;flex-shrink:0;font-family:Poppins,sans-serif;font-weight:700;">now</span>' : ''}
-                </div>`;
-                }).join('');
-
-                histBox.innerHTML = header + rows + `<div onclick="document.getElementById('gh-commit-history').style.display='none'" style="padding:7px 10px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;border-top:1px solid var(--glass-border);position:sticky;bottom:0;background:var(--glass-bg);transition:background 0.15s;" onmouseenter="this.style.background='rgba(239,68,68,0.08)'" onmouseleave="this.style.background='var(--glass-bg)'">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                <span style="font-size:10px;color:#ef4444;font-family:'Poppins',sans-serif;font-weight:600;pointer-events:none;">Cancel</span>
-            </div>`;
-            } catch (e) {
-                let err = e.message || 'Failed to load commits.';
-                try { const j = JSON.parse(err); if (j.message) err = j.message; } catch (_) { }
-                histBox.innerHTML = `<div style="padding:10px 12px;font-size:11px;color:#f87171;font-family:'Poppins',sans-serif;">${err}</div>`;
+                    const isCurrent = idx === 0;
+                    
+                    html += `
+                        <div class="gh-undo-item" data-sha="${c.sha}" data-msg="${msg.replace(/['"]/g, '&quot;')}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--glass-border);cursor:${isCurrent ? 'default' : 'pointer'};transition:background 0.15s;${isCurrent ? 'opacity:0.5;' : ''}" ${!isCurrent ? 'onmouseenter="this.style.background=\'var(--accent-dim)\'" onmouseleave="this.style.background=\'\'"' : ''}>
+                            <span style="font-family:\'Courier New\',monospace;font-size:10px;color:var(--accent);flex-shrink:0;background:rgba(16,185,129,0.1);padding:2px 6px;border-radius:5px;">${sha7}</span>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:11px;font-weight:600;color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${msg || '(no message)'}</div>
+                                <div style="font-size:9px;color:var(--text-color);opacity:0.45;margin-top:2px;">${dateStr} · ${timeStr}</div>
+                            </div>
+                            ${!isCurrent ? `<button class="gh-undo-restore-btn" style="background:var(--accent);border:none;border-radius:8px;padding:5px 12px;font-size:10px;font-weight:700;color:white;cursor:pointer;font-family:'Poppins',sans-serif;">Restore</button>` : '<span style="font-size:9px;background:var(--accent-dim);color:var(--accent);padding:3px 8px;border-radius:12px;">Current</span>'}
+                        </div>
+                    `;
+                });
+                
+                listContainer.innerHTML = html;
+                
+                // Attach restore handlers
+                document.querySelectorAll('.gh-undo-item').forEach(item => {
+                    const restoreBtn = item.querySelector('.gh-undo-restore-btn');
+                    if (restoreBtn) {
+                        restoreBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            const sha = item.dataset.sha;
+                            const msg = item.dataset.msg;
+                            const btn = restoreBtn;
+                            btn.textContent = 'Restoring...';
+                            btn.disabled = true;
+                            try {
+                                const prevFile = await ghApi(`/repos/${ghCurrentRepo}/contents/${ghCurrentFile}?ref=${sha}`);
+                                const prevContent = decodeB64(prevFile.content);
+                                const curTab = fileTabs.find(t => t.id === activeTabId);
+                                if (curTab) curTab.content = prevContent;
+                                editor.setValue(prevContent, -1);
+                                showToast(`Restored to ${sha.slice(0, 7)}: ${msg.slice(0, 40)}`, 'undo');
+                                closeModal();
+                                if (document.getElementById('github-modal')?.classList.contains('active')) {
+                                    closeGithubModal();
+                                }
+                            } catch (err) {
+                                let errMsg = err.message || 'Restore failed.';
+                                cdAlert('Restore Failed', errMsg, 'error');
+                                btn.textContent = 'Restore';
+                                btn.disabled = false;
+                            }
+                        };
+                    }
+                });
+            }
+            
+            await loadCommits(1, false);
+            
+            const loadMoreBtn = document.getElementById('gh-undo-load-more');
+            if (loadMoreBtn) {
+                loadMoreBtn.onclick = async () => {
+                    currentPage++;
+                    await loadCommits(currentPage, true);
+                };
             }
         }
 
