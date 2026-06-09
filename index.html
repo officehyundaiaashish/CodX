@@ -7348,24 +7348,38 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             } catch (e) { tree.innerHTML = '<div class="gh-tree-loading">Failed to load files.</div>'; }
         }
 
+        let _ghSelectedItems = new Set();
+
         function _ghRenderTree() {
             const tree = document.getElementById('gh-file-tree');
             const breadcrumb = document.getElementById('gh-breadcrumb');
 
-            // Breadcrumb
+            // Add multi-select toolbar
+            let toolbarHtml = '';
+            if (_ghSelectedItems.size > 0) {
+                toolbarHtml = `
+                    <div style="display:flex;gap:6px;padding:8px 12px;background:var(--accent-dim);border-radius:8px;margin-bottom:8px;align-items:center;">
+                        <span style="font-size:11px;font-weight:700;color:var(--accent);flex:1;">${_ghSelectedItems.size} item(s) selected</span>
+                        <button onclick="_ghMoveSelected()" style="background:rgba(16,185,129,0.2);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:var(--accent);cursor:pointer;">Move</button>
+                        <button onclick="_ghCopySelected()" style="background:rgba(16,185,129,0.2);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:var(--accent);cursor:pointer;">Copy</button>
+                        <button onclick="_ghDeleteSelected()" style="background:rgba(239,68,68,0.2);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:#ef4444;cursor:pointer;">Delete All</button>
+                        <button onclick="_ghClearSelection()" style="background:rgba(128,128,128,0.2);border:none;border-radius:6px;padding:5px 8px;font-size:10px;cursor:pointer;">Clear</button>
+                    </div>
+                `;
+            }
             breadcrumb.innerHTML = '';
             const parts = _ghCurrentPath ? _ghCurrentPath.split('/') : [];
             const rootCrumb = document.createElement('span');
             rootCrumb.className = 'gh-crumb';
             rootCrumb.textContent = ghCurrentRepo.split('/').pop();
-            rootCrumb.onclick = () => { _ghCurrentPath = ''; _ghSelectedItem = null; _ghDisableFileActions(); _ghRenderTree(); };
+            rootCrumb.onclick = () => { _ghCurrentPath = ''; _ghSelectedItem = null; _ghDisableFileActions(); _ghClearSelection(); _ghRenderTree(); };
             breadcrumb.appendChild(rootCrumb);
             parts.forEach((part, i) => {
                 const sep = document.createElement('span'); sep.className = 'gh-crumb-sep'; sep.textContent = '/';
                 breadcrumb.appendChild(sep);
                 const crumb = document.createElement('span'); crumb.className = 'gh-crumb'; crumb.textContent = part;
                 const pathUpTo = parts.slice(0, i + 1).join('/');
-                crumb.onclick = () => { _ghCurrentPath = pathUpTo; _ghSelectedItem = null; _ghDisableFileActions(); _ghRenderTree(); };
+                crumb.onclick = () => { _ghCurrentPath = pathUpTo; _ghSelectedItem = null; _ghDisableFileActions(); _ghClearSelection(); _ghRenderTree(); };
                 breadcrumb.appendChild(crumb);
             });
 
@@ -7388,24 +7402,49 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             // Sort: folders first
             items.sort((a, b) => { if (a.type === b.type) return a.name.localeCompare(b.name); return a.type === 'tree' ? -1 : 1; });
 
-            tree.innerHTML = '';
-            if (items.length === 0) { tree.innerHTML = '<div class="gh-tree-loading">Empty folder</div>'; return; }
+            tree.innerHTML = toolbarHtml;
+            if (items.length === 0) { 
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'gh-tree-loading';
+                emptyMsg.textContent = 'Empty folder';
+                tree.appendChild(emptyMsg);
+                return; 
+            }
 
             items.forEach(item => {
                 const row = document.createElement('div');
                 row.className = 'gh-tree-item';
+                const isSelected = _ghSelectedItems.has(item.path);
                 const icon = item.type === 'tree' ? 'folder' : _ghFileIcon(item.name);
                 row.innerHTML = `
-                <span class="material-icons-round gh-item-icon">${icon}</span>
-                <span class="gh-item-name">${item.name}</span>
-                <div class="gh-item-actions">
-                    ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Open in Editor" onclick="event.stopPropagation();_ghQuickOpen('${item.path}')"><span class="material-icons-round">open_in_new</span></button>` : ''}
-                    ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Download" onclick="event.stopPropagation();_ghQuickDownload('${item.path}','${item.name}')"><span class="material-icons-round">download</span></button>` : ''}
-                    <button class="gh-item-action-btn" title="Rename" onclick="event.stopPropagation();_ghSelectItem(this.closest('.gh-tree-item'),'${item.path}','${item.name}','${item.type}','${item.sha || ''}');renameGhFile()"><span class="material-icons-round">drive_file_rename_outline</span></button>
-                    <button class="gh-item-action-btn" title="Delete" style="color:#ef4444" onclick="event.stopPropagation();_ghSelectItem(this.closest('.gh-tree-item'),'${item.path}','${item.name}','${item.type}','${item.sha || ''}');deleteGhFile()"><span class="material-icons-round">delete</span></button>
-                </div>
-            `;
-                row.onclick = () => {
+                    <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                        <div class="gh-item-checkbox" style="width:18px;height:18px;border-radius:3px;border:1.5px solid var(--accent);background:${isSelected ? 'var(--accent)' : 'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                            ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                        </div>
+                        <span class="material-icons-round gh-item-icon">${icon}</span>
+                        <span class="gh-item-name">${item.name}</span>
+                    </div>
+                    <div class="gh-item-actions">
+                        ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Open in Editor" onclick="event.stopPropagation();_ghQuickOpen('${item.path}')"><span class="material-icons-round">open_in_new</span></button>` : ''}
+                        ${item.type === 'blob' ? `<button class="gh-item-action-btn" title="Download" onclick="event.stopPropagation();_ghQuickDownload('${item.path}','${item.name}')"><span class="material-icons-round">download</span></button>` : ''}
+                        <button class="gh-item-action-btn" title="Rename" onclick="event.stopPropagation();_ghSelectItem(this.closest('.gh-tree-item'),'${item.path}','${item.name}','${item.type}','${item.sha || ''}');renameGhFile()"><span class="material-icons-round">drive_file_rename_outline</span></button>
+                        <button class="gh-item-action-btn" title="Delete" style="color:#ef4444" onclick="event.stopPropagation();_ghSelectItem(this.closest('.gh-tree-item'),'${item.path}','${item.name}','${item.type}','${item.sha || ''}');deleteGhFile()"><span class="material-icons-round">delete</span></button>
+                    </div>
+                `;
+                
+                const checkbox = row.querySelector('.gh-item-checkbox');
+                checkbox.onclick = (e) => {
+                    e.stopPropagation();
+                    if (_ghSelectedItems.has(item.path)) {
+                        _ghSelectedItems.delete(item.path);
+                    } else {
+                        _ghSelectedItems.add(item.path);
+                    }
+                    _ghRenderTree();
+                };
+                
+                row.onclick = (e) => {
+                    if (e.target.closest('.gh-item-checkbox')) return;
                     if (item.type === 'tree') {
                         _ghCurrentPath = item.path; _ghSelectedItem = null; _ghDisableFileActions(); _ghRenderTree();
                     } else {
@@ -7413,6 +7452,267 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     }
                 };
                 tree.appendChild(row);
+            });
+        }
+        
+        function _ghClearSelection() {
+            _ghSelectedItems.clear();
+            _ghRenderTree();
+        }
+        
+        async function _ghMoveSelected() {
+            if (_ghSelectedItems.size === 0) return;
+            const items = Array.from(_ghSelectedItems);
+            
+            // Create modal dialog for destination selection
+            const modalId = 'gh-move-copy-modal';
+            let modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+            
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.96);width:90%;max-width:400px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;z-index:100003;padding:20px;opacity:0;transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.2,0.64,1);pointer-events:none;';
+            
+            // Fetch repos for destination selection
+            let reposList = [];
+            try {
+                reposList = await ghApi('/user/repos?sort=updated&per_page=100');
+            } catch(e) { reposList = []; }
+            
+            const currentRepo = ghCurrentRepo;
+            
+            modal.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="material-icons-round" style="color:var(--accent);font-size:20px;">drive_file_move</span>
+                        <span style="font-weight:700;font-size:14px;color:var(--text-color);">Move ${items.length} Item(s)</span>
+                    </div>
+                    <span class="material-icons-round" onclick="document.getElementById('gh-move-copy-modal').remove()" style="opacity:0.5;cursor:pointer;">close</span>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-color);opacity:0.5;margin-bottom:5px;">Destination Repository</div>
+                    <div class="gh-custom-select" style="position:relative;margin-bottom:0;">
+                        <div class="gh-custom-trigger" id="gh-dest-repo-trigger" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:13px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+                            <span id="gh-dest-repo-label">Same Repo (${currentRepo.split('/').pop()})</span>
+                            <span class="material-icons-round" style="font-size:18px;color:var(--accent);">expand_more</span>
+                        </div>
+                        <div id="gh-dest-repo-list" class="gh-custom-list" style="max-height:200px;overflow-y:auto;">
+                            <div class="gh-custom-option" data-repo="${currentRepo}" style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons-round" style="font-size:15px;">folder</span>
+                                <span>Same Repo (${currentRepo.split('/').pop()})</span>
+                            </div>
+                            ${reposList.filter(r => r.full_name !== currentRepo).map(r => `
+                                <div class="gh-custom-option" data-repo="${r.full_name}" style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                                    <span class="material-icons-round" style="font-size:15px;">folder</span>
+                                    <span>${r.full_name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <input type="hidden" id="gh-dest-repo" value="${currentRepo}">
+                    </div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-color);opacity:0.5;margin-bottom:5px;">Destination Folder (optional)</div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <span style="font-size:12px;color:var(--accent);">📁</span>
+                        <input type="text" id="gh-dest-folder" placeholder="Leave empty for root" style="flex:1;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;">
+                    </div>
+                </div>
+                <div id="gh-folder-browser" style="max-height:150px;overflow-y:auto;background:rgba(0,0,0,0.15);border-radius:10px;margin-bottom:16px;padding:5px 0;">
+                    <div style="padding:8px 12px;font-size:10px;opacity:0.5;">Loading folder structure...</div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="document.getElementById('gh-move-copy-modal').remove()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-weight:600;cursor:pointer;">Cancel</button>
+                    <button id="gh-move-confirm" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;">Move Items</button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => {
+                modal.style.opacity = '1';
+                modal.style.transform = 'translate(-50%,-50%) scale(1)';
+                modal.style.pointerEvents = 'auto';
+            });
+            
+            // Load folder structure for current repo
+            async function loadFolderStructure() {
+                const browser = document.getElementById('gh-folder-browser');
+                if (!browser) return;
+                try {
+                    const repoData = await ghApi(`/repos/${ghCurrentRepo}`);
+                    const branch = repoData.default_branch;
+                    const treeData = await ghApi(`/repos/${ghCurrentRepo}/git/trees/${branch}?recursive=1`);
+                    const folders = new Set();
+                    treeData.tree.forEach(node => {
+                        const parts = node.path.split('/');
+                        for (let i = 0; i < parts.length - 1; i++) {
+                            folders.add(parts.slice(0, i + 1).join('/'));
+                        }
+                    });
+                    const folderList = Array.from(folders).sort();
+                    if (folderList.length === 0) {
+                        browser.innerHTML = '<div style="padding:8px 12px;font-size:10px;opacity:0.5;">No folders found. Files will go to root.</div>';
+                    } else {
+                        browser.innerHTML = folderList.map(f => `
+                            <div onclick="document.getElementById('gh-dest-folder').value='${f}'" style="padding:6px 12px;cursor:pointer;font-size:10px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--glass-border);transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-dim)'" onmouseleave="this.style.background=''">
+                                <span class="material-icons-round" style="font-size:14px;color:var(--accent);">folder</span>
+                                <span>${f}</span>
+                            </div>
+                        `).join('');
+                    }
+                } catch(e) {
+                    browser.innerHTML = '<div style="padding:8px 12px;font-size:10px;opacity:0.5;">Could not load folders</div>';
+                }
+            }
+            loadFolderStructure();
+            
+            document.getElementById('gh-move-confirm').onclick = async () => {
+                const destRepo = document.getElementById('gh-dest-repo').value;
+                const destFolder = document.getElementById('gh-dest-folder').value.trim().replace(/\/$/, '');
+                const confirmBtn = document.getElementById('gh-move-confirm');
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Moving...';
+                
+                let success = 0, failed = 0;
+                const isSameRepo = (destRepo === currentRepo);
+                
+                for (const oldPath of items) {
+                    const name = oldPath.split('/').pop();
+                    const newPath = destFolder ? `${destFolder}/${name}` : name;
+                    try {
+                        if (isSameRepo) {
+                            const fileData = await ghApi(`/repos/${currentRepo}/contents/${oldPath}`);
+                            await ghApi(`/repos/${currentRepo}/contents/${newPath}`, 'PUT', {
+                                message: `Move ${name} to ${destFolder || 'root'}`,
+                                content: fileData.content,
+                                sha: undefined
+                            });
+                            await ghApi(`/repos/${currentRepo}/contents/${oldPath}`, 'DELETE', {
+                                message: `Delete after move: ${name}`,
+                                sha: fileData.sha
+                            });
+                        } else {
+                            const fileData = await ghApi(`/repos/${currentRepo}/contents/${oldPath}`);
+                            await ghApi(`/repos/${destRepo}/contents/${newPath}`, 'PUT', {
+                                message: `Move ${name} from ${currentRepo.split('/').pop()}`,
+                                content: fileData.content
+                            });
+                            await ghApi(`/repos/${currentRepo}/contents/${oldPath}`, 'DELETE', {
+                                message: `Delete after move to ${destRepo.split('/').pop()}: ${name}`,
+                                sha: fileData.sha
+                            });
+                        }
+                        success++;
+                    } catch (e) { failed++; }
+                }
+                
+                modal.remove();
+                _ghSelectedItems.clear();
+                _ghTree = [];
+                await fetchGhFiles();
+                cdAlert('Move Complete', `${success} moved, ${failed} failed.`, success > 0 ? 'success' : 'warn');
+            };
+        }
+        
+        async function _ghCopySelected() {
+            if (_ghSelectedItems.size === 0) return;
+            const items = Array.from(_ghSelectedItems);
+            
+            const modalId = 'gh-copy-modal';
+            let modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+            
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.96);width:90%;max-width:400px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;z-index:100003;padding:20px;opacity:0;transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.2,0.64,1);pointer-events:none;';
+            
+            let reposList = [];
+            try {
+                reposList = await ghApi('/user/repos?sort=updated&per_page=100');
+            } catch(e) { reposList = []; }
+            
+            modal.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="material-icons-round" style="color:var(--accent);font-size:20px;">content_copy</span>
+                        <span style="font-weight:700;font-size:14px;color:var(--text-color);">Copy ${items.length} Item(s)</span>
+                    </div>
+                    <span class="material-icons-round" onclick="document.getElementById('gh-copy-modal').remove()" style="opacity:0.5;cursor:pointer;">close</span>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-color);opacity:0.5;margin-bottom:5px;">Destination Repository</div>
+                    <select id="gh-copy-dest-repo" style="width:100%;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:13px;">
+                        ${reposList.map(r => `<option value="${r.full_name}" ${r.full_name === ghCurrentRepo ? 'selected' : ''}>${r.full_name}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-color);opacity:0.5;margin-bottom:5px;">Destination Folder (optional)</div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <span style="font-size:12px;color:var(--accent);">📁</span>
+                        <input type="text" id="gh-copy-dest-folder" placeholder="e.g., src/backup or leave empty for root" style="flex:1;padding:10px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;">
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="document.getElementById('gh-copy-modal').remove()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-weight:600;cursor:pointer;">Cancel</button>
+                    <button id="gh-copy-confirm" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;">Copy Items</button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => {
+                modal.style.opacity = '1';
+                modal.style.transform = 'translate(-50%,-50%) scale(1)';
+                modal.style.pointerEvents = 'auto';
+            });
+            
+            document.getElementById('gh-copy-confirm').onclick = async () => {
+                const destRepo = document.getElementById('gh-copy-dest-repo').value;
+                const destFolder = document.getElementById('gh-copy-dest-folder').value.trim().replace(/\/$/, '');
+                const confirmBtn = document.getElementById('gh-copy-confirm');
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Copying...';
+                
+                let success = 0, failed = 0;
+                for (const oldPath of items) {
+                    const name = oldPath.split('/').pop();
+                    const newPath = destFolder ? `${destFolder}/${name}` : name;
+                    try {
+                        const fileData = await ghApi(`/repos/${ghCurrentRepo}/contents/${oldPath}`);
+                        await ghApi(`/repos/${destRepo}/contents/${newPath}`, 'PUT', {
+                            message: `Copy ${name} from ${ghCurrentRepo.split('/').pop()}`,
+                            content: fileData.content
+                        });
+                        success++;
+                    } catch (e) { failed++; }
+                }
+                
+                modal.remove();
+                _ghSelectedItems.clear();
+                await fetchGhFiles();
+                cdAlert('Copy Complete', `${success} copied, ${failed} failed.`, success > 0 ? 'success' : 'warn');
+            };
+        }
+        
+        async function _ghDeleteSelected() {
+            if (_ghSelectedItems.size === 0) return;
+            const items = Array.from(_ghSelectedItems);
+            cdConfirm('Delete Multiple', `Permanently delete ${items.length} item(s) from GitHub? This cannot be undone.`, 'Delete All', 'Cancel', async (ok) => {
+                if (!ok) return;
+                let success = 0, failed = 0;
+                for (const path of items) {
+                    try {
+                        const fileData = await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`);
+                        await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`, 'DELETE', {
+                            message: `Delete ${path}`,
+                            sha: fileData.sha
+                        });
+                        success++;
+                    } catch (e) { failed++; }
+                }
+                _ghSelectedItems.clear();
+                _ghTree = [];
+                await fetchGhFiles();
+                cdAlert('Delete Complete', `${success} deleted, ${failed} failed.`, success > 0 ? 'success' : 'warn');
             });
         }
 
