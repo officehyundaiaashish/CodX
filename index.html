@@ -5346,11 +5346,12 @@
             <div style="display:flex;gap:4px;align-items:center;">
                 <button class="fm-chip" id="fm-chip-case" onclick="_fmToggle('case',this)">Aa</button>
                 <button class="fm-chip" id="fm-chip-regex" onclick="_fmToggle('regex',this)">.*</button>
-                <button class="fm-chip" id="fm-chip-magic" onclick="parseMagicJson()" title="Paste AI JSON Block" style="padding: 4px 6px; display: flex; align-items: center; justify-content: center; color: #a78bfa; border-color: rgba(139, 92, 246, 0.3);">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                    </svg>
-                </button>
+                <<button onclick="parseMagicJson()" title="Magic Parser" style="background:none;border:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#a78bfa;opacity:0.9;border-radius:6px;transition:opacity 0.15s,background 0.15s;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+</button>
+                
             </div>
             <div style="display:flex;gap:5px;">
                 <button onclick="clearFind()" title="Clear"
