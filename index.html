@@ -921,15 +921,6 @@
             margin-bottom: 8px;
         }
 
-        /* Custom dialog input - taller and adjustable */
-        #custom-dialog-input {
-            min-height: 80px;
-            max-height: 250px;
-            resize: vertical;
-            overflow-y: auto;
-            line-height: 1.6;
-        }
-
         .find-check-label {
             display: flex;
             align-items: center;
@@ -6666,7 +6657,11 @@
             const chatMessagesBox = document.getElementById('inline-chat-messages');
             if (chatMessagesBox) {
                 const observer = new MutationObserver(() => {
-                    chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
+                    // Only auto-scroll if user is already near bottom (within 100px)
+                    const isNearBottom = chatMessagesBox.scrollHeight - chatMessagesBox.scrollTop - chatMessagesBox.clientHeight < 100;
+                    if (isNearBottom) {
+                        chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
+                    }
                 });
                 observer.observe(chatMessagesBox, { childList: true, subtree: true, characterData: true });
             }
@@ -10718,10 +10713,17 @@ No markdown, no backticks, no explanation outside the array.`;
         }, 0);
 
         // ── Scroll messages to bottom ──
-        function _inlineChatScroll() {
+        function _inlineChatScroll(force = false) {
             const box = document.getElementById('inline-chat-messages');
             if (!box) return;
-            requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+            if (force) {
+                requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+            } else {
+                const isNearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 100;
+                if (isNearBottom) {
+                    requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+                }
+            }
         }
 
         // ── Append message bubble ──
@@ -12231,8 +12233,15 @@ Rules:
                 const wrap = document.createElement('div');
                 wrap.className = 'chat-msg agent';
                 wrap.appendChild(errEl);
+                                // Scroll to bottom only if user is near bottom
                 const box = document.getElementById('inline-chat-messages');
-                if (box) { box.appendChild(wrap); _inlineChatScroll(); }
+                if (box) {
+                    const isNearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 100;
+                    if (isNearBottom) {
+                        requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+                    }
+                }
+                _inlineChatScroll();
             } finally {
                 // Restore button — never leave dead
                 sendBtn.dataset.processing = '';
