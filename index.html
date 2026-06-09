@@ -5343,9 +5343,14 @@
 
         <!-- Footer: chips left, actions right -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:0 12px 10px;gap:6px;">
-            <div style="display:flex;gap:4px;">
+            <div style="display:flex;gap:4px;align-items:center;">
                 <button class="fm-chip" id="fm-chip-case" onclick="_fmToggle('case',this)">Aa</button>
                 <button class="fm-chip" id="fm-chip-regex" onclick="_fmToggle('regex',this)">.*</button>
+                <button class="fm-chip" id="fm-chip-magic" onclick="parseMagicJson()" title="Paste AI JSON Block" style="padding: 4px 6px; display: flex; align-items: center; justify-content: center; color: #a78bfa; border-color: rgba(139, 92, 246, 0.3);">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                </button>
             </div>
             <div style="display:flex;gap:5px;">
                 <button onclick="clearFind()" title="Clear"
@@ -7105,10 +7110,78 @@
                 cdAlert('Replace', "Click 'Find Next' first.", 'info');
             }
         }
-        function clearFind() { document.getElementById('find-input').value = ''; document.getElementById('replace-input').value = ''; editor.clearSelection(); }
+        function clearFind() {
+    document.getElementById('find-input').value = '';
+    document.getElementById('replace-input').value = '';
+    editor.clearSelection();
+}
 
-        // --- GITHUB MANAGER ---
-        let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = localStorage.getItem('gh_last_file') || "", ghCurrentSha = "";
+function parseMagicJson() {
+    cdPrompt('JSON Magic Paste', 'Paste your AI generated JSON block containing "old" and "new" rules:', '', function(pastedData) {
+        if (!pastedData) return;
+        try {
+            let cleanedData = pastedData.trim();
+            if (!cleanedData.startsWith('{')) {
+                let startBrace = cleanedData.indexOf('{');
+                let endBrace = cleanedData.lastIndexOf('}');
+                if (startBrace !== -1 && endBrace !== -1) {
+                    cleanedData = cleanedData.slice(startBrace, endBrace + 1);
+                } else {
+                    throw new Error('Invalid block layout');
+                }
+            }
+            let parsed;
+            try {
+                parsed = JSON.parse(cleanedData);
+            } catch (jsonErr) {
+                if (typeof jsonrepair !== 'undefined') {
+                    parsed = JSON.parse(jsonrepair(cleanedData));
+                } else {
+                    throw jsonErr;
+                }
+            }
+            if (parsed && (parsed.old !== undefined || parsed.new !== undefined)) {
+                const oldVal = parsed.old || '';
+                const newVal = parsed.new || '';
+                document.getElementById('find-input').value = oldVal;
+                document.getElementById('replace-input').value = newVal;
+                setTimeout(function() {
+                    findText(false);
+                    let match = editor.getSelectionRange();
+                    if (!match.isEmpty()) {
+                        showToast('Magic Parse Success! Match Found.', 'auto_fix_high');
+                    } else {
+                        showToast('Parsed! But no matching block found in code.', 'error_outline');
+                    }
+                }, 100);
+            } else {
+                showToast('Failed: "old" or "new" keys missing.', 'error_outline');
+            }
+        } catch (err) {
+            showToast('Unsuccessful: Invalid JSON format.', 'error_outline');
+        }
+    });
+    setTimeout(function() {
+        let dialogOverlay = document.getElementById('custom-dialog-overlay');
+        if (dialogOverlay) {
+            dialogOverlay.style.zIndex = '100005';
+        }
+    }, 50);
+}
+
+        // --- KEYBOARD SHORTCUTS ---
+window.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        const modal = document.getElementById('find-modal');
+        if (!modal.classList.contains('active')) {
+            toggleFindReplace();
+        }
+    }
+});
+
+// --- GITHUB MANAGER ---
+let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = localStorage.getItem('gh_last_file') || "", ghCurrentSha = "";
 
         function _ghUpdateHeaderStatus() {
             const el = document.getElementById('gh-header-status');
