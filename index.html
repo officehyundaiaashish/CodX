@@ -8082,6 +8082,8 @@
                 { provider: 'nvidia', providerName: 'Llama Nemotron Super', tag: 'FREE', tagColor: '#76b900', url: NIM, model: 'nvidia/llama-3.3-nemotron-super-49b-v1' },
                 { provider: 'nvidia', providerName: 'Phi-4 Mini', tag: 'FAST', tagColor: '#76b900', url: NIM, model: 'microsoft/phi-4-mini-instruct' },
                 { provider: 'nvidia', providerName: 'Gemma 3 27B', tag: 'FREE', tagColor: '#76b900', url: NIM, model: 'google/gemma-3-27b-it' },
+                // STEPFUN — direct NIM endpoint (no proxy needed)
+                { provider: 'nvidia', providerName: 'Step-3.7 Flash', tag: 'FAST', tagColor: '#76b900', url: 'https://integrate.api.nvidia.com/v1/chat/completions', model: 'stepfun-ai/step-3.7-flash' },
             ];
 
             if (/^AIza[A-Za-z0-9_-]{20,}/.test(key)) return [
@@ -8550,10 +8552,10 @@
                 let res, d, text;
 
                 // Per-provider max_tokens — free models have tight output limits
-                const _maxTok = {
+                const _maxTok = cfg.model === 'stepfun-ai/step-3.7-flash' ? 16384 : ({
                     groq: 8000, gemini: 8192, openai: 8000,
                     anthropic: 8000, openrouter: 8000, deepseek: 8000, nvidia: 8000
-                }[cfg.provider] ?? 8000;
+                }[cfg.provider] ?? 8000);
 
                 if (cfg.provider === 'anthropic') {
                     res = await fetch(cfg.url, {
