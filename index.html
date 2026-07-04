@@ -8646,7 +8646,8 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
 
             const trigger = document.createElement('div');
             trigger.className = 'gh-custom-trigger';
-            trigger.innerHTML = `<span class="gh-trigger-text">${placeholder}</span><span class="material-icons-round">expand_more</span>`;
+            const isSelected = placeholder && placeholder !== 'Select Repository...' && placeholder !== 'Select Folder...' && placeholder !== 'Select File...';
+            trigger.innerHTML = `<span class="gh-trigger-text ${isSelected ? 'selected' : ''}">${placeholder}</span><span class="material-icons-round">expand_more</span>`;
 
             const list = document.createElement('div');
             list.className = 'gh-custom-list';
