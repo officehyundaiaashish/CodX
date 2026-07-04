@@ -5706,7 +5706,7 @@
         </div>
 
         <!-- Content Area -->
-        <div id="gh-undo-content" style="border-radius:12px;border:1px solid var(--glass-border);overflow:hidden;background:var(--glass-bg);max-height:300px;overflow-y:auto;">
+        <div id="gh-undo-content" style="border-radius:12px;border:1px solid var(--glass-border);overflow:hidden;background:var(--glass-bg);">
             <!-- Commits list will be populated here -->
         </div>
     </div>
@@ -8426,13 +8426,13 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             </div>`;
 
             try {
-                const commits = await ghApi(`/repos/${ghCurrentRepo}/commits?path=${encodeURIComponent(ghCurrentFile)}&per_page=10`);
+                const commits = await ghApi(`/repos/${ghCurrentRepo}/commits?path=${encodeURIComponent(ghCurrentFile)}&per_page=20`);
                 if (!commits || commits.length === 0) {
                     contentBox.innerHTML = `<div style="padding:16px;font-size:12px;opacity:0.5;font-family:'Poppins',sans-serif;text-align:center;">No commits found for this file.</div>`;
                     return;
                 }
 
-                const header = `<div style="padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;opacity:0.4;font-family:'Poppins',sans-serif;border-bottom:1px solid var(--glass-border);position:sticky;top:0;background:var(--glass-bg);">
+                const header = `<div style="padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;opacity:0.4;font-family:'Poppins',sans-serif;border-bottom:1px solid var(--glass-border);">
                     Last ${commits.length} commits — tap to restore
                 </div>`;
 
@@ -8455,10 +8455,14 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     </div>`;
                 }).join('');
 
-                contentBox.innerHTML = header + rows + `<div onclick="closeUndoModal()" style="padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;border-top:1px solid var(--glass-border);position:sticky;bottom:0;background:var(--glass-bg);transition:background 0.15s;" onmouseenter="this.style.background='linear-gradient(rgba(239,68,68,0.08), rgba(239,68,68,0.08)), var(--glass-bg)'" onmouseleave="this.style.background='var(--glass-bg)'">
+                const scrollableList = `<div style="max-height:240px;overflow-y:auto;">${rows}</div>`;
+
+                const footer = `<div onclick="closeUndoModal()" style="padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;border-top:1px solid var(--glass-border);background:var(--glass-bg);transition:background 0.15s;" onmouseenter="this.style.background='linear-gradient(rgba(239,68,68,0.08), rgba(239,68,68,0.08)), var(--glass-bg)'" onmouseleave="this.style.background='var(--glass-bg)'">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     <span style="font-size:11px;color:#ef4444;font-family:'Poppins',sans-serif;font-weight:600;pointer-events:none;">Close</span>
                 </div>`;
+
+                contentBox.innerHTML = header + scrollableList + footer;
             } catch (e) {
                 let err = e.message || 'Failed to load commits.';
                 try { const j = JSON.parse(err); if (j.message) err = j.message; } catch (_) { }
