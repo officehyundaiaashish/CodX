@@ -8018,7 +8018,9 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     URL.revokeObjectURL(a.href);
                     showToast(`"${repoName}.zip" downloaded`, 'download_done');
                 } catch (e) {
-                    cdAlert('Download Failed', e.message || 'Could not download repository.', 'error');
+                    // Fallback to direct browser download in case of CORS redirect issues
+                    window.open(url, '_blank');
+                    showToast(`Downloading via browser...`, 'download');
                 }
             });
         }
