@@ -8169,7 +8169,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     } else {
                         cdAlert('Rename Folder', 'GitHub does not support direct folder rename. Please rename files individually.', 'info');
                     }
-                    _ghTree = []; setTimeout(() => fetchGhRepos(true), 800);
+                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
                 } catch (e) { cdAlert('Rename Failed', 'Could not rename. Check permissions.', 'error'); }
             });
         }
@@ -8194,7 +8194,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                         cdAlert('Deleted', `Folder "${item.name}" deleted.`, 'success');
                     }
                     _ghSelectedItem = null; _ghDisableFileActions();
-                    _ghTree = []; setTimeout(() => fetchGhRepos(true), 800);
+                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
                 } catch (e) { cdAlert('Delete Failed', 'Could not delete. Check permissions.', 'error'); }
             });
         }
@@ -8208,7 +8208,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     const blankContent = encodeB64(_getBlankContentForFile(name));
                     await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`, 'PUT', { message: `Create ${name}`, content: blankContent });
                     cdAlert('Created', `"${name}" created.`, 'success');
-                    _ghTree = []; setTimeout(() => fetchGhRepos(true), 800);
+                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
                 } catch (e) { cdAlert('Failed', 'Could not create file.', 'error'); }
             });
         }
@@ -8221,7 +8221,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 try {
                     await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`, 'PUT', { message: `Create folder ${name}`, content: btoa('') });
                     cdAlert('Created', `Folder "${name}" created.`, 'success');
-                    _ghTree = []; setTimeout(() => fetchGhRepos(true), 800);
+                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
                 } catch (e) { cdAlert('Failed', 'Could not create folder.', 'error'); }
             });
         }
@@ -8438,7 +8438,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 200); }
                 closeGithubModal();
                 _showCommitToast(`"${ghCurrentFile.split('/').pop()}" pushed to ${ghCurrentRepo.split('/').pop()}`);
-                if (document.getElementById('gh-repo-select')?._value) setTimeout(() => fetchGhRepos(true), 800);
+                if (document.getElementById('gh-repo-select')?._value) setTimeout(() => fetchGhFiles(true), 800);
             } catch (e) {
                 const sp = document.getElementById('commit-spinner');
                 if (sp) sp.remove();
