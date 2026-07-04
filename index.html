@@ -1023,6 +1023,54 @@
             opacity: 1;
         }
 
+        #gh-undo-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.88);
+            bottom: auto !important;
+            width: 88%;
+            max-width: 380px;
+            max-height: 82vh;
+            overflow-y: auto;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 14px;
+            z-index: 120;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+        }
+
+        #gh-undo-modal::-webkit-scrollbar {
+            display: none;
+        }
+
+        #gh-undo-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #gh-undo-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 115;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        #gh-undo-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
         #gh-overlay {
             position: fixed;
             inset: 0;
@@ -8341,7 +8389,6 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 cdAlert('Undo Commit', 'Please select a file first.', 'warn');
                 return;
             }
-            closeGithubModal();
 
             const undoModal = document.getElementById('gh-undo-modal');
             const undoOverlay = document.getElementById('gh-undo-overlay');
@@ -8420,25 +8467,35 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
         }
 
         async function _restoreCommit(sha, fname, rowEl) {
-            // Highlight selected row
-            rowEl.style.background = 'var(--accent-dim)';
-            rowEl.style.pointerEvents = 'none';
-            rowEl.innerHTML += `<div style="font-size:10px;color:var(--accent);font-family:'Poppins',sans-serif;margin-top:3px;display:flex;align-items:center;gap:4px;">
-            <span class="material-icons-round" style="font-size:12px;animation:commitSpin 0.8s linear infinite;">refresh</span>Restoring...
-        </div>`;
-            try {
-                const prevFile = await ghApi(`/repos/${ghCurrentRepo}/contents/${ghCurrentFile}?ref=${sha}`);
-                const prevContent = decodeB64(prevFile.content);
-                const curTab = fileTabs.find(t => t.id === activeTabId);
-                if (curTab) curTab.content = prevContent;
-                editor.setValue(prevContent, -1);
-                closeUndoModal();
-                showToast(`"${fname}" restored to ${sha.slice(0, 7)}`, 'undo');
-            } catch (e) {
-                let err = e.message || 'Restore failed.';
-                try { const j = JSON.parse(err); if (j.message) err = j.message; } catch (_) { }
-                cdAlert('Restore Failed', err, 'error');
-            }
+            cdConfirm('Restore Commit', `Are you sure you want to restore "${fname}" to commit ${sha.slice(0, 7)}?`, 'Restore', 'Cancel', async (confirmed) => {
+                if (!confirmed) return;
+
+                // Highlight selected row
+                rowEl.style.background = 'var(--accent-dim)';
+                rowEl.style.pointerEvents = 'none';
+                
+                const loader = document.createElement('div');
+                loader.style.cssText = "font-size:10px;color:var(--accent);font-family:'Poppins',sans-serif;margin-top:3px;display:flex;align-items:center;gap:4px;";
+                loader.innerHTML = `<span class="material-icons-round" style="font-size:12px;animation:commitSpin 0.8s linear infinite;">refresh</span>Restoring...`;
+                rowEl.appendChild(loader);
+
+                try {
+                    const prevFile = await ghApi(`/repos/${ghCurrentRepo}/contents/${ghCurrentFile}?ref=${sha}`);
+                    const prevContent = decodeB64(prevFile.content);
+                    const curTab = fileTabs.find(t => t.id === activeTabId);
+                    if (curTab) curTab.content = prevContent;
+                    editor.setValue(prevContent, -1);
+                    closeUndoModal();
+                    showToast(`"${fname}" restored to ${sha.slice(0, 7)}`, 'undo');
+                } catch (e) {
+                    let err = e.message || 'Restore failed.';
+                    try { const j = JSON.parse(err); if (j.message) err = j.message; } catch (_) { }
+                    cdAlert('Restore Failed', err, 'error');
+                    rowEl.style.background = '';
+                    rowEl.style.pointerEvents = 'auto';
+                    loader.remove();
+                }
+            });
         }
 
         // LOAD ENTIRE REPO
