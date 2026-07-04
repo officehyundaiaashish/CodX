@@ -8032,13 +8032,33 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 if (!newName || newName === currentName) return;
                 try {
                     await ghApi(`/repos/${ghCurrentRepo}`, 'PATCH', { name: newName });
+                    
+                    // Clear current files and selection state
+                    _ghTree = [];
+                    _ghCurrentPath = '';
+                    _ghSelectedItem = null;
+                    const treeEl = document.getElementById('gh-file-tree');
+                    if (treeEl) treeEl.innerHTML = '<div class="gh-tree-loading">Loading files...</div>';
+
                     const owner = ghCurrentRepo.split('/')[0];
                     ghCurrentRepo = `${owner}/${newName}`;
                     localStorage.setItem('gh_last_repo', ghCurrentRepo);
                     _ghUpdateHeaderStatus();
+                    
+                    // Instantly update the custom select trigger text to match new name
+                    const triggerText = document.querySelector('#gh-repo-select ~ .gh-custom-trigger .gh-trigger-text');
+                    if (triggerText) {
+                        triggerText.textContent = newName;
+                        triggerText.classList.add('selected');
+                    }
+
                     _ghReposLoaded = false;
-                    fetchGhRepos();
-                    cdAlert('Renamed', `Repository renamed to "${newName}"`, 'success');
+                    
+                    // Delay slightly to let GitHub backend register the rename before listing repos
+                    setTimeout(() => {
+                        fetchGhRepos();
+                        cdAlert('Renamed', `Repository renamed to "${newName}"`, 'success');
+                    }, 1000);
                 } catch (e) {
                     cdAlert('Rename Failed', 'Could not rename. Check permissions.', 'error');
                 }
