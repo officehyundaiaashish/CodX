@@ -980,7 +980,7 @@
         @media (min-width: 768px) {
             #github-modal,
             #gh-undo-modal {
-                max-width: 500px;
+                max-width: 680px;
                 padding: 24px;
             }
         }
@@ -1117,7 +1117,7 @@
             width: 100%;
             padding: 11px 36px 11px 12px;
             border-radius: 10px;
-            background: rgba(0, 0, 0, 0.25);
+            background: var(--glass-bg);
             border: 1px solid var(--glass-border);
             color: var(--text-color);
             font-family: 'Poppins', sans-serif;
@@ -1138,7 +1138,7 @@
             font-family: 'Poppins', sans-serif;
             border-radius: 12px;
             padding: 12px 14px;
-            background: rgba(0, 0, 0, 0.2);
+            background: var(--glass-bg);
             border: 1px solid var(--glass-border);
             color: var(--text-color);
             transition: all 0.2s ease;
@@ -1147,7 +1147,7 @@
         #github-modal input:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 2px var(--accent-dim);
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--glass-bg);
             outline: none;
         }
 
@@ -1157,7 +1157,7 @@
             max-height: 260px;
             overflow-y: auto;
             border-radius: 10px;
-            background: var(--glass-bg);
+            background: rgba(0, 0, 0, 0.15);
             border: 1px solid var(--glass-border);
         }
 
@@ -1252,8 +1252,9 @@
             flex-wrap: wrap;
             margin-bottom: 8px;
             padding: 6px 10px;
-            background: rgba(0, 0, 0, 0.15);
+            background: var(--glass-bg);
             border-radius: 8px;
+            border: 1px solid var(--glass-border);
         }
 
         .gh-crumb {
