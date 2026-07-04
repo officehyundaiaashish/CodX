@@ -6805,14 +6805,10 @@
             toast.style.bottom = 'auto';
             toast.style.transform = 'translateX(-50%)';
 
-            if (commitModal) {
-                // Commit modal open → center vertically
+            if (commitModal || anyModal) {
+                // Modal or Commit modal open → center vertically
                 toast.style.top = '50%';
                 toast.style.transform = 'translateX(-50%) translateY(-50%)';
-            } else if (anyModal) {
-                // Modal open → just below header with 16px gap
-                const hh = (document.getElementById('header') || {}).offsetHeight || 48;
-                toast.style.top = (hh + 16) + 'px';
             } else if (_chatIsFullscreen) {
                 // Chat fullscreen → dead center of screen
                 toast.style.top = '50%';
@@ -8028,11 +8024,16 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     });
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     const blob = await resp.blob();
+                    const blobUrl = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
+                    a.href = blobUrl;
                     a.download = `${repoName}.zip`;
+                    document.body.appendChild(a);
                     a.click();
-                    URL.revokeObjectURL(a.href);
+                    document.body.removeChild(a);
+                    setTimeout(() => {
+                        URL.revokeObjectURL(blobUrl);
+                    }, 1000);
                     showToast(`"${repoName}.zip" downloaded`, 'download_done');
                 } catch (e) {
                     // Fallback to direct browser download in case of CORS redirect issues
@@ -8123,10 +8124,16 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 };
                 const mime = mimeTypes[ext] || 'application/octet-stream';
                 const blob = new Blob([bytes], { type: mime });
+                const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = name; a.click();
-                URL.revokeObjectURL(a.href);
+                a.href = blobUrl;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => {
+                    URL.revokeObjectURL(blobUrl);
+                }, 1000);
                 showToast(`"${name}" downloaded`, 'download_done');
             } catch (e) { 
                 cdAlert('GitHub', 'Failed to download.', 'error'); 
