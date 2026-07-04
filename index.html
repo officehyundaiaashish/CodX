@@ -8100,6 +8100,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
         }
 
         async function _ghQuickDownload(path, name) {
+            showToast('Downloading file...', 'download');
             try {
                 let fileData = await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`);
                 const b64 = fileData.content.replace(/\s/g, '');
@@ -8126,7 +8127,10 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 a.href = URL.createObjectURL(blob);
                 a.download = name; a.click();
                 URL.revokeObjectURL(a.href);
-            } catch (e) { cdAlert('GitHub', 'Failed to download.', 'error'); }
+                showToast(`"${name}" downloaded`, 'download_done');
+            } catch (e) { 
+                cdAlert('GitHub', 'Failed to download.', 'error'); 
+            }
         }
 
         async function loadGhFile() {
