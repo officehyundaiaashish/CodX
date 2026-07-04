@@ -1920,7 +1920,7 @@
             width: 100%;
             padding: 11px 36px 11px 12px;
             border-radius: 10px;
-            background: rgba(0, 0, 0, 0.25);
+            background: var(--glass-bg);
             border: 1px solid var(--glass-border);
             color: var(--text-color);
             font-family: 'Poppins', sans-serif;
@@ -8639,6 +8639,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
         function renderGhCustomSelect(id, items, placeholder, onChange) {
             // Find parent container
             const oldEl = document.getElementById(id);
+            const currentVal = oldEl ? (oldEl.value || oldEl._value || '') : '';
             const parent = oldEl ? oldEl.closest('.gh-select-wrap') || oldEl.parentElement : null;
             if (!parent) return;
             parent.innerHTML = '';
@@ -8656,9 +8657,14 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 if (!item.value) return;
                 const opt = document.createElement('div');
                 opt.className = 'gh-custom-option';
+                if (item.value === currentVal) {
+                    opt.classList.add('selected');
+                }
                 opt.innerHTML = `<span class="material-icons-round">${item.icon || 'insert_drive_file'}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${item.label}</span>`;
                 opt.onclick = (e) => {
                     e.stopPropagation();
+                    list.querySelectorAll('.gh-custom-option.selected').forEach(o => o.classList.remove('selected'));
+                    opt.classList.add('selected');
                     trigger.querySelector('.gh-trigger-text').textContent = item.label;
                     trigger.querySelector('.gh-trigger-text').classList.add('selected');
                     trigger.classList.remove('open'); list.classList.remove('open');
@@ -8669,7 +8675,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             });
 
             const hidden = document.createElement('span');
-            hidden.id = id; hidden._value = '';
+            hidden.id = id; hidden._value = currentVal;
 
             trigger.onclick = (e) => {
                 e.stopPropagation();
