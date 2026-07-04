@@ -8065,10 +8065,30 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
         async function _ghQuickDownload(path, name) {
             try {
                 let fileData = await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`);
-                let content = decodeB64(fileData.content);
+                const b64 = fileData.content.replace(/\s/g, '');
+                const binaryStr = atob(b64);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) {
+                    bytes[i] = binaryStr.charCodeAt(i);
+                }
+                const ext = name.split('.').pop().toLowerCase();
+                const mimeTypes = {
+                    'png': 'image/png',
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'gif': 'image/gif',
+                    'svg': 'image/svg+xml',
+                    'webp': 'image/webp',
+                    'ico': 'image/x-icon',
+                    'pdf': 'application/pdf',
+                    'zip': 'application/zip'
+                };
+                const mime = mimeTypes[ext] || 'application/octet-stream';
+                const blob = new Blob([bytes], { type: mime });
                 const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+                a.href = URL.createObjectURL(blob);
                 a.download = name; a.click();
+                URL.revokeObjectURL(a.href);
             } catch (e) { cdAlert('GitHub', 'Failed to download.', 'error'); }
         }
 
