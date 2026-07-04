@@ -8274,7 +8274,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 }
             }
 
-            _ghTree = []; setTimeout(fetchGhFiles, 800);
+            _ghTree = []; setTimeout(fetchGhRepos, 800);
             if (failed === 0) {
                 cdAlert('Uploaded', `${uploaded} file${uploaded > 1 ? 's' : ''} uploaded successfully.`, 'success');
             } else {
