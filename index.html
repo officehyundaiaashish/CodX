@@ -7615,8 +7615,11 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             _ghDisableFileActions();
             try {
                 let repoData = await ghApi(`/repos/${ghCurrentRepo}`);
-                let branch = repoData.default_branch;
-                let treeData = await ghApi(`/repos/${ghCurrentRepo}/git/trees/${branch}?recursive=1`);
+                let branchName = repoData.default_branch;
+                // Get the actual latest commit SHA of the default branch to bypass API and CDN caches
+                let refData = await ghApi(`/repos/${ghCurrentRepo}/git/ref/heads/${branchName}`);
+                let sha = refData.object.sha;
+                let treeData = await ghApi(`/repos/${ghCurrentRepo}/git/trees/${sha}?recursive=1`);
                 _ghTree = treeData.tree;
                 _ghCurrentPath = '';
                 _ghRenderTree();
