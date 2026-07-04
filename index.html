@@ -7490,7 +7490,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
         function encodeB64(str) { return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1) { return String.fromCharCode('0x' + p1); })); }
         function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(function (c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); }
 
-        async function fetchGhRepos(preservePath = false) {
+        async function fetchGhRepos() {
             try {
                 // Try /user/repos first (classic tokens)
                 // For fine-grained tokens, fallback to last saved repo
@@ -7513,10 +7513,10 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                             localStorage.setItem('gh_last_repo', val);
                             _ghUpdateHeaderStatus();
                             _ghTree = []; _ghCurrentPath = ''; _ghSelectedItem = null;
-                            fetchGhFiles(false);
+                            fetchGhFiles();
                         });
                         const el = document.getElementById('gh-repo-select');
-                        if (el) { el._value = lastRepo; ghCurrentRepo = lastRepo; _ghUpdateHeaderStatus(); fetchGhFiles(preservePath); }
+                        if (el) { el._value = lastRepo; ghCurrentRepo = lastRepo; _ghUpdateHeaderStatus(); fetchGhFiles(); }
                     } else {
                         cdAlert('GitHub', 'Fine-grained token detected. Please use a Classic token with "repo" scope for full access.', 'warn');
                         _ghReposLoaded = false;
@@ -7530,11 +7530,11 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     localStorage.setItem('gh_last_repo', val);
                     _ghUpdateHeaderStatus();
                     _ghTree = []; _ghCurrentPath = ''; _ghSelectedItem = null;
-                    fetchGhFiles(false);
+                    fetchGhFiles();
                 });
                 if (lastRepo) {
                     const el = document.getElementById('gh-repo-select');
-                    if (el) { el._value = lastRepo; ghCurrentRepo = lastRepo; _ghUpdateHeaderStatus(); fetchGhFiles(preservePath); }
+                    if (el) { el._value = lastRepo; ghCurrentRepo = lastRepo; _ghUpdateHeaderStatus(); fetchGhFiles(); }
                 }
                 // Initialize custom dropdown trigger for repo selector
                 _initRepoCustomDropdown();
@@ -7597,7 +7597,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             await fetchGhFiles();
         }
 
-        async function fetchGhFiles(preservePath = false) {
+        async function fetchGhFiles() {
             const _repoEl = document.getElementById('gh-repo-select');
             ghCurrentRepo = (_repoEl ? _repoEl._value : '') || ghCurrentRepo || '';
             if (!ghCurrentRepo) return;
@@ -7621,9 +7621,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 let sha = refData.object.sha;
                 let treeData = await ghApi(`/repos/${ghCurrentRepo}/git/trees/${sha}?recursive=1`);
                 _ghTree = treeData.tree;
-                if (!preservePath) {
-                    _ghCurrentPath = '';
-                }
+                _ghCurrentPath = '';
                 _ghRenderTree();
             } catch (e) { tree.innerHTML = '<div class="gh-tree-loading">Failed to load files.</div>'; }
         }
@@ -8169,7 +8167,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     } else {
                         cdAlert('Rename Folder', 'GitHub does not support direct folder rename. Please rename files individually.', 'info');
                     }
-                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
+                    _ghTree = []; setTimeout(fetchGhRepos, 800);
                 } catch (e) { cdAlert('Rename Failed', 'Could not rename. Check permissions.', 'error'); }
             });
         }
@@ -8194,7 +8192,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                         cdAlert('Deleted', `Folder "${item.name}" deleted.`, 'success');
                     }
                     _ghSelectedItem = null; _ghDisableFileActions();
-                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
+                    _ghTree = []; setTimeout(fetchGhRepos, 800);
                 } catch (e) { cdAlert('Delete Failed', 'Could not delete. Check permissions.', 'error'); }
             });
         }
@@ -8208,7 +8206,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                     const blankContent = encodeB64(_getBlankContentForFile(name));
                     await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`, 'PUT', { message: `Create ${name}`, content: blankContent });
                     cdAlert('Created', `"${name}" created.`, 'success');
-                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
+                    _ghTree = []; setTimeout(fetchGhRepos, 800);
                 } catch (e) { cdAlert('Failed', 'Could not create file.', 'error'); }
             });
         }
@@ -8221,7 +8219,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 try {
                     await ghApi(`/repos/${ghCurrentRepo}/contents/${path}`, 'PUT', { message: `Create folder ${name}`, content: btoa('') });
                     cdAlert('Created', `Folder "${name}" created.`, 'success');
-                    _ghTree = []; setTimeout(() => fetchGhFiles(true), 800);
+                    _ghTree = []; setTimeout(fetchGhRepos, 800);
                 } catch (e) { cdAlert('Failed', 'Could not create folder.', 'error'); }
             });
         }
@@ -8276,7 +8274,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 }
             }
 
-            _ghTree = []; setTimeout(() => fetchGhRepos(true), 800);
+            _ghTree = []; setTimeout(fetchGhRepos, 800);
             if (failed === 0) {
                 cdAlert('Uploaded', `${uploaded} file${uploaded > 1 ? 's' : ''} uploaded successfully.`, 'success');
             } else {
@@ -8438,7 +8436,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 200); }
                 closeGithubModal();
                 _showCommitToast(`"${ghCurrentFile.split('/').pop()}" pushed to ${ghCurrentRepo.split('/').pop()}`);
-                if (document.getElementById('gh-repo-select')?._value) setTimeout(() => fetchGhFiles(true), 800);
+                if (document.getElementById('gh-repo-select')?._value) setTimeout(fetchGhRepos, 800);
             } catch (e) {
                 const sp = document.getElementById('commit-spinner');
                 if (sp) sp.remove();
