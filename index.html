@@ -697,8 +697,17 @@
         .cursor-nav {
             display: flex;
             overflow-x: auto;
-            padding: 4px 8px 6px 8px;
+            padding: 4px 12px 6px 12px;
             gap: 5px;
+            scroll-behavior: smooth;
+            scroll-snap-type: x proximity;
+            -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+        }
+        .cursor-nav .icon-btn {
+            scroll-snap-align: start;
+            transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease, background 0.15s;
+            will-change: transform, opacity;
         }
 
         .cursor-nav::-webkit-scrollbar {
@@ -5009,22 +5018,82 @@
         #editor {
             z-index: 20 !important;
         }
-        /* Global Ultra-Round Theme Override */
-        button:not(#nav-toggle-btn):not(.mp-choice):not(.jumper-btn):not(.file-tab):not(.gh-tree-item),
-        .cdlg-btn, .toolbar-btn, .icon-btn, .fm-chip, .code-canvas-btn,
-        .gh-btn, .agent-action-btn, .tabs, .tabs::before, .tab,
+        /* Global Ultra-Round Theme Override (All Buttons, Icons, Pills, Tabs, Dialogs) */
+        button:not(#nav-toggle-btn):not(.mp-choice):not(.file-tab):not(.gh-tree-item),
+        .cdlg-btn, .toolbar-btn, .icon-btn, .jumper-btn, .fm-chip, .code-canvas-btn,
+        .gh-btn, .modal-btn, .pv-btn, .welcome-start-btn, .agent-action-btn,
+        .agent-step-accept, .agent-step-reject, .agent-step-refine-btn, .agent-step-refine-send,
+        .chat-apply-btn, .chat-copy-btn, .chat-split-mini-btn, .chp-del-btn,
+        .gh-item-action-btn, .am-agent-del, .gena-ask-submit, #lang-chip,
+        .am-model-tag, .am-provider-tag, .drag-pill, #chat-session-label,
+        .tabs, .tabs::before, .tab, .np-tab-bar, .np-tab,
         #magic-copy, #magic-undo, #magic-upload, #magic-paste, #magic-clear, #magic-parse,
         #magic-box header button, #magic-box footer button, #magic-prompt-dialog header button {
             border-radius: 999px !important;
         }
-        .file-tab, .mp-choice, .mp-guide, .mp-outcome,
-        .code-canvas, .agent-step-card, #magic-json,
-        input[type="text"], input[type="password"], input[type="search"], textarea, select {
-            border-radius: 18px !important;
+        .file-tab, .mp-choice, .mp-guide, .mp-outcome, .agent-provider-btn,
+        .np-save-opt, .np-vis-opt, .am-agent-row, .am-provider-row, .am-model-row,
+        .welcome-feature, .code-canvas, .agent-step-card, .chat-fix-card, .chat-split-card,
+        .gena-ask-card, .gena-run-card, .prompt-preview-card, .repo-progress-card,
+        .chp-session-row, .gh-custom-trigger, .gh-custom-list, .gh-breadcrumb, #gh-file-tree,
+        #magic-json, input[type="text"], input[type="password"], input[type="search"], textarea, select {
+            border-radius: 20px !important;
         }
-        dialog, #magic-box, #magic-prompt-dialog,
-        .modal, #github-modal, #agent-modal, #custom-dialog-box, #new-project-modal, #welcome-card {
-            border-radius: 28px !important;
+        dialog, #magic-box, #magic-prompt-dialog, .modal,
+        #github-modal, #agent-modal, #gh-undo-modal, #custom-dialog-box, #new-project-modal,
+        #custom-model-dialog, #move-copy-dialog, #diff-review-modal,
+        .welcome-card, #agent-step-panel, #chat-panel-toast, #action-toast,
+        #chat-mode-toast, #commit-modal-box, #commit-success-toast {
+            border-radius: 30px !important;
+        }
+        #agent-chat-panel, #chat-history-panel, #inline-chat-panel {
+            border-radius: 30px 30px 0 0 !important;
+        }
+        /* Circular Red Close Buttons & Icons */
+        button[aria-label="Close"],
+        #mp-close,
+        #chat-close-btn,
+        .chp-close-btn,
+        #agent-close-btn,
+        .ft-close,
+        button[onclick*="close" i]:not([onclick*="closeAllTabs"]),
+        span.material-icons-round[onclick*="close" i],
+        span.material-icons-round[onclick*=".remove()"],
+        span.material-icons-round[onclick*="_inlineClearAttach"] {
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            border: none !important;
+            opacity: 1 !important;
+            border-radius: 999px !important;
+            width: 28px !important;
+            height: 28px !important;
+            min-width: 28px !important;
+            min-height: 28px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            transition: background 0.15s, transform 0.15s;
+        }
+        button[aria-label="Close"]:hover,
+        #mp-close:hover,
+        #chat-close-btn:hover,
+        .chp-close-btn:hover,
+        #agent-close-btn:hover,
+        .ft-close:hover,
+        button[onclick*="close" i]:not([onclick*="closeAllTabs"]):hover,
+        span.material-icons-round[onclick*="close" i]:hover,
+        span.material-icons-round[onclick*=".remove()"]:hover,
+        span.material-icons-round[onclick*="_inlineClearAttach"]:hover {
+            background: #dc2626 !important;
+        }
+        .ft-close {
+            width: 17px !important;
+            height: 17px !important;
+            min-width: 17px !important;
+            min-height: 17px !important;
+            font-size: 12px !important;
         }
     </style>
 </head>
@@ -7221,6 +7290,37 @@
                 observer.observe(chatMessagesBox, { childList: true, subtree: true, characterData: true });
             }
         });
+
+        // ── Smooth edge-wave animation on .cursor-nav horizontal scroll ──
+        (function initCursorNavScrollAnim() {
+            const nav = document.querySelector('.cursor-nav');
+            if (!nav) return;
+            let rafId = null;
+            const update = () => {
+                rafId = null;
+                const rect = nav.getBoundingClientRect();
+                const edge = 28;
+                nav.querySelectorAll('.icon-btn').forEach(btn => {
+                    const b = btn.getBoundingClientRect();
+                    const cx = b.left + b.width / 2;
+                    const distLeft = cx - rect.left;
+                    const distRight = rect.right - cx;
+                    const d = Math.min(distLeft, distRight);
+                    const t = Math.max(0, Math.min(1, d / edge));
+                    const s = 0.82 + 0.18 * t;
+                    const o = 0.45 + 0.55 * t;
+                    btn.style.transform = t < 0.99 ? 'scale(' + s.toFixed(3) + ')' : '';
+                    btn.style.opacity = t < 0.99 ? o.toFixed(2) : '';
+                });
+            };
+            nav.addEventListener('scroll', () => {
+                if (!rafId) rafId = requestAnimationFrame(update);
+            }, { passive: true });
+            window.addEventListener('resize', () => {
+                if (!rafId) rafId = requestAnimationFrame(update);
+            });
+            requestAnimationFrame(update);
+        })();
 
         // ── NAV TOGGLE: full ↔ mini (single cursor row) ──
         function toggleNavSize() {
