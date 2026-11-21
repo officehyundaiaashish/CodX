@@ -1950,6 +1950,18 @@
 
 
         /* ──────────────────────── Custom Dialog ──────────────────────── */
+        #magic-box { margin: auto; width: min(350px, 94vw); max-height: 88dvh; overflow: auto; padding: 10px; border: 1px solid var(--glass-border); border-radius: 12px; background: var(--glass-bg); color: var(--text-color); }
+        #magic-box::backdrop { background: rgba(0,0,0,.4); }
+        #magic-box header, #magic-box footer { display: flex; align-items: center; gap: 6px; }
+        #magic-box strong { flex: 1; font-size: 13px; }
+        #magic-box button { min-height: 32px; padding: 0 8px; flex: none; font-size: 12px; }
+        #magic-box button:focus-visible, #magic-box input:focus-visible, #magic-json:focus-visible { outline: 2px solid var(--accent); }
+        #magic-json { display: block; width: 100%; height: 88px; max-height: 48vh; max-height: 48dvh; margin: 5px 0; padding: 8px; resize: none; border: 1px solid var(--glass-border); border-radius: 7px; background: var(--editor-bg); color: inherit; font: 13px/1.4 monospace; user-select: text; -webkit-user-select: text; }
+        #magic-box label, #magic-note { font-size: 11px; }
+        #magic-height { width: 72px; accent-color: var(--accent); }
+        #magic-parse { margin-left: auto; }
+        #magic-note:empty { display: none; }
+
         #custom-dialog-overlay {
             position: fixed;
             inset: 0;
@@ -5990,6 +6002,24 @@
         </div>
     </div>
 
+    <dialog id="magic-box" aria-labelledby="magic-title" onkeydown="event.stopPropagation()">
+        <header>
+            <strong id="magic-title">JSON Magic</strong>
+            <button type="button" id="magic-copy" class="cdlg-btn secondary" aria-label="Copy prompt" title="Copy prompt">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+            <button type="button" id="magic-paste" class="cdlg-btn secondary" autofocus>Paste</button>
+            <button type="button" class="cdlg-btn secondary" aria-label="Close" onclick="this.closest('dialog').close()">×</button>
+        </header>
+        <textarea id="magic-json" aria-label="JSON to parse" placeholder="Paste JSON here" spellcheck="false"></textarea>
+        <footer>
+            <label for="magic-height">Height</label>
+            <input id="magic-height" type="range" min="60" max="300" step="4" value="88">
+            <button type="button" id="magic-parse" class="cdlg-btn primary">Parse</button>
+        </footer>
+        <p id="magic-note" role="status"></p>
+    </dialog>
+
     <!-- Custom Dialog (replaces all browser confirm/alert/prompt) -->
     <div id="custom-dialog-overlay">
         <div id="custom-dialog-box">
@@ -7511,8 +7541,32 @@
 }
 
 function parseMagicJson() {
-    cdPrompt('JSON Magic Paste', 'Paste your AI generated JSON block containing "old" and "new" rules:', '', function(pastedData) {
-        if (!pastedData) return;
+    const box = document.getElementById('magic-box');
+    if (box.open) return;
+    const field = document.getElementById('magic-json');
+    const size = document.getElementById('magic-height');
+    const paste = document.getElementById('magic-paste');
+    const note = document.getElementById('magic-note');
+    note.textContent = '';
+    field.value = '';
+    try { size.value = localStorage.getItem('codx_magic_height') || '88'; } catch {}
+    const resize = () => { field.style.height = size.value + 'px'; };
+    resize();
+    size.oninput = resize;
+    size.onchange = () => { try { localStorage.setItem('codx_magic_height', size.value); } catch {} };
+    paste.onclick = async function readClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (!box.open || paste.onclick !== readClipboard) return;
+            if (text) field.value = text;
+            note.textContent = text ? '' : 'Clipboard is empty.';
+        } catch {
+            if (box.open && paste.onclick === readClipboard) note.textContent = 'Touch and hold the field to paste.';
+        }
+    };
+    document.getElementById('magic-parse').onclick = () => {
+        const pastedData = field.value;
+        if (!pastedData.trim()) { note.textContent = 'Paste JSON first.'; return; }
         try {
             let cleanedData = pastedData.trim();
             if (!cleanedData.startsWith('{')) {
@@ -7535,6 +7589,7 @@ function parseMagicJson() {
                 }
             }
             if (parsed && (parsed.old !== undefined || parsed.new !== undefined)) {
+                box.close();
                 const oldVal = parsed.old || '';
                 const newVal = parsed.new || '';
                 document.getElementById('find-input').value = oldVal;
@@ -7549,16 +7604,13 @@ function parseMagicJson() {
                     }
                 }, 100);
             } else {
-                showToast('Failed: "old" or "new" keys missing.', 'error_outline');
+                note.textContent = 'Missing "old" or "new".';
             }
         } catch (err) {
-            showToast('Unsuccessful: Invalid JSON format.', 'error_outline');
+            note.textContent = 'Invalid JSON.';
         }
-    });
-    const copyButton = document.createElement('button');
-    copyButton.type = 'button';
-    copyButton.className = 'cdlg-btn secondary';
-    copyButton.textContent = 'Copy prompt';
+    };
+    const copyButton = document.getElementById('magic-copy');
     copyButton.onclick = async () => {
         const promptText = [
             'Use the source file and change request I provide. If either is missing, ask for it first.',
@@ -7571,18 +7623,12 @@ function parseMagicJson() {
         ].join('\n');
         try {
             await navigator.clipboard.writeText(promptText);
-            copyButton.textContent = 'Copied';
+            note.textContent = 'Prompt copied.';
         } catch {
             window.prompt('Copy this model prompt', promptText);
         }
     };
-    document.getElementById('custom-dialog-btns').prepend(copyButton);
-    setTimeout(function() {
-        let dialogOverlay = document.getElementById('custom-dialog-overlay');
-        if (dialogOverlay) {
-            dialogOverlay.style.zIndex = '100005';
-        }
-    }, 50);
+    box.showModal();
 }
 
         // --- KEYBOARD SHORTCUTS ---
