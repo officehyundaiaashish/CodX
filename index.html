@@ -7082,6 +7082,9 @@
 
             const chatPanel = document.getElementById('inline-chat-panel');
             const commitModal = document.getElementById('commit-modal-overlay');
+            const openDialog = document.querySelector('dialog[open]');
+            const host = openDialog || document.body;
+            if (toast.parentElement !== host) host.appendChild(toast);
             const anyModal = document.querySelector('.modal.active, #github-modal.active, #agent-modal.active, #custom-dialog-overlay.active, #new-project-overlay.active');
             const panel = document.getElementById('bottom-panel');
 
@@ -7090,7 +7093,9 @@
             toast.style.bottom = 'auto';
             toast.style.transform = 'translateX(-50%)';
 
-            if (commitModal || anyModal) {
+            if (openDialog) {
+                toast.style.top = '18px';
+            } else if (commitModal || anyModal) {
                 // Modal or Commit modal open → center vertically
                 toast.style.top = '50%';
                 toast.style.transform = 'translateX(-50%) translateY(-50%)';
@@ -7908,7 +7913,8 @@ function parseMagicJson(fromShortcut = false) {
                 ].join('\n');
             try {
                 await navigator.clipboard.writeText(promptText);
-                note.textContent = type === 'single' ? 'Step-by-step prompt copied.' : 'All-in-one prompt copied.';
+                note.textContent = '';
+                showToast(type === 'single' ? 'Step-by-Step prompt copied!' : 'All-in-One prompt copied!', 'content_copy');
             } catch {
                 window.prompt('Copy this model prompt', promptText);
             }
