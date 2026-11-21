@@ -1961,15 +1961,22 @@
         #magic-height { width: 72px; accent-color: var(--accent); }
         #magic-parse { margin-left: auto; }
         #magic-note:empty { display: none; }
-        #magic-copy-wrap { position: relative; display: inline-flex; }
-        #magic-copy { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: background 0.15s, color 0.15s; }
-        #magic-copy[aria-expanded="true"] { background: var(--accent-wash); color: var(--accent); }
-        #magic-copy-menu { position: absolute; top: calc(100% + 6px); right: 0; min-width: 230px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28); z-index: 20; display: none; flex-direction: column; gap: 2px; }
-        #magic-copy-menu.open { display: flex; }
-        #magic-copy-menu button { width: 100%; min-height: 0; padding: 8px 10px; border: none; border-radius: 7px; background: transparent; color: var(--text-color); text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; cursor: pointer; font-family: 'Poppins', sans-serif; }
-        #magic-copy-menu button:hover, #magic-copy-menu button:focus-visible { background: var(--accent-wash); color: var(--accent); }
-        #magic-copy-menu button span { font-size: 11px; font-weight: 600; line-height: 1.2; }
-        #magic-copy-menu button small { font-size: 10px; opacity: 0.65; font-weight: 400; line-height: 1.2; }
+        #magic-copy, #magic-undo { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: opacity 0.15s, background 0.15s, color 0.15s; }
+        #magic-copy:hover, #magic-undo:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
+        #magic-undo:disabled { opacity: 0.35; cursor: not-allowed; }
+        #magic-prompt-dialog { margin: auto; width: min(360px, 92vw); padding: 14px; border: 1px solid var(--glass-border); border-radius: 14px; background: var(--glass-bg); color: var(--text-color); font-family: 'Poppins', sans-serif; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
+        #magic-prompt-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+        #magic-prompt-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+        #magic-prompt-dialog header strong { font-size: 13px; font-weight: 600; color: var(--text-color); }
+        #magic-prompt-dialog header button { min-height: 28px; width: 28px; padding: 0; flex: none; font-size: 14px; border-radius: 7px; }
+        .mp-guide { background: var(--editor-bg); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .mp-step { display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45; color: var(--text-color); }
+        .mp-num { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-wash); color: var(--accent); font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .mp-actions { display: flex; flex-direction: column; gap: 7px; }
+        .mp-choice { width: 100%; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--glass-border); background: rgba(128, 128, 128, 0.08); color: var(--text-color); text-align: left; display: flex; flex-direction: column; gap: 2px; cursor: pointer; font-family: 'Poppins', sans-serif; transition: border-color 0.15s, background 0.15s; }
+        .mp-choice:hover, .mp-choice:focus-visible { border-color: var(--accent); background: var(--accent-wash); outline: none; }
+        .mp-choice span { font-size: 12px; font-weight: 600; color: var(--text-color); }
+        .mp-choice small { font-size: 10px; opacity: 0.65; font-weight: 400; color: var(--text-color); }
 
         #custom-dialog-overlay {
             position: fixed;
@@ -6015,21 +6022,12 @@
     <dialog id="magic-box" aria-labelledby="magic-title" onkeydown="event.stopPropagation()">
         <header>
             <strong id="magic-title">JSON Magic</strong>
-            <div id="magic-copy-wrap">
-                <button type="button" id="magic-copy" class="cdlg-btn secondary" aria-label="Copy prompt" aria-haspopup="menu" aria-expanded="false" title="Copy prompt">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                </button>
-                <div id="magic-copy-menu" role="menu" aria-label="Prompt options">
-                    <button type="button" role="menuitem" data-prompt-type="single">
-                        <span>Split Old &amp; New Block</span>
-                        <small>Single {"old", "new"} JSON object</small>
-                    </button>
-                    <button type="button" role="menuitem" data-prompt-type="batch">
-                        <span>Single Edit · Multiple Blocks</span>
-                        <small>One {"edits": [...]} JSON array</small>
-                    </button>
-                </div>
-            </div>
+            <button type="button" id="magic-undo" class="cdlg-btn secondary" aria-label="Undo last edit" title="Undo last edit">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+            </button>
+            <button type="button" id="magic-copy" class="cdlg-btn secondary" aria-label="Copy AI prompt" title="Copy AI prompt">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
             <button type="button" id="magic-paste" class="cdlg-btn secondary" autofocus>Paste</button>
             <button type="button" class="cdlg-btn secondary" aria-label="Close" onclick="closeMagicJson()">×</button>
         </header>
@@ -6041,6 +6039,27 @@
             <button type="button" id="magic-parse" class="cdlg-btn primary">Parse</button>
         </footer>
         <p id="magic-note" role="status"></p>
+    </dialog>
+    <dialog id="magic-prompt-dialog" aria-labelledby="mp-title" onkeydown="event.stopPropagation()">
+        <header>
+            <strong id="mp-title">AI Prompt Guide</strong>
+            <button type="button" id="mp-close" class="cdlg-btn secondary" aria-label="Close">×</button>
+        </header>
+        <div class="mp-guide">
+            <div class="mp-step"><span class="mp-num">1</span><span>Choose and copy one of the AI instruction prompts below.</span></div>
+            <div class="mp-step"><span class="mp-num">2</span><span>Paste it into any AI (ChatGPT, Claude, Gemini) along with your code and requested changes.</span></div>
+            <div class="mp-step"><span class="mp-num">3</span><span>Copy the JSON returned by the AI, paste it into Magic Parser, and click <strong>Parse</strong>.</span></div>
+        </div>
+        <div class="mp-actions">
+            <button type="button" class="mp-choice" data-prompt-type="single">
+                <span>Copy Step-by-Step Prompt</span>
+                <small>AI splits each change into a separate {"old", "new"} block</small>
+            </button>
+            <button type="button" class="mp-choice" data-prompt-type="batch">
+                <span>Copy All-in-One Prompt</span>
+                <small>AI combines all changes into one {"edits": [...]} JSON</small>
+            </button>
+        </div>
     </dialog>
 
     <!-- Custom Dialog (replaces all browser confirm/alert/prompt) -->
@@ -7570,21 +7589,10 @@
 
 function closeMagicJson(result = '') {
     const box = document.getElementById('magic-box');
-    if (!box.open || box.dataset.closing) return;
-    box.dataset.closing = 'true';
-    const finish = () => {
-        delete box.dataset.closing;
-        box.close(result);
-    };
-    if (!box.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        finish();
-        return;
-    }
+    if (!box.open) return;
+    delete box.dataset.closing;
     box.getAnimations().forEach(animation => animation.cancel());
-    box.animate([
-        { opacity: 1, transform: 'translateY(0) scale(1)' },
-        { opacity: 0, transform: 'translateY(8px) scale(.97)' }
-    ], { duration: 140, easing: 'ease-in', fill: 'forwards' }).finished.then(finish, finish);
+    box.close(result);
 }
 
 function applyMagicBatch(edits) {
@@ -7708,48 +7716,62 @@ function parseMagicJson(fromShortcut = false) {
             note.textContent = 'Invalid JSON.';
         }
     };
+    const undoButton = document.getElementById('magic-undo');
+    const syncUndoState = () => {
+        const um = editor.session.getUndoManager();
+        undoButton.disabled = !(um && (typeof um.hasUndo === 'function' ? um.hasUndo() : um.canUndo()));
+    };
+    syncUndoState();
+    undoButton.onclick = () => {
+        const um = editor.session.getUndoManager();
+        const canUndo = um && (typeof um.hasUndo === 'function' ? um.hasUndo() : um.canUndo());
+        if (!canUndo) {
+            note.textContent = 'Nothing to undo.';
+            syncUndoState();
+            return;
+        }
+        editorUndo();
+        const tab = fileTabs.find(item => item.id === activeTabId);
+        if (tab) tab.content = editor.getValue();
+        saveSession();
+        if (_inPreview && !_pythonMode) _refreshPreview();
+        syncUndoState();
+        note.textContent = 'Last change undone.';
+    };
     const copyButton = document.getElementById('magic-copy');
-    const copyMenu = document.getElementById('magic-copy-menu');
-    const copyWrap = document.getElementById('magic-copy-wrap');
-    const closeCopyMenu = () => {
-        copyMenu.classList.remove('open');
-        copyButton.setAttribute('aria-expanded', 'false');
+    const promptDialog = document.getElementById('magic-prompt-dialog');
+    document.getElementById('mp-close').onclick = () => promptDialog.close();
+    copyButton.onclick = () => {
+        if (!promptDialog.open) promptDialog.showModal();
     };
-    closeCopyMenu();
-    copyButton.onclick = (e) => {
-        e.stopPropagation();
-        const isOpen = copyMenu.classList.toggle('open');
-        copyButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    };
-    box.onclick = (e) => {
-        if (!copyWrap.contains(e.target)) closeCopyMenu();
-    };
-    copyMenu.querySelectorAll('[data-prompt-type]').forEach(item => {
-        item.onclick = async (e) => {
-            e.stopPropagation();
+    promptDialog.querySelectorAll('[data-prompt-type]').forEach(item => {
+        item.onclick = async () => {
             const type = item.dataset.promptType;
-            closeCopyMenu();
+            promptDialog.close();
             const promptText = type === 'single'
                 ? [
                     'Use the source file and change request I provide. If either is missing, ask for it first.',
-                    'Return one valid JSON object with exactly two string keys: "old" and "new".',
+                    'Split every requested change into its own separate valid JSON object with exactly two string keys: "old" and "new", so I can apply them one by one.',
+                    'Do NOT combine multiple changes into an "edits" array. Output each {"old":"...","new":"..."} JSON block separately in order.',
                     'Copy the smallest unique, nonempty block from my file into "old" exactly, including whitespace.',
                     'Put its complete replacement in "new". For an insertion, keep the anchor in the replacement. For deletion, use an empty string.',
-                    'Use valid JSON escaping for newlines, tabs, quotes and backslashes. Include no Markdown, commentary, line numbers or placeholders.',
-                    'Example: {"old":"let count = 1;","new":"let count = 2;"}'
+                    'Use valid JSON escaping for newlines, tabs, quotes and backslashes. Include no commentary, line numbers or placeholders.',
+                    'Example:',
+                    '{"old":"let count = 1;","new":"let count = 2;"}',
+                    '{"old":"let ready = false;","new":"let ready = true;"}'
                 ].join('\n')
                 : [
                     'Use the source file and change request I provide. If either is missing, ask for it first.',
-                    'Return one valid JSON object with an edits array. Include every requested change as an object with old and new string keys.',
+                    'Return ONE single valid JSON object containing an "edits" array with all requested changes together, where each item has "old" and "new" string keys.',
                     'Copy the smallest unique, nonempty block from my file into "old" exactly, including whitespace.',
                     'Put its complete replacement in "new". For an insertion, keep the anchor in the replacement. For deletion, use an empty string.',
                     'Use valid JSON escaping for newlines, tabs, quotes and backslashes. Include no Markdown, commentary, line numbers or placeholders.',
-                    'Edits run in array order on the active file. Each old block must match exactly once after all preceding edits. Include all changes in this response.',
+                    'Edits run in array order on the active file. Each old block must match exactly once after all preceding edits. Include all changes in this single JSON.',
                     'Example: {"edits":[{"old":"let count = 1;","new":"let count = 2;"},{"old":"let ready = false;","new":"let ready = true;"}]}'
                 ].join('\n');
             try {
                 await navigator.clipboard.writeText(promptText);
-                note.textContent = type === 'single' ? 'Single block prompt copied.' : 'Multi-edit prompt copied.';
+                note.textContent = type === 'single' ? 'Step-by-step prompt copied.' : 'All-in-one prompt copied.';
             } catch {
                 window.prompt('Copy this model prompt', promptText);
             }
