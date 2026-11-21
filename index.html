@@ -1961,8 +1961,8 @@
         #magic-height { width: 72px; accent-color: var(--accent); }
         #magic-parse { margin-left: auto; }
         #magic-note:empty { display: none; }
-        #magic-copy, #magic-undo { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: opacity 0.15s, background 0.15s, color 0.15s; }
-        #magic-copy:hover, #magic-undo:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
+        #magic-copy, #magic-undo, #magic-upload { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: opacity 0.15s, background 0.15s, color 0.15s; }
+        #magic-copy:hover, #magic-upload:hover, #magic-undo:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
         #magic-undo:disabled { opacity: 0.35; cursor: not-allowed; }
         #magic-prompt-dialog { margin: auto; width: min(360px, 92vw); padding: 14px; border: 1px solid var(--glass-border); border-radius: 14px; background: var(--glass-bg); color: var(--text-color); font-family: 'Poppins', sans-serif; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
         #magic-prompt-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
@@ -5251,9 +5251,9 @@
             </div>
 
             <div class="scroll-jumpers no-select" id="jumpers">
-                <div class="jumper-btn" onclick="customFastScroll('up')"><span
+                <div class="jumper-btn" data-scroll-dir="up" oncontextmenu="return false"><span
                         class="material-icons-round">keyboard_double_arrow_up</span></div>
-                <div class="jumper-btn" onclick="customFastScroll('down')"><span
+                <div class="jumper-btn" data-scroll-dir="down" oncontextmenu="return false"><span
                         class="material-icons-round">keyboard_double_arrow_down</span></div>
             </div>
 
@@ -6031,6 +6031,10 @@
             <button type="button" id="magic-copy" class="cdlg-btn secondary" aria-label="Copy AI prompt" title="Copy AI prompt">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             </button>
+            <button type="button" id="magic-upload" class="cdlg-btn secondary" aria-label="Upload JSON file" title="Upload JSON file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
+            <input type="file" id="magic-file" accept=".json,application/json,text/plain" hidden>
             <button type="button" id="magic-paste" class="cdlg-btn secondary" autofocus>Paste</button>
             <button type="button" class="cdlg-btn secondary" aria-label="Close" onclick="closeMagicJson()">×</button>
         </header>
@@ -7010,6 +7014,57 @@
             }
             requestAnimationFrame(animation);
         }
+        (function initJumperHoldScroll() {
+            const speedPxPerMs = 800 / 250;
+            let holdTimer = null;
+            let holdRaf = null;
+            let activeDir = null;
+            let holding = false;
+            let lastTime = 0;
+            const stopHold = (runTap) => {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+                if (holdRaf) { cancelAnimationFrame(holdRaf); holdRaf = null; }
+                if (runTap && !holding && activeDir) customFastScroll(activeDir);
+                holding = false;
+                activeDir = null;
+            };
+            const stepHold = (now) => {
+                if (!holding || !activeDir) return;
+                const dt = Math.min(now - lastTime, 64);
+                lastTime = now;
+                const maxScroll = Math.max(0, editor.renderer.layerConfig.maxHeight - editor.renderer.$size.scrollerHeight);
+                const cur = editor.renderer.getScrollTop();
+                const next = Math.max(0, Math.min(maxScroll, cur + (activeDir === 'up' ? -1 : 1) * speedPxPerMs * dt));
+                editor.renderer.scrollToY(next);
+                jumpers.classList.add('visible');
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => jumpers.classList.remove('visible'), 2000);
+                if ((activeDir === 'up' && next > 0) || (activeDir === 'down' && next < maxScroll)) {
+                    holdRaf = requestAnimationFrame(stepHold);
+                } else {
+                    holdRaf = null;
+                }
+            };
+            document.querySelectorAll('#jumpers .jumper-btn[data-scroll-dir]').forEach(btn => {
+                btn.addEventListener('pointerdown', (e) => {
+                    if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+                    e.preventDefault();
+                    stopHold(false);
+                    activeDir = btn.dataset.scrollDir;
+                    holding = false;
+                    try { btn.setPointerCapture(e.pointerId); } catch {}
+                    holdTimer = setTimeout(() => {
+                        holding = true;
+                        lastTime = performance.now();
+                        holdRaf = requestAnimationFrame(stepHold);
+                    }, 180);
+                });
+                btn.addEventListener('pointerup', () => stopHold(true));
+                btn.addEventListener('pointercancel', () => stopHold(false));
+                btn.addEventListener('lostpointercapture', () => stopHold(false));
+            });
+        })();
 
         async function pasteClipboard() { try { const text = await navigator.clipboard.readText(); if (text) { editor.insert(text); showToast('Pasted', 'content_paste'); } } catch (err) { /* fallback silent */ } }
         async function copyClipboard() { try { const text = editor.getSelectedText(); if (text) { await navigator.clipboard.writeText(text); showToast('Copied', 'content_copy'); } else { cdAlert('Copy', 'Double-tap text to select it first.', 'info'); } } catch (err) { cdAlert('Copy', 'Copy failed.', 'error'); } }
@@ -7684,6 +7739,23 @@ function parseMagicJson(fromShortcut = false) {
     size.oninput = resize;
     size.onchange = () => { try { localStorage.setItem('codx_magic_height', size.value); } catch {} };
     let pasteVersion = 0;
+    const fileInput = document.getElementById('magic-file');
+    document.getElementById('magic-upload').onclick = () => {
+        fileInput.value = '';
+        fileInput.click();
+    };
+    fileInput.onchange = async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            pasteVersion++;
+            field.value = text;
+            note.textContent = text.trim() ? 'Loaded "' + file.name + '".' : 'Selected file is empty.';
+        } catch {
+            note.textContent = 'Could not read file.';
+        }
+    };
     document.getElementById('magic-clear').onclick = () => {
         pasteVersion++;
         field.value = '';
