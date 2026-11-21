@@ -7093,9 +7093,7 @@
             toast.style.bottom = 'auto';
             toast.style.transform = 'translateX(-50%)';
 
-            if (openDialog) {
-                toast.style.top = '18px';
-            } else if (commitModal || anyModal) {
+            if (commitModal || anyModal) {
                 // Modal or Commit modal open → center vertically
                 toast.style.top = '50%';
                 toast.style.transform = 'translateX(-50%) translateY(-50%)';
