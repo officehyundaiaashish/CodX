@@ -5042,7 +5042,9 @@
             flex: 1 1 0 !important;
             width: 0 !important;
             min-width: 0 !important;
-            min-height: 40px !important;
+            height: 42px !important;
+            min-height: 42px !important;
+            padding: 0 14px !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -5096,7 +5098,7 @@
         .chp-close-btn,
         #agent-close-btn,
         .ft-close,
-        button[onclick*="close" i]:not([onclick*="closeAllTabs"]),
+        button[onclick*="close" i]:not([onclick*="closeAllTabs"]):not(.secondary):not(.modal-btn):not([style*="flex:1"]),
         span.material-icons-round[onclick*="close" i],
         span.material-icons-round[onclick*=".remove()"],
         span.material-icons-round[onclick*="_inlineClearAttach"] {
@@ -5122,7 +5124,7 @@
         .chp-close-btn:hover,
         #agent-close-btn:hover,
         .ft-close:hover,
-        button[onclick*="close" i]:not([onclick*="closeAllTabs"]):hover,
+        button[onclick*="close" i]:not([onclick*="closeAllTabs"]):not(.secondary):not(.modal-btn):not([style*="flex:1"]):hover,
         span.material-icons-round[onclick*="close" i]:hover,
         span.material-icons-round[onclick*=".remove()"]:hover,
         span.material-icons-round[onclick*="_inlineClearAttach"]:hover {
