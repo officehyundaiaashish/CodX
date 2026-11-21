@@ -35,7 +35,7 @@
             --accent-ink-end: #a4f28e;
             --accent-dim: rgba(16, 185, 129, 0.15);
             --sidebar-width: 220px;
-            --panel-round: 24px;
+            --panel-round: 30px;
             --transition: opacity 0.15s;
         }
 
@@ -5008,6 +5008,23 @@
 
         #editor {
             z-index: 20 !important;
+        }
+        /* Global Ultra-Round Theme Override */
+        button:not(#nav-toggle-btn):not(.mp-choice):not(.jumper-btn):not(.file-tab):not(.gh-tree-item),
+        .cdlg-btn, .toolbar-btn, .icon-btn, .fm-chip, .code-canvas-btn,
+        .gh-btn, .agent-action-btn, .tabs, .tabs::before, .tab,
+        #magic-copy, #magic-undo, #magic-upload, #magic-paste, #magic-clear, #magic-parse,
+        #magic-box header button, #magic-box footer button, #magic-prompt-dialog header button {
+            border-radius: 999px !important;
+        }
+        .file-tab, .mp-choice, .mp-guide, .mp-outcome,
+        .code-canvas, .agent-step-card, #magic-json,
+        input[type="text"], input[type="password"], input[type="search"], textarea, select {
+            border-radius: 18px !important;
+        }
+        dialog, #magic-box, #magic-prompt-dialog,
+        .modal, #github-modal, #agent-modal, #custom-dialog-box, #new-project-modal, #welcome-card {
+            border-radius: 28px !important;
         }
     </style>
 </head>
