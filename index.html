@@ -1972,6 +1972,9 @@
         .mp-guide { background: var(--editor-bg); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
         .mp-step { display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45; color: var(--text-color); }
         .mp-num { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-wash); color: var(--accent); font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .mp-outcomes { display: flex; flex-direction: column; gap: 6px; padding-left: 26px; margin-top: 2px; }
+        .mp-outcome { font-size: 11px; line-height: 1.4; color: var(--text-color); opacity: 0.9; padding: 6px 8px; border-radius: 7px; background: rgba(128, 128, 128, 0.08); border-left: 2px solid var(--accent); }
+        .mp-outcome strong { color: var(--accent); font-weight: 600; }
         .mp-actions { display: flex; flex-direction: column; gap: 7px; }
         .mp-choice { width: 100%; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--glass-border); background: rgba(128, 128, 128, 0.08); color: var(--text-color); text-align: left; display: flex; flex-direction: column; gap: 2px; cursor: pointer; font-family: 'Poppins', sans-serif; transition: border-color 0.15s, background 0.15s; }
         .mp-choice:hover, .mp-choice:focus-visible { border-color: var(--accent); background: var(--accent-wash); outline: none; }
@@ -6048,7 +6051,11 @@
         <div class="mp-guide">
             <div class="mp-step"><span class="mp-num">1</span><span>Choose and copy one of the AI instruction prompts below.</span></div>
             <div class="mp-step"><span class="mp-num">2</span><span>Paste it into any AI (ChatGPT, Claude, Gemini) along with your code and requested changes.</span></div>
-            <div class="mp-step"><span class="mp-num">3</span><span>Copy the JSON returned by the AI, paste it into Magic Parser, and click <strong>Parse</strong>.</span></div>
+            <div class="mp-step"><span class="mp-num">3</span><span>Copy the JSON returned by the AI, paste it into Magic Parser, and click <strong>Parse</strong>:</span></div>
+            <div class="mp-outcomes">
+                <div class="mp-outcome"><strong>Step-by-Step ({"old", "new"}):</strong> Opens Find &amp; Replace pre-filled and highlights the match so you can review and apply each change one by one.</div>
+                <div class="mp-outcome"><strong>All-in-One ({"edits": [...]}):</strong> Applies all changes in sequence at once. Revert the whole batch anytime with <strong>Undo</strong>.</div>
+            </div>
         </div>
         <div class="mp-actions">
             <button type="button" class="mp-choice" data-prompt-type="single">
@@ -7587,12 +7594,45 @@
     editor.clearSelection();
 }
 
+function animateDialogOpen(dlg) {
+    if (!dlg || dlg.open) return;
+    delete dlg.dataset.closing;
+    dlg.getAnimations().forEach(animation => animation.cancel());
+    dlg.showModal();
+    if (dlg.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        dlg.animate([
+            { opacity: 0, transform: 'translateY(8px) scale(.97)' },
+            { opacity: 1, transform: 'translateY(0) scale(1)' }
+        ], { duration: 180, easing: 'ease-out' });
+        try {
+            dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out', pseudoElement: '::backdrop' });
+        } catch {}
+    }
+}
+
+function animateDialogClose(dlg, result = '') {
+    if (!dlg || !dlg.open || dlg.dataset.closing) return;
+    dlg.dataset.closing = 'true';
+    const finish = () => {
+        delete dlg.dataset.closing;
+        dlg.close(result);
+    };
+    if (!dlg.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        finish();
+        return;
+    }
+    dlg.getAnimations().forEach(animation => animation.cancel());
+    try {
+        dlg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-in', fill: 'forwards', pseudoElement: '::backdrop' });
+    } catch {}
+    dlg.animate([
+        { opacity: 1, transform: 'translateY(0) scale(1)' },
+        { opacity: 0, transform: 'translateY(8px) scale(.97)' }
+    ], { duration: 140, easing: 'ease-in', fill: 'forwards' }).finished.then(finish, finish);
+}
+
 function closeMagicJson(result = '') {
-    const box = document.getElementById('magic-box');
-    if (!box.open) return;
-    delete box.dataset.closing;
-    box.getAnimations().forEach(animation => animation.cancel());
-    box.close(result);
+    animateDialogClose(document.getElementById('magic-box'), result);
 }
 
 function applyMagicBatch(edits) {
@@ -7740,14 +7780,22 @@ function parseMagicJson(fromShortcut = false) {
     };
     const copyButton = document.getElementById('magic-copy');
     const promptDialog = document.getElementById('magic-prompt-dialog');
-    document.getElementById('mp-close').onclick = () => promptDialog.close();
+    document.getElementById('mp-close').onclick = () => animateDialogClose(promptDialog);
+    promptDialog.oncancel = event => {
+        event.preventDefault();
+        animateDialogClose(promptDialog);
+    };
+    promptDialog.onclose = () => {
+        delete promptDialog.dataset.closing;
+        promptDialog.getAnimations().forEach(animation => animation.cancel());
+    };
     copyButton.onclick = () => {
-        if (!promptDialog.open) promptDialog.showModal();
+        animateDialogOpen(promptDialog);
     };
     promptDialog.querySelectorAll('[data-prompt-type]').forEach(item => {
         item.onclick = async () => {
             const type = item.dataset.promptType;
-            promptDialog.close();
+            animateDialogClose(promptDialog);
             const promptText = type === 'single'
                 ? [
                     'Use the source file and change request I provide. If either is missing, ask for it first.',
@@ -7789,14 +7837,7 @@ function parseMagicJson(fromShortcut = false) {
         event.preventDefault();
         closeMagicJson();
     };
-    box.getAnimations().forEach(animation => animation.cancel());
-    box.showModal();
-    if (box.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        box.animate([
-            { opacity: 0, transform: 'translateY(8px) scale(.97)' },
-            { opacity: 1, transform: 'translateY(0) scale(1)' }
-        ], { duration: 180, easing: 'ease-out' });
-    }
+    animateDialogOpen(box);
 }
 
         // --- KEYBOARD SHORTCUTS ---
