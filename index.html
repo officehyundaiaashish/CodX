@@ -5540,9 +5540,6 @@
                             <button class="toolbar-btn" id="plain-text-btn" onclick="togglePlainTextMode()"
                                 title="Force plain text mode" style="width: 68px;"><span
                                     class="material-icons-round">text_fields</span>Plain Text</button>
-                            <button class="toolbar-btn" id="tools-magic-btn" onclick="parseMagicJson(true)"
-                                title="JSON Magic" style="width: 68px;"><span
-                                    class="material-icons-round">auto_fix_high</span>Magic</button>
                         </div>
 
                     </div>
@@ -7096,7 +7093,9 @@
             toast.style.bottom = 'auto';
             toast.style.transform = 'translateX(-50%)';
 
-            if (commitModal || anyModal) {
+            if (openDialog) {
+                toast.style.top = '18px';
+            } else if (commitModal || anyModal) {
                 // Modal or Commit modal open → center vertically
                 toast.style.top = '50%';
                 toast.style.transform = 'translateX(-50%) translateY(-50%)';
@@ -7922,9 +7921,12 @@ function parseMagicJson(fromShortcut = false) {
         };
     });
     if (findModal.classList.contains('active')) toggleFindReplace();
+    const wasNavVisible = !_navHidden;
+    if (wasNavVisible) toggleNavVisibility();
     box.onclose = () => {
         if (box.open) return;
         box.getAnimations().forEach(animation => animation.cancel());
+        if (wasNavVisible && _navHidden) toggleNavVisibility();
         if (box.returnValue === 'applied' || box.returnValue === 'parsed') {
             try { sessionStorage.removeItem('codx_magic_draft'); } catch {}
         }
