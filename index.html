@@ -188,6 +188,24 @@
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
         }
 
+        .app-header {
+            flex-wrap: wrap;
+            gap: 4px 6px;
+        }
+
+        .app-header > div {
+            flex: 1 1 0;
+            min-width: max-content;
+        }
+
+        .app-header > div:last-child {
+            justify-content: flex-end;
+        }
+
+        @media (max-width: 440px) {
+            .app-header .tab { padding-inline: 7px; }
+        }
+
         /* Tabs pill with snake border animation */
         .tabs {
             display: flex;
@@ -4999,9 +5017,9 @@
                 </div>
             </div>
 
-            <!-- Language chip — centered absolutely -->
+            <!-- Language toggle shares the header row with tabs and actions. -->
             <button id="lang-chip" onclick="_toggleLangMode()" title="Switch language" style="
-            position:absolute;left:50%;transform:translateX(-50%);
+            position:static;
             display:flex;align-items:center;gap:5px;
             padding:4px 10px 4px 8px;
             border-radius:8px;
