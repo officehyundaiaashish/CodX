@@ -5018,6 +5018,16 @@
         #editor {
             z-index: 20 !important;
         }
+        /* Equal-sized action buttons across all dialogs and modals */
+        #custom-dialog-btns .cdlg-btn,
+        .modal-actions .modal-btn,
+        .agent-step-actions > button,
+        .confirm-apply-btn,
+        .confirm-decline-btn,
+        #diff-review-modal > div:last-child > button {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+        }
         /* Global Ultra-Round Theme Override (All Buttons, Icons, Pills, Tabs, Dialogs) */
         button:not(#nav-toggle-btn):not(.mp-choice):not(.file-tab):not(.gh-tree-item),
         .cdlg-btn, .toolbar-btn, .icon-btn, .jumper-btn, .fm-chip, .code-canvas-btn,
@@ -6101,7 +6111,7 @@
                 <div style="display:flex;gap:8px;margin-top:14px;">
                     <button class="modal-btn secondary" onclick="closeNewProjectModal()" style="flex:1;">Cancel</button>
                     <button class="modal-btn" onclick="createNewProject()"
-                        style="flex:2;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
                         <span class="material-icons-round"
                             style="font-size:16px;pointer-events:none;">rocket_launch</span> Create & Open
                     </button>
@@ -6164,7 +6174,7 @@
                 <div style="display:flex;gap:8px;">
                     <button class="modal-btn secondary" onclick="closeNewProjectModal()" style="flex:1;">Cancel</button>
                     <button class="modal-btn" onclick="createGithubRepo()"
-                        style="flex:2;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
                         <span class="material-icons-round" style="font-size:16px;pointer-events:none;">cloud</span>
                         Create Repo
                     </button>
@@ -6284,7 +6294,7 @@
                 </div>
                 <div style="display:flex;gap:7px;margin-top:8px;">
                     <button onclick="closeAgentModal();openAgentBar();"
-                        style="flex:1.6;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
+                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
                         ontouchstart="this.style.opacity='0.8'" ontouchend="this.style.opacity='1'">
                         <span class="material-icons-round" style="font-size:15px;pointer-events:none;">chat</span>Open
                         Chat
@@ -6398,7 +6408,7 @@
             <button onclick="closeCustomModelDialog()"
                 style="flex:1;padding:10px;border-radius:11px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancel</button>
             <button onclick="connectCustomModel()"
-                style="flex:1.5;padding:10px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                style="flex:1;padding:10px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
                 <span class="material-icons-round" style="font-size:15px;pointer-events:none;">add_circle</span>Add
             </button>
         </div>
@@ -9048,7 +9058,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 <button onclick="_commitAnotherFile()" style="flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-wash)'" onmouseleave="this.style.background='rgba(128,128,128,0.08)'">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">swap_horiz</span>Change File
                 </button>
-                <button onclick="_doCommit()" style="flex:1.4;padding:10px 8px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button onclick="_doCommit()" style="flex:1;padding:10px 8px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">upload</span>Commit
                 </button>
             </div>
@@ -9359,9 +9369,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             btnsEl.innerHTML = '';
             buttons.forEach(b => {
                 const btn = document.createElement('button');
-                const isDangerLabel = /^(close|close all|delete|delete all|remove|remove all|discard|discard & close|logout|reject|reject all|clear)$/i.test((b.label || '').trim());
-                const cls = (b.cls === 'primary' && isDangerLabel) ? 'danger' : (b.cls || 'secondary');
-                btn.className = 'cdlg-btn ' + cls;
+                btn.className = 'cdlg-btn ' + (b.cls || 'secondary');
                 btn.textContent = b.label;
                 btn.onclick = () => { _hideDialog(); const r = _cdResolve; _cdResolve = null; if (r) r(b.value); };
                 btnsEl.appendChild(btn);
