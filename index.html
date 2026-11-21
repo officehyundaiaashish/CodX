@@ -640,6 +640,27 @@
             padding-bottom: max(env(safe-area-inset-bottom), 12px);
             box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.10);
         }
+        #nav-toggle-btn {
+            position: absolute;
+            top: -20px;
+            width: 64px;
+            height: 22px;
+            background: var(--glass-bg);
+            border: 2px solid var(--accent);
+            border-bottom: none;
+            border-radius: 14px 14px 0 0;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 0 0;
+            cursor: pointer;
+            flex-shrink: 0;
+            box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.10);
+            transition: background 0.18s, transform 0.15s;
+        }
+        #nav-toggle-btn:hover { background: var(--accent-wash); }
+        #nav-toggle-btn:active { transform: translateY(1px) scale(0.96); }
 
         .drag-handle-area {
             width: 100%;
@@ -5422,23 +5443,7 @@
             <div id="sidebar-resizer"></div>
             <!-- Arrow pill sits on top border of bottom-area: half outside half inside -->
             <div style="position:relative;height:0;overflow:visible;display:flex;justify-content:center;z-index:51;">
-                <button id="nav-toggle-btn" onclick="toggleNavSize()" style="
-                background:var(--glass-bg);
-                border:1.5px solid var(--accent);
-                border-radius:999px;
-                cursor:pointer;
-                color:var(--accent);
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                width:52px;
-                height:26px;
-                flex-shrink:0;
-                box-shadow:none;
-                position:absolute;
-                top:-13px;
-                padding:0;
-            ">
+                <button id="nav-toggle-btn" onclick="toggleNavSize()" aria-label="Toggle toolbar">
                     <span class="material-icons-round" id="nav-toggle-icon"
                         style="font-size:20px;pointer-events:none;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);">expand_more</span>
                 </button>
