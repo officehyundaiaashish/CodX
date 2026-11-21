@@ -1814,6 +1814,86 @@
             display: block;
         }
 
+        /* Tab motion uses the selected tab as its source of truth. */
+        @supports selector(:has(*)) {
+            .tabs, .np-tab-bar {
+                position: relative;
+                isolation: isolate;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                --tab-inset: 2px;
+            }
+            .np-tab-bar { --tab-inset: 3px; }
+            .tabs::after, .np-tab-bar::after {
+                content: '';
+                position: absolute;
+                inset: var(--tab-inset) auto var(--tab-inset) var(--tab-inset);
+                width: calc(50% - var(--tab-inset));
+                border-radius: inherit;
+                background: var(--accent-fill);
+                pointer-events: none;
+            }
+            .tabs:has(#tab-preview.active)::after,
+            .np-tab-bar:has(#np-tab-repo.active)::after {
+                transform: translateX(100%);
+            }
+            .tabs > .tab, .np-tab-bar > .np-tab {
+                position: relative;
+                z-index: 1;
+                text-align: center;
+            }
+            .tabs > .tab.active, .np-tab-bar > .np-tab.active {
+                background: transparent;
+            }
+        }
+
+        @keyframes tab-pane-in {
+            from { opacity: 0.65; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes file-tab-line-in {
+            from { transform: scaleX(0); }
+            to { transform: scaleX(1); }
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .tabs::after, .np-tab-bar::after {
+                transition: transform 180ms cubic-bezier(.2,.8,.2,1);
+            }
+            #preview-area {
+                transform: translateX(8px);
+                pointer-events: none;
+                transition: opacity 160ms ease, transform 180ms ease-out, visibility 0s 180ms;
+            }
+            #preview-area.active-pane {
+                transform: translateX(0);
+                pointer-events: auto;
+                transition-delay: 0s;
+            }
+            #editor { transition: opacity 150ms ease; }
+            .np-pane.active { animation: tab-pane-in 160ms ease-out; }
+            .file-tab.tab-enter {
+                position: relative;
+                border-bottom-color: transparent;
+            }
+            .file-tab.tab-enter::after {
+                content: '';
+                position: absolute;
+                inset: auto 0 -2px;
+                height: 2px;
+                background: var(--accent-ink);
+                animation: file-tab-line-in 160ms ease-out;
+                pointer-events: none;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tabs::before, .tab, .np-tab, #editor, #preview-area,
+            #python-output, #bottom-panel, #bottom-outer {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+
         .np-repo-visibility {
             display: flex;
             gap: 8px;
@@ -7065,13 +7145,9 @@
             const outerEl = document.getElementById('bottom-outer');
             const innerEl = document.getElementById('bottom-panel');
 
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            if (fromBtn) fromBtn.classList.add('active');
-            else if (event && event.currentTarget) event.currentTarget.classList.add('active');
-            else {
-                const tgt = document.getElementById(tabName === 'preview' ? 'tab-preview' : 'tab-code');
-                if (tgt) tgt.classList.add('active');
-            }
+            const showPreview = tabName === 'preview';
+            document.getElementById('tab-code').classList.toggle('active', !showPreview);
+            document.getElementById('tab-preview').classList.toggle('active', showPreview);
 
             // Always keep header visible
             const header = document.getElementById('header');
@@ -7136,14 +7212,27 @@
         function renderFileTabs() {
             if (typeof saveSession === 'function') saveSession();
             const bar = document.getElementById('file-tabs-bar');
+            const nextId = String(activeTabId);
+            const didSwitch = bar.dataset.activeFile !== undefined && bar.dataset.activeFile !== nextId;
+            bar.dataset.activeFile = nextId;
             bar.innerHTML = '';
             fileTabs.forEach(tab => {
                 const el = document.createElement('div');
                 el.className = 'file-tab' + (tab.id === activeTabId ? ' active' : '');
+                if (didSwitch && tab.id === activeTabId) el.classList.add('tab-enter');
                 el.innerHTML = `<span style="pointer-events:none">${tab.name}</span><span class="material-icons-round ft-close" onclick="closeFileTab(${tab.id},event)">close</span>`;
                 el.onclick = (e) => { if (!e.target.classList.contains('ft-close')) switchFileTab(tab.id); };
                 bar.appendChild(el);
             });
+            if (didSwitch && !_inPreview && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                const pane = document.getElementById('editor');
+                if (pane.animate && pane.getAnimations) {
+                    pane.getAnimations().filter(a => a.id === 'file-tab-fade').forEach(a => a.cancel());
+                    pane.animate([{ opacity: 0.72 }, { opacity: 1 }], {
+                        id: 'file-tab-fade', duration: 130, easing: 'ease-out'
+                    });
+                }
+            }
         }
 
         function switchFileTab(id) {
