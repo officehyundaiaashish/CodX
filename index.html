@@ -642,25 +642,31 @@
         }
         #nav-toggle-btn {
             position: absolute;
-            top: -20px;
-            width: 64px;
-            height: 22px;
-            background: var(--glass-bg);
-            border: 2px solid var(--accent);
-            border-bottom: none;
-            border-radius: 14px 14px 0 0;
+            top: -21px;
+            width: 92px;
+            height: 23px;
+            background: transparent;
+            border: none;
             color: var(--accent);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2px 0 0;
+            padding: 3px 0 0;
             cursor: pointer;
             flex-shrink: 0;
-            box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.10);
-            transition: background 0.18s, transform 0.15s;
+            transition: transform 0.15s, filter 0.18s;
         }
-        #nav-toggle-btn:hover { background: var(--accent-wash); }
-        #nav-toggle-btn:active { transform: translateY(1px) scale(0.96); }
+        #nav-toggle-btn svg.nav-tab-curve {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+            filter: drop-shadow(0 -2px 6px rgba(0, 0, 0, 0.10));
+        }
+        #nav-toggle-btn:hover { filter: brightness(1.08); }
+        #nav-toggle-btn:active { transform: translateY(1px) scale(0.97); }
 
         .drag-handle-area {
             width: 100%;
@@ -5444,8 +5450,12 @@
             <!-- Arrow pill sits on top border of bottom-area: half outside half inside -->
             <div style="position:relative;height:0;overflow:visible;display:flex;justify-content:center;z-index:51;">
                 <button id="nav-toggle-btn" onclick="toggleNavSize()" aria-label="Toggle toolbar">
+                    <svg class="nav-tab-curve" viewBox="0 0 92 23" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="M0 23 L0 22 C12 22 14 2 28 2 L64 2 C78 2 80 22 92 22 L92 23 Z" fill="var(--glass-bg)"/>
+                        <path d="M0 22 C12 22 14 2 28 2 L64 2 C78 2 80 22 92 22" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
                     <span class="material-icons-round" id="nav-toggle-icon"
-                        style="font-size:20px;pointer-events:none;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);">expand_more</span>
+                        style="position:relative;z-index:1;font-size:19px;pointer-events:none;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);">expand_more</span>
                 </button>
             </div>
             <div class="bottom-area">
