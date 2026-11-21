@@ -5022,7 +5022,7 @@
         #custom-dialog-btns,
         .modal-actions,
         .agent-step-actions,
-        div:has(> .modal-btn),
+        div:has(> .modal-btn ~ .modal-btn),
         div:has(> .confirm-apply-btn),
         #diff-review-modal > div:last-child,
         #move-copy-dialog > div:last-child,
@@ -5033,7 +5033,7 @@
         #custom-dialog-btns > button,
         .modal-actions > button,
         .agent-step-actions > button,
-        div:has(> .modal-btn) > button,
+        div:has(> .modal-btn ~ .modal-btn) > button,
         div:has(> .confirm-apply-btn) > button,
         #diff-review-modal > div:last-child > button,
         #move-copy-dialog > div:last-child > button,
@@ -5095,6 +5095,7 @@
         #chat-close-btn,
         .chp-close-btn,
         #agent-close-btn,
+        button[onclick*="_hideDialog"],
         .ft-close,
         button[onclick*="close" i]:not([onclick*="closeAllTabs"]):not([onclick*="closest"]):not([onclick*="openAgentBar"]):not([onclick*="openAgentModal"]):not(.secondary):not(.modal-btn):not([style*="flex:1"]),
         span.material-icons-round[onclick*="close" i],
@@ -5121,12 +5122,16 @@
         #chat-close-btn:hover,
         .chp-close-btn:hover,
         #agent-close-btn:hover,
+        button[onclick*="_hideDialog"]:hover,
         .ft-close:hover,
         button[onclick*="close" i]:not([onclick*="closeAllTabs"]):not([onclick*="closest"]):not([onclick*="openAgentBar"]):not([onclick*="openAgentModal"]):not(.secondary):not(.modal-btn):not([style*="flex:1"]):hover,
         span.material-icons-round[onclick*="close" i]:hover,
         span.material-icons-round[onclick*=".remove()"]:hover,
         span.material-icons-round[onclick*="_inlineClearAttach"]:hover {
             background: #dc2626 !important;
+        }
+        button[onclick*="ghLogout"] {
+            padding: 4px 10px !important;
         }
         .ft-close {
             width: 17px !important;
@@ -9407,10 +9412,14 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             else { inp.style.display = 'none'; }
             const btnsEl = document.getElementById('custom-dialog-btns');
             btnsEl.innerHTML = '';
+            const destructiveRe = /^(close|close all|delete|delete all|remove|remove all|discard|discard & close|logout|reject|reject all|clear|decline|dismiss)$/i;
+            const hasDestructive = buttons.some(x => destructiveRe.test((x.label || '').trim()));
             buttons.forEach(b => {
                 const btn = document.createElement('button');
-                const isDangerLabel = /^(cancel|close|close all|delete|delete all|remove|remove all|discard|discard & close|logout|reject|reject all|clear|decline|dismiss)$/i.test((b.label || '').trim());
-                const cls = isDangerLabel ? 'danger' : (b.cls || 'secondary');
+                const lbl = (b.label || '').trim();
+                const isDestructive = destructiveRe.test(lbl);
+                const isCancel = /^cancel$/i.test(lbl);
+                const cls = isDestructive ? 'danger' : (isCancel ? (hasDestructive ? 'secondary' : 'danger') : (b.cls || 'secondary'));
                 btn.className = 'cdlg-btn ' + cls;
                 btn.textContent = b.label;
                 btn.onclick = () => { _hideDialog(); const r = _cdResolve; _cdResolve = null; if (r) r(b.value); };
