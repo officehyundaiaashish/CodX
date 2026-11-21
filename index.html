@@ -9359,7 +9359,9 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             btnsEl.innerHTML = '';
             buttons.forEach(b => {
                 const btn = document.createElement('button');
-                btn.className = 'cdlg-btn ' + (b.cls || 'secondary');
+                const isDangerLabel = /^(close|close all|delete|delete all|remove|remove all|discard|discard & close|logout|reject|reject all|clear)$/i.test((b.label || '').trim());
+                const cls = (b.cls === 'primary' && isDangerLabel) ? 'danger' : (b.cls || 'secondary');
+                btn.className = 'cdlg-btn ' + cls;
                 btn.textContent = b.label;
                 btn.onclick = () => { _hideDialog(); const r = _cdResolve; _cdResolve = null; if (r) r(b.value); };
                 btnsEl.appendChild(btn);
