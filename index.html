@@ -5140,6 +5140,11 @@
         /* Red Danger / Clear / Delete / Remove / Reject / Logout Buttons */
         .cdlg-btn.danger,
         #magic-clear,
+        #new-project-modal .modal-btn.secondary,
+        #custom-model-dialog button[onclick*="closeCustomModelDialog"]:not([style*="width:28px"]),
+        #move-copy-dialog button[onclick*="closeMoveCopyDialog"]:not([style*="width:32px"]),
+        #diff-review-modal button[onclick*="closeDiffReviewModal"]:not([style*="padding:4px"]),
+        button[onclick*=".remove()"]:not(.toolbar-btn),
         button[onclick*="clearFind"],
         button[onclick*="_inlineClearChatUI"],
         button[onclick*="_ghClearSelection"],
@@ -5165,6 +5170,11 @@
         }
         .cdlg-btn.danger:hover,
         #magic-clear:hover,
+        #new-project-modal .modal-btn.secondary:hover,
+        #custom-model-dialog button[onclick*="closeCustomModelDialog"]:not([style*="width:28px"]):hover,
+        #move-copy-dialog button[onclick*="closeMoveCopyDialog"]:not([style*="width:32px"]):hover,
+        #diff-review-modal button[onclick*="closeDiffReviewModal"]:not([style*="padding:4px"]):hover,
+        button[onclick*=".remove()"]:not(.toolbar-btn):hover,
         button[onclick*="clearFind"]:hover,
         button[onclick*="_inlineClearChatUI"]:hover,
         button[onclick*="_ghClearSelection"]:hover,
@@ -9401,7 +9411,9 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             btnsEl.innerHTML = '';
             buttons.forEach(b => {
                 const btn = document.createElement('button');
-                btn.className = 'cdlg-btn ' + (b.cls || 'secondary');
+                const isDangerLabel = /^(cancel|close|close all|delete|delete all|remove|remove all|discard|discard & close|logout|reject|reject all|clear|decline|dismiss)$/i.test((b.label || '').trim());
+                const cls = isDangerLabel ? 'danger' : (b.cls || 'secondary');
+                btn.className = 'cdlg-btn ' + cls;
                 btn.textContent = b.label;
                 btn.onclick = () => { _hideDialog(); const r = _cdResolve; _cdResolve = null; if (r) r(b.value); };
                 btnsEl.appendChild(btn);
