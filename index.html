@@ -5018,6 +5018,36 @@
         #editor {
             z-index: 20 !important;
         }
+        /* Equal-sized action buttons (width + height) in all dialogs and modals */
+        #custom-dialog-btns,
+        .modal-actions,
+        .agent-step-actions,
+        div:has(> .modal-btn),
+        div:has(> .confirm-apply-btn),
+        #diff-review-modal > div:last-child,
+        #move-copy-dialog > div:last-child,
+        #custom-model-dialog > div:last-child {
+            display: flex !important;
+            gap: 8px !important;
+        }
+        #custom-dialog-btns > button,
+        .modal-actions > button,
+        .agent-step-actions > button,
+        div:has(> .modal-btn) > button,
+        div:has(> .confirm-apply-btn) > button,
+        #diff-review-modal > div:last-child > button,
+        #move-copy-dialog > div:last-child > button,
+        #custom-model-dialog > div:last-child > button,
+        #agent-connected-section div:has(> button[onclick*="openAgentBar"]) > button {
+            flex: 1 1 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            min-height: 40px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            white-space: nowrap !important;
+        }
         /* Equal-sized action buttons across all dialogs and modals */
         #custom-dialog-btns .cdlg-btn,
         .modal-actions .modal-btn,
@@ -16026,6 +16056,90 @@ _codx_stderr = None
             showToast(activeTab.name + ' saved', 'save');
         }
 
+
+        // ── Android Back Button Hierarchy (Parent & Child Stack) ──
+        (function initAndroidBackHierarchy() {
+            function getOpenLayers() {
+                const layers = [];
+                if (_inPreview) layers.push(() => switchTab('editor'));
+                if (_inlineChatOpen) {
+                    layers.push(() => closeInlineChat());
+                    if (_chatIsFullscreen) layers.push(() => _toggleChatFullscreen());
+                }
+                if (document.getElementById('agent-bar')?.classList.contains('visible')) layers.push(() => closeAgentBar());
+                if (document.getElementById('find-modal')?.classList.contains('active')) layers.push(() => toggleFindReplace());
+                if (document.getElementById('github-modal')?.classList.contains('active')) layers.push(() => closeGithubModal());
+                if (document.getElementById('agent-modal')?.classList.contains('active')) layers.push(() => closeAgentModal());
+                if (document.getElementById('new-project-overlay')?.classList.contains('active')) layers.push(() => closeNewProjectModal());
+                if (document.getElementById('chat-history-panel')?.classList.contains('active')) layers.push(() => closeChatHistoryPanel());
+                if (document.getElementById('gh-undo-modal')?.classList.contains('active')) layers.push(() => closeUndoModal());
+                if (document.getElementById('commit-modal-overlay')) layers.push(() => document.getElementById('commit-modal-overlay')?.remove());
+                if (document.getElementById('gh-move-copy-modal')) layers.push(() => document.getElementById('gh-move-copy-modal')?.remove());
+                if (document.getElementById('gh-copy-modal')) layers.push(() => document.getElementById('gh-copy-modal')?.remove());
+                if (document.getElementById('custom-model-dialog')?.style.pointerEvents === 'auto') layers.push(() => closeCustomModelDialog());
+                if (document.getElementById('move-copy-dialog')?.style.pointerEvents === 'auto') layers.push(() => closeMoveCopyDialog());
+                const diffModal = document.getElementById('diff-review-modal');
+                if (diffModal && diffModal.style.pointerEvents === 'auto') layers.push(() => closeDiffReviewModal());
+                const magicBox = document.getElementById('magic-box');
+                if (magicBox && magicBox.open) layers.push(() => closeMagicJson());
+                const promptDlg = document.getElementById('magic-prompt-dialog');
+                if (promptDlg && promptDlg.open) layers.push(() => animateDialogClose(promptDlg));
+                if (document.getElementById('custom-dialog-overlay')?.classList.contains('active')) layers.push(() => _hideDialog());
+                return layers;
+            }
+
+            let pushedCount = 0;
+            let ignoreNextPop = false;
+            let syncScheduled = false;
+
+            function syncHistory() {
+                syncScheduled = false;
+                const count = getOpenLayers().length;
+                if (count > pushedCount) {
+                    while (pushedCount < count) {
+                        pushedCount++;
+                        history.pushState({ codxLayer: pushedCount }, '');
+                    }
+                } else if (count < pushedCount) {
+                    const diff = pushedCount - count;
+                    pushedCount = count;
+                    for (let i = 0; i < diff; i++) {
+                        ignoreNextPop = true;
+                        history.back();
+                    }
+                }
+            }
+
+            const scheduleSync = () => {
+                if (!syncScheduled) {
+                    syncScheduled = true;
+                    setTimeout(syncHistory, 30);
+                }
+            };
+
+            const observer = new MutationObserver(scheduleSync);
+            observer.observe(document.body, {
+                attributes: true,
+                attributeFilter: ['class', 'open', 'style'],
+                childList: true,
+                subtree: true
+            });
+
+            window.addEventListener('popstate', () => {
+                if (ignoreNextPop) {
+                    ignoreNextPop = false;
+                    return;
+                }
+                const layers = getOpenLayers();
+                if (layers.length > 0) {
+                    pushedCount = Math.max(0, pushedCount - 1);
+                    const closeTop = layers[layers.length - 1];
+                    closeTop();
+                } else {
+                    pushedCount = 0;
+                }
+            });
+        })();
 
         // ── Sidebar Resizer Logic (Desktop only) ──
         (function() {
