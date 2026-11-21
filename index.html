@@ -7567,6 +7567,36 @@ function closeMagicJson(result = '') {
     ], { duration: 140, easing: 'ease-in', fill: 'forwards' }).finished.then(finish, finish);
 }
 
+function applyMagicBatch(edits) {
+    if (!Array.isArray(edits) || !edits.length) throw Error('Add at least one edit.');
+    let result = editor.getValue().replace(/\r\n?/g, '\n');
+    for (const [index, edit] of edits.entries()) {
+        const label = 'Edit ' + (index + 1) + ': ';
+        if (!edit || typeof edit.old !== 'string' || typeof edit.new !== 'string' || !edit.old.length) {
+            throw Error(label + 'Use nonempty old and a string new.');
+        }
+        const oldText = edit.old.replace(/\r\n?/g, '\n');
+        const newText = edit.new.replace(/\r\n?/g, '\n');
+        const start = result.indexOf(oldText);
+        if (start < 0) throw Error(label + 'Old block not found.');
+        if (result.indexOf(oldText, start + 1) >= 0) throw Error(label + 'Old block matches multiple places.');
+        result = result.slice(0, start) + newText + result.slice(start + oldText.length);
+    }
+    const session = editor.session;
+    if (result !== editor.getValue().replace(/\r\n?/g, '\n')) {
+        const Range = ace.require('ace/range').Range;
+        const last = session.getLength() - 1;
+        session.markUndoGroup();
+        session.replace(new Range(0, 0, last, session.getLine(last).length), result);
+        session.markUndoGroup();
+        const tab = fileTabs.find(item => item.id === activeTabId);
+        if (tab) tab.content = editor.getValue();
+        saveSession();
+        if (_inPreview && !_pythonMode) _refreshPreview();
+    }
+    return edits.length;
+}
+
 function parseMagicJson(fromShortcut = false) {
     const box = document.getElementById('magic-box');
     if (box.open) return;
@@ -7601,6 +7631,7 @@ function parseMagicJson(fromShortcut = false) {
         }
     };
     document.getElementById('magic-parse').onclick = () => {
+        if (box.dataset.closing) return;
         const pastedData = field.value;
         if (!pastedData.trim()) { note.textContent = 'Paste JSON first.'; return; }
         try {
@@ -7623,6 +7654,17 @@ function parseMagicJson(fromShortcut = false) {
                 } else {
                     throw jsonErr;
                 }
+            }
+            if (parsed && Object.prototype.hasOwnProperty.call(parsed, 'edits')) {
+                try {
+                    const count = applyMagicBatch(parsed.edits);
+                    note.textContent = count + ' edits applied.';
+                    box.addEventListener('close', () => showToast(count + ' edits applied. Undo available.', 'check_circle'), { once: true });
+                    closeMagicJson('applied');
+                } catch (error) {
+                    note.textContent = error.message;
+                }
+                return;
             }
             if (parsed && (parsed.old !== undefined || parsed.new !== undefined)) {
                 closeMagicJson('parsed');
@@ -7650,12 +7692,12 @@ function parseMagicJson(fromShortcut = false) {
     copyButton.onclick = async () => {
         const promptText = [
             'Use the source file and change request I provide. If either is missing, ask for it first.',
-            'Return one valid JSON object on one line, with exactly two string keys: "old" and "new".',
+            'Return one valid JSON object with an edits array. Include every requested change as an object with old and new string keys.',
             'Copy the smallest unique, nonempty block from my file into "old" exactly, including whitespace.',
             'Put its complete replacement in "new". For an insertion, keep the anchor in the replacement. For deletion, use an empty string.',
             'Use valid JSON escaping for newlines, tabs, quotes and backslashes. Include no Markdown, commentary, line numbers or placeholders.',
-            'For separate changes, return the first edit only and wait for the updated file.',
-            'Example: {"old":"let count = 1;","new":"let count = 2;"}'
+            'Edits run in array order on the active file. Each old block must match exactly once after all preceding edits. Include all changes in this response.',
+            'Example: {"edits":[{"old":"let count = 1;","new":"let count = 2;"},{"old":"let ready = false;","new":"let ready = true;"}]}'
         ].join('\n');
         try {
             await navigator.clipboard.writeText(promptText);
