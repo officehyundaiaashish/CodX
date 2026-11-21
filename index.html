@@ -7539,7 +7539,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 // Initialize custom dropdown trigger for repo selector
                 _initRepoCustomDropdown();
             } catch (e) {
-                cdAlert('GitHub', 'Token invalid ya expired hai. GitHub se naya Classic token banao with "repo" scope.', 'error');
+                cdAlert('GitHub', 'Invalid or expired token. Use a classic token with "repo" scope.', 'error');
                 _ghReposLoaded = false;
             }
         }
@@ -12087,8 +12087,8 @@ No markdown, no backticks, no explanation outside the array.`;
             _inlineAppendMsg('agent',
                 '✅ **' + targetTab.name + '** scanned!\n' +
                 fc + ' functions · ' + cc + ' CSS selectors · ' + vc + ' variables mapped.\n\n' +
-                'Ab har API call mein main relevant context automatically include karunga. ' +
-                'Conversation bhi persist hogi — ek session se doosre session tak.');
+                'Each request includes relevant code. ' +
+                'Chat history carries over between sessions.');
         }
 
         // ── CONTEXT BUILDER: Request se related code chunks dhundho ──
