@@ -5080,6 +5080,7 @@
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                 </button>
+                <button type="button" id="header-magic-btn" class="icon-btn no-select" title="JSON Magic" aria-label="Open JSON Magic" onclick="parseMagicJson()" style="width:30px;height:30px;min-width:30px;background:none;color:var(--accent);font:bold 14px monospace;">{ }</button>
                 <!-- Nav hide/show toggle -->
                 <button class="icon-btn no-select" id="nav-hide-btn"
                     style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleNavVisibility()"
@@ -6007,6 +6008,7 @@
             <strong id="magic-title">JSON Magic</strong>
             <button type="button" id="magic-copy" class="cdlg-btn secondary" aria-label="Copy prompt" title="Copy prompt">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+                <small>Copy prompt</small>
             </button>
             <button type="button" id="magic-paste" class="cdlg-btn secondary" autofocus>Paste</button>
             <button type="button" class="cdlg-btn secondary" aria-label="Close" onclick="this.closest('dialog').close()">×</button>
@@ -6015,6 +6017,7 @@
         <footer>
             <label for="magic-height">Height</label>
             <input id="magic-height" type="range" min="60" max="300" step="4" value="88">
+            <button type="button" id="magic-clear" class="cdlg-btn danger">Clear</button>
             <button type="button" id="magic-parse" class="cdlg-btn primary">Parse</button>
         </footer>
         <p id="magic-note" role="status"></p>
@@ -7471,7 +7474,7 @@
             if (type === 'regex') document.getElementById('find-regex').checked = btn.classList.contains('on');
         }
 
-        function toggleFindReplace() {
+        function toggleFindReplace(focusInput = true) {
             closeGithubModal();
             const isActive = !findModal.classList.contains('active');
             if (isActive) {
@@ -7479,9 +7482,14 @@
                 document.getElementById('editor').style.zIndex = '1';
                 _syncBottomLayout();
                 requestAnimationFrame(() => {
-                    const fi = document.getElementById('find-input');
-                    fi.focus();
-                    fi.setSelectionRange(fi.value.length, fi.value.length);
+                    if (!findModal.classList.contains('active')) return;
+                    if (focusInput) {
+                        const fi = document.getElementById('find-input');
+                        fi.focus();
+                        fi.setSelectionRange(fi.value.length, fi.value.length);
+                    } else {
+                        findModal.querySelector('button[onclick="findText(true)"]').focus({ preventScroll: true });
+                    }
                     _positionFindModal();
                     setTimeout(_positionFindModal, 400);
                 });
@@ -7519,7 +7527,7 @@
                         if (lineRelative < hiddenPx) {
                             editor.renderer.scrollToPixel(0, Math.max(0, lineTopPx - hiddenPx));
                         }
-                        editor.focus();
+                        if (showErrorAlert && findModal.classList.contains('active')) editor.focus();
                     }, 30);
                 }
             });
@@ -7554,14 +7562,22 @@ function parseMagicJson() {
     resize();
     size.oninput = resize;
     size.onchange = () => { try { localStorage.setItem('codx_magic_height', size.value); } catch {} };
+    let pasteVersion = 0;
+    document.getElementById('magic-clear').onclick = () => {
+        pasteVersion++;
+        field.value = '';
+        note.textContent = '';
+    };
     paste.onclick = async function readClipboard() {
+        const version = ++pasteVersion;
+        const current = () => box.open && paste.onclick === readClipboard && version === pasteVersion;
         try {
             const text = await navigator.clipboard.readText();
-            if (!box.open || paste.onclick !== readClipboard) return;
+            if (!current()) return;
             if (text) field.value = text;
             note.textContent = text ? '' : 'Clipboard is empty.';
         } catch {
-            if (box.open && paste.onclick === readClipboard) note.textContent = 'Touch and hold the field to paste.';
+            if (current()) note.textContent = 'Touch and hold the field to paste.';
         }
     };
     document.getElementById('magic-parse').onclick = () => {
@@ -7627,6 +7643,12 @@ function parseMagicJson() {
         } catch {
             window.prompt('Copy this model prompt', promptText);
         }
+    };
+    if (findModal.classList.contains('active')) toggleFindReplace();
+    box.onclose = () => {
+        if (box.open) return;
+        if (_inPreview) switchTab('editor');
+        if (!findModal.classList.contains('active')) toggleFindReplace(false);
     };
     box.showModal();
 }
