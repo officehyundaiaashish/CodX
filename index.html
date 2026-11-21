@@ -31,7 +31,8 @@
             --text-color: #e0e0e0;
             --glass-bg: #141419;
             --glass-border: rgba(255, 255, 255, 0.08);
-            --accent: #10b981;
+            --accent: #59dfaa;
+            --accent-ink-end: #a4f28e;
             --accent-dim: rgba(16, 185, 129, 0.15);
             --sidebar-width: 220px;
             --panel-round: 24px;
@@ -44,8 +45,45 @@
             --text-color: #1c1e21;
             --glass-bg: #f8f9fb;
             --glass-border: rgba(0, 0, 0, 0.05);
-            --accent: #059669;
+            --accent: #00684f;
+            --accent-ink-end: #397119;
             --accent-dim: rgba(5, 150, 105, 0.1);
+        }
+
+        :root, body.light-theme {
+            --accent-fill-start: #006953;
+            --accent-fill-end: #407b21;
+            --accent-fill: linear-gradient(120deg, var(--accent-fill-start), var(--accent-fill-end));
+            --accent-ink: linear-gradient(120deg, var(--accent), var(--accent-ink-end));
+            --accent-mist: linear-gradient(120deg, rgba(16,185,129,.05), rgba(128,198,70,.10));
+            --accent-wash: linear-gradient(120deg, rgba(16,185,129,.12), rgba(128,198,70,.20));
+            --accent-selection: linear-gradient(120deg, rgba(16,185,129,.27), rgba(128,198,70,.37));
+        }
+
+        /* Paint accent glyphs separately from the surfaces behind them. */
+        @media (forced-colors: none) {
+            @supports (background-clip: text) or (-webkit-background-clip: text) {
+                .repo-progress-count, .np-section-label, .agent-step-label,
+                .code-canvas-lang, .codx-loader-title, .prompt-preview-label,
+                .chat-header-status, .agent-plan-num, .chat-fix-title,
+                .welcome-feature .material-icons-round, .gh-custom-trigger .material-icons-round,
+                .np-save-opt .material-icons-round, .np-vis-opt .material-icons-round,
+                #chat-empty-state .material-icons-round, #inline-chat-empty .material-icons-round,
+                .chp-empty .material-icons-round,
+                span:is([style*="color:var(--accent)"], [style*="color: var(--accent)"],
+                        [style*="color:#10b981"]):not([style*="background"]):not(:has(*)) {
+                    background-image: var(--accent-ink);
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                }
+            }
+            :is(svg, svg *)[stroke="var(--accent)"], :is(svg, svg *)[stroke="#10b981"] {
+                stroke: url(#codx-accent-ink) var(--accent);
+            }
+            :is(svg, svg *)[fill="var(--accent)"], :is(svg, svg *)[fill="#10b981"] {
+                fill: url(#codx-accent-ink) var(--accent);
+            }
         }
 
         /* Anti-Google Search & Global UI Font */
@@ -224,7 +262,7 @@
         }
 
         .tab.active {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             opacity: 1;
         }
@@ -339,7 +377,7 @@
 
         .pv-btn:hover, .pv-btn.active {
             opacity: 1;
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
         }
 
@@ -419,11 +457,11 @@
         }
 
         .ace_selection {
-            background: rgba(16, 185, 129, 0.35) !important;
+            background: var(--accent-selection) !important;
         }
 
         .ace_selected-word {
-            background: rgba(16, 185, 129, 0.3) !important;
+            background: var(--accent-selection) !important;
             border: 1px solid rgba(16, 185, 129, 0.6) !important;
             border-radius: 2px;
         }
@@ -515,11 +553,11 @@
         }
 
         .ace_selection {
-            background: rgba(16, 185, 129, 0.35) !important;
+            background: var(--accent-selection) !important;
         }
 
         .ace_selected-word {
-            background: rgba(16, 185, 129, 0.3) !important;
+            background: var(--accent-selection) !important;
             border: 1px solid rgba(16, 185, 129, 0.6) !important;
             border-radius: 2px;
         }
@@ -640,7 +678,7 @@
         }
 
         .icon-btn:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
             transform: scale(0.9);
         }
@@ -713,7 +751,7 @@
         }
 
         .toolbar-btn:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
             opacity: 1;
             transform: scale(0.9);
@@ -866,7 +904,7 @@
 
         .fm-chip.on {
             border-color: var(--accent);
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
             opacity: 1;
         }
@@ -894,7 +932,7 @@
             padding: 10px;
             border: none;
             border-radius: 8px;
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             font-weight: 600;
             font-family: 'Poppins', sans-serif;
@@ -1181,11 +1219,11 @@
         }
 
         .gh-tree-item:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .gh-tree-item.selected {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .gh-tree-item .gh-item-icon {
@@ -1230,12 +1268,12 @@
         }
 
         .gh-item-action-btn:hover {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
         }
 
         .gh-item-action-btn:active {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             transform: scale(0.9);
         }
@@ -1451,7 +1489,7 @@
             width: 72px;
             height: 72px;
             border-radius: 20px;
-            background: #10b981;
+            background: var(--accent-fill);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1541,7 +1579,7 @@
             padding: 15px;
             border: none;
             border-radius: 16px;
-            background: linear-gradient(135deg, #10b981, #059669);
+            background: var(--accent-fill);
             color: white;
             font-size: 15px;
             font-weight: 700;
@@ -1618,7 +1656,7 @@
 
         .repo-progress-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #10b981, #34d399);
+            background: var(--accent-ink);
             border-radius: 10px;
             width: 0%;
             transition: width 0.3s ease;
@@ -1725,7 +1763,7 @@
 
         .np-save-opt.selected {
             border-color: var(--accent);
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .np-save-opt .material-icons-round {
@@ -1763,7 +1801,7 @@
         }
 
         .np-tab.active {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             opacity: 1;
         }
@@ -1796,7 +1834,7 @@
 
         .np-vis-opt.selected {
             border-color: var(--accent);
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .np-vis-opt .material-icons-round {
@@ -1912,7 +1950,7 @@
         }
 
         .cdlg-btn.primary {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: #fff;
         }
 
@@ -2024,7 +2062,7 @@
 
         .gh-custom-option:active,
         .gh-custom-option.selected {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
         }
 
@@ -2091,7 +2129,7 @@
             width: 36px;
             height: 36px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #10b981, #059669);
+            background: var(--accent-fill);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -2130,7 +2168,7 @@
 
         .am-agent-row.active {
             border-color: var(--accent);
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .am-agent-row:active {
@@ -2147,7 +2185,7 @@
         }
 
         .am-agent-row.active .am-agent-dot {
-            background: #10b981;
+            background: var(--accent-fill);
         }
 
         .am-agent-name {
@@ -2221,7 +2259,7 @@
         }
 
         .am-provider-row:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             border-color: var(--accent);
         }
 
@@ -2316,7 +2354,7 @@
         .am-model-row:hover,
         .am-model-row.selected {
             border-color: var(--accent);
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .am-model-dot {
@@ -2333,7 +2371,7 @@
         }
 
         .am-model-row.selected .am-model-dot {
-            background: var(--accent);
+            background: var(--accent-fill);
             border-color: var(--accent);
         }
 
@@ -2452,7 +2490,7 @@
         }
 
         #agent-send-btn {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
         }
 
@@ -2499,7 +2537,7 @@
             width: 4px;
             height: 4px;
             border-radius: 50%;
-            background: var(--accent);
+            background: var(--accent-fill);
             margin-right: 2px;
             animation: agentBounce 0.8s infinite;
         }
@@ -2632,7 +2670,7 @@
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #10b981, #059669);
+            background: var(--accent-fill);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -2709,7 +2747,7 @@
             font-size: 10px;
             font-weight: 700;
             color: var(--accent);
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             border: 1px solid var(--accent);
             border-radius: 20px;
             padding: 2px 9px;
@@ -2767,7 +2805,7 @@
         }
 
         .chat-msg.user .chat-bubble {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             border-bottom-right-radius: 4px;
         }
@@ -2827,7 +2865,7 @@
 
         .chat-copy-btn:active {
             opacity: 1 !important;
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
         }
 
@@ -2895,7 +2933,7 @@
         }
 
         .code-canvas-btn:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             color: var(--accent);
         }
 
@@ -2924,7 +2962,7 @@
         .chat-inline-code {
             font-family: 'Courier New', Courier, monospace;
             font-size: 11px;
-            background: rgba(16, 185, 129, 0.12);
+            background: var(--accent-wash);
             color: var(--accent);
             padding: 1px 5px;
             border-radius: 4px;
@@ -2959,7 +2997,7 @@
             align-items: center;
             gap: 8px;
             padding: 9px 12px;
-            background: rgba(16, 185, 129, 0.08);
+            background: var(--accent-mist);
             border-bottom: 1px solid var(--glass-border);
         }
 
@@ -2967,7 +3005,7 @@
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             font-size: 10px;
             font-weight: 700;
@@ -3008,7 +3046,7 @@
             padding: 8px;
             border: none;
             border-radius: 8px;
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             font-family: 'Poppins', sans-serif;
             font-size: 12px;
@@ -3066,7 +3104,7 @@
         }
 
         .agent-step-refine-btn:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .agent-step-refine-area {
@@ -3104,7 +3142,7 @@
             border-radius: 8px;
             border: none;
             flex-shrink: 0;
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             cursor: pointer;
             display: flex;
@@ -3173,7 +3211,7 @@
             width: 5px;
             height: 5px;
             border-radius: 50%;
-            background: var(--accent);
+            background: var(--accent-fill);
             display: inline-block;
             animation: agentBounce 0.8s infinite;
         }
@@ -3189,7 +3227,7 @@
         /* Fix / Apply card inside chat bubble */
         .chat-fix-card {
             margin-top: 8px;
-            background: rgba(16, 185, 129, 0.07);
+            background: var(--accent-mist);
             border: 1px solid rgba(16, 185, 129, 0.25);
             border-radius: 10px;
             padding: 9px 11px;
@@ -3231,7 +3269,7 @@
         }
 
         .chat-fix-side.insert {
-            background: rgba(16, 185, 129, 0.08);
+            background: var(--accent-mist);
             border: 1px solid rgba(16, 185, 129, 0.2);
         }
 
@@ -3270,7 +3308,7 @@
             padding: 8px;
             border: none;
             border-radius: 8px;
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             font-family: 'Poppins', sans-serif;
             font-size: 12px;
@@ -3302,7 +3340,7 @@
         /* Split file card */
         .chat-split-card {
             margin-top: 8px;
-            background: rgba(16, 185, 129, 0.06);
+            background: var(--accent-mist);
             border: 1px solid rgba(16, 185, 129, 0.2);
             border-radius: 10px;
             padding: 9px 11px;
@@ -3331,7 +3369,7 @@
         }
 
         .chat-split-mini-btn {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             border: none;
             border-radius: 6px;
             padding: 4px 7px;
@@ -3429,7 +3467,7 @@
         }
 
         #agent-chat-send-btn {
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
         }
 
@@ -3524,7 +3562,7 @@
             width: 26px;
             height: 26px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #10b981, #059669);
+            background: var(--accent-fill);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -3584,7 +3622,7 @@
 
         #inline-chat-fullscreen:active {
             opacity: 1;
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         #inline-chat-panel.chat-fullscreen {
@@ -3602,7 +3640,7 @@
         }
 
         #inline-chat-mode-btn.mode-on {
-            background: var(--accent) !important;
+            background: var(--accent-fill) !important;
             color: white !important;
             animation: chatModePulse 2s ease-out infinite;
         }
@@ -3943,7 +3981,7 @@
             height: 34px;
             border-radius: 50%;
             border: none;
-            background: var(--accent);
+            background: var(--accent-fill);
             color: white;
             display: flex;
             align-items: center;
@@ -3965,7 +4003,7 @@
         }
 
         .prompt-preview-card {
-            background: rgba(16, 185, 129, 0.06);
+            background: var(--accent-mist);
             border: 1px solid rgba(16, 185, 129, 0.2);
             border-radius: 10px;
             margin: 4px 0;
@@ -3983,7 +4021,7 @@
         }
 
         .prompt-preview-header:active {
-            background: rgba(16, 185, 129, 0.08);
+            background: var(--accent-mist);
         }
 
         .prompt-preview-title {
@@ -4079,7 +4117,7 @@
 
         .ace-diff-add-line {
             position: absolute;
-            background: rgba(16, 185, 129, 0.15);
+            background: var(--accent-wash);
             border-left: 3px solid #10b981;
             z-index: 4;
         }
@@ -4090,13 +4128,13 @@
         }
 
         .ace_gutter-cell.ace-diff-add {
-            background: rgba(16, 185, 129, 0.2);
+            background: var(--accent-wash);
             color: #10b981 !important;
         }
 
         /* AI Agent button — glowing when chat open */
         .toolbar-btn.chat-active {
-            background: var(--accent-dim) !important;
+            background: var(--accent-wash) !important;
             color: var(--accent) !important;
             opacity: 1 !important;
         }
@@ -4142,7 +4180,7 @@
                 transition: background 0.2s;
             }
             #sidebar-resizer:hover, #sidebar-resizer.active {
-                background: var(--accent);
+                background: var(--accent-fill);
                 opacity: 0.5;
             }
             #sidebar-resizer::after {
@@ -4369,7 +4407,7 @@
             }
 
             .ace_scrollbar::-webkit-scrollbar-thumb:hover {
-                background: var(--accent) !important;
+                background: var(--accent-fill) !important;
             }
 
             body.light-theme .ace_scrollbar::-webkit-scrollbar-thumb {
@@ -4402,7 +4440,7 @@
             width: 44px;
             height: 44px;
             border-radius: 14px;
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             border: 1px solid rgba(16, 185, 129, 0.25);
             display: flex;
             align-items: center;
@@ -4519,7 +4557,7 @@
         .codx-loader-dot {
             width: 6px;
             height: 6px;
-            background: var(--accent);
+            background: var(--accent-fill);
             border-radius: 50%;
             box-shadow: 0 0 8px var(--accent);
             animation: pulse 1.2s infinite ease-in-out;
@@ -4675,14 +4713,14 @@
         }
 
         .chp-session-row:active {
-            background: var(--accent-dim);
+            background: var(--accent-wash);
         }
 
         .chp-session-icon {
             width: 30px;
             height: 30px;
             border-radius: 9px;
-            background: var(--accent-dim);
+            background: var(--accent-wash);
             border: 1px solid rgba(16, 185, 129, 0.2);
             display: flex;
             align-items: center;
@@ -4820,6 +4858,14 @@
 </head>
 
 <body class="dark-theme no-select">
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;pointer-events:none">
+        <defs>
+            <linearGradient id="codx-accent-ink" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="24">
+                <stop stop-color="var(--accent)" />
+                <stop offset="1" stop-color="var(--accent-ink-end)" />
+            </linearGradient>
+        </defs>
+    </svg>
 
     <!-- Welcome Screen (first launch only) -->
     <div id="welcome-screen" class="hidden">
@@ -4910,7 +4956,7 @@
 
             <div style="display:flex; align-items:center; gap:4px;">
                 <button class="icon-btn no-select" id="install-btn"
-                    style="display:none; width:30px; height:30px; background:var(--accent-dim); min-width:30px; border: 1px solid var(--accent); margin-right: 5px;">
+                    style="display:none; width:30px; height:30px; background:var(--accent-wash); min-width:30px; border: 1px solid var(--accent); margin-right: 5px;">
                     <span class="material-icons-round" style="color:var(--accent); font-size:16px;">download</span>
                 </button>
 
@@ -5000,7 +5046,7 @@
         ">
                 <!-- Python output header bar -->
                 <div id="py-out-header"
-                    style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(16,185,129,0.08);border-bottom:1px solid rgba(16,185,129,0.2);flex-shrink:0;">
+                    style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--accent-mist);border-bottom:1px solid rgba(16,185,129,0.2);flex-shrink:0;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"
                         stroke-linecap="round" style="flex-shrink:0;">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
@@ -5013,7 +5059,7 @@
                     <span id="py-run-time"
                         style="font-size:9px;color:var(--text-color);opacity:0.4;font-family:'Poppins',sans-serif;"></span>
                     <button onclick="_pyRunCode()" title="Run again"
-                        style="background:var(--accent-dim);border:none;border-radius:6px;padding:3px 8px;font-size:9px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:3px;">
+                        style="background:var(--accent-wash);border:none;border-radius:6px;padding:3px 8px;font-size:9px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:3px;">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"
                             style="pointer-events:none;">
                             <polygon points="5 3 19 12 5 21 5 3" />
@@ -5046,7 +5092,7 @@
             <!-- Preview welcome overlay — shown when no project is loaded -->
             <div id="preview-welcome" style="
             position:absolute;top:0;left:0;right:0;bottom:0;
-            background:#10b981;
+            background:var(--accent-fill);
             display:none;flex-direction:column;align-items:center;justify-content:center;
             z-index:25;padding:28px;
         ">
@@ -5059,7 +5105,7 @@
                 <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:260px;">
                     <button onclick="dismissPreviewWelcome();openNewProjectModal();" style="
                     padding:15px;border:none;border-radius:14px;
-                    background:white;color:#10b981;
+                    background:white;color:var(--accent-fill-start);
                     font-size:15px;font-weight:700;font-family:'Poppins',sans-serif;
                     display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
                 "><span style="font-size:20px;font-family:'Material Icons Round';font-style:normal;">add_box</span>New
@@ -5191,7 +5237,7 @@
                     </div>
 
                     <div id="inline-attach-bar"
-                        style="display:none;align-items:center;gap:6px;padding:4px 10px;background:var(--accent-dim);border-top:1px solid var(--accent);font-size:10px;font-weight:600;color:var(--accent);">
+                        style="display:none;align-items:center;gap:6px;padding:4px 10px;background:var(--accent-wash);border-top:1px solid var(--accent);font-size:10px;font-weight:600;color:var(--accent);">
                         <span class="material-icons-round" style="font-size:14px;">attach_file</span>
                         <span id="inline-attach-name"
                             style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
@@ -5379,13 +5425,13 @@
 
         <!-- Shimmer top bar -->
         <div
-            style="height:2px;background:linear-gradient(90deg,#10b981,#34d399,#10b981);background-size:200% 100%;animation:shimmer 2.5s linear infinite;border-radius:20px 20px 0 0;">
+            style="height:2px;background:linear-gradient(90deg,var(--accent),var(--accent-ink-end),var(--accent));background-size:200% 100%;animation:shimmer 2.5s linear infinite;border-radius:20px 20px 0 0;">
         </div>
 
         <!-- Header row: icon + title + undo/redo + close -->
         <div style="display:flex;align-items:center;gap:8px;padding:10px 12px 8px;">
             <div
-                style="width:30px;height:30px;border-radius:9px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                style="width:30px;height:30px;border-radius:9px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
                     <circle id="fm-scan-circle" cx="11" cy="11" r="8" stroke="var(--accent)" fill="none" />
                     <circle id="fm-lens-dot" cx="11" cy="11" r="2.2" fill="var(--accent)" stroke="none" />
@@ -5479,7 +5525,7 @@
                 </button>
                 <button onclick="findText(true)"
                     style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;"
-                    onmouseenter="this.style.background='var(--accent-dim)';this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+                    onmouseenter="this.style.background='var(--accent-wash)';this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
                     onmouseleave="this.style.background='rgba(128,128,128,0.08)';this.style.color='var(--text-color)';this.style.borderColor='var(--glass-border)'">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round">
@@ -5489,7 +5535,7 @@
                     Find
                 </button>
                 <button onclick="replaceText()"
-                    style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:700;cursor:pointer;"
+                    style="display:flex;align-items:center;gap:4px;padding:6px 11px;border-radius:7px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:700;cursor:pointer;"
                     ontouchstart="this.style.opacity='0.8'" ontouchend="this.style.opacity='1'">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round">
@@ -5510,7 +5556,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <div style="display:flex;align-items:center;gap:9px;">
                 <div
-                    style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    style="width:34px;height:34px;border-radius:10px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                     <span class="material-icons-round" style="color:var(--accent);font-size:18px;">cloud_sync</span>
                 </div>
                 <div>
@@ -5536,7 +5582,7 @@
         <!-- LOGIN SECTION -->
         <div id="gh-login-section">
             <div
-                style="background:var(--accent-dim);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:12px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--text-color);font-family:'Poppins',sans-serif;">
+                style="background:var(--accent-wash);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:12px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--text-color);font-family:'Poppins',sans-serif;">
                 <div style="font-weight:700;color:var(--accent);margin-bottom:3px;"><svg width="13" height="13"
                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                         style="display:inline;vertical-align:middle;pointer-events:none;">
@@ -5561,9 +5607,9 @@
 
             <!-- Connected status bar -->
             <div
-                style="display:flex;justify-content:space-between;align-items:center;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:8px 12px;margin-bottom:12px;">
+                style="display:flex;justify-content:space-between;align-items:center;background:var(--accent-mist);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:8px 12px;margin-bottom:12px;">
                 <div style="display:flex;align-items:center;gap:7px;">
-                    <div style="width:7px;height:7px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>
+                    <div style="width:7px;height:7px;border-radius:50%;background:var(--accent-fill);flex-shrink:0;"></div>
                     <span
                         style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;">Connected</span>
                 </div>
@@ -5609,7 +5655,7 @@
                 </div>
                 <button onclick="_ghForceRefresh()" title="Refresh — fetch latest from GitHub"
                     style="width:38px;height:38px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.15s;"
-                    onmouseenter="this.style.background='var(--accent-dim)'"
+                    onmouseenter="this.style.background='var(--accent-wash)'"
                     onmouseleave="this.style.background='rgba(128,128,128,0.08)'">
                     <span class="material-icons-round" style="font-size:17px;pointer-events:none;">refresh</span>
                 </button>
@@ -5632,21 +5678,21 @@
                 Create &amp; Upload</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;" id="gh-create-bar">
                 <button onclick="createGhFile()" id="gh-new-file-btn"
-                    style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;"
+                    style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-wash);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;"
                     ontouchstart="this.style.opacity='0.75';this.style.transform='scale(0.95)'"
                     ontouchend="this.style.opacity='1';this.style.transform='scale(1)'">
                     <span class="material-icons-round" style="font-size:17px;pointer-events:none;">add_circle</span>New
                     File
                 </button>
                 <button onclick="createGhFolder()"
-                    style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;"
+                    style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-wash);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;"
                     ontouchstart="this.style.opacity='0.75';this.style.transform='scale(0.95)'"
                     ontouchend="this.style.opacity='1';this.style.transform='scale(1)'">
                     <span class="material-icons-round"
                         style="font-size:17px;pointer-events:none;">create_new_folder</span>New Folder
                 </button>
                 <button onclick="uploadGhFile()"
-                    style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-dim);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;"
+                    style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;border-radius:10px;border:1px solid rgba(16,185,129,0.25);background:var(--accent-wash);color:var(--accent);font-family:'Poppins',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;"
                     ontouchstart="this.style.opacity='0.75';this.style.transform='scale(0.95)'"
                     ontouchend="this.style.opacity='1';this.style.transform='scale(1)'">
                     <span class="material-icons-round"
@@ -5660,14 +5706,14 @@
                 Open</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
                 <button id="gh-load-btn" onclick="loadGhFile()" disabled
-                    style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;"
+                    style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;"
                     ontouchstart="if(!this.disabled){this.style.opacity='0.75';this.style.transform='scale(0.95)'}"
                     ontouchend="if(!this.disabled){this.style.opacity='1';this.style.transform='scale(1)'}">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">file_open</span>Load
                     File
                 </button>
                 <button id="gh-load-repo-btn" onclick="loadGhRepo()" disabled
-                    style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;"
+                    style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.15s;opacity:0.35;"
                     ontouchstart="if(!this.disabled){this.style.opacity='0.75';this.style.transform='scale(0.95)'}"
                     ontouchend="if(!this.disabled){this.style.opacity='1';this.style.transform='scale(1)'}">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">folder_zip</span>Load
@@ -5681,11 +5727,11 @@
                 Sync</div>
             <div style="display:flex;gap:6px;">
                 <button class="modal-btn" id="gh-commit-btn" onclick="commitGhFile()" disabled
-                    style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:linear-gradient(135deg,#10b981,#059669);">
+                    style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:var(--accent-fill);">
                     <span class="material-icons-round" style="font-size:16px;pointer-events:none;">upload</span>Commit
                 </button>
                 <button class="modal-btn" id="gh-undo-btn" onclick="openUndoModal()" disabled
-                    style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:linear-gradient(135deg,#10b981,#059669);">
+                    style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:11px;background:var(--accent-fill);">
                     <span class="material-icons-round" style="font-size:16px;pointer-events:none;">history</span>Undo
                 </button>
             </div>
@@ -5699,7 +5745,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <div style="display:flex;align-items:center;gap:9px;">
                 <div
-                    style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    style="width:34px;height:34px;border-radius:10px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                     <span class="material-icons-round" style="color:var(--accent);font-size:18px;">history</span>
                 </div>
                 <div>
@@ -5820,7 +5866,7 @@
                         style="accent-color:var(--accent);width:14px;height:14px;"> Add MIT License
                 </label>
                 <label id="np-deploy-wrap"
-                    style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:14px;cursor:pointer;user-select:none;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:9px 11px;">
+                    style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:14px;cursor:pointer;user-select:none;background:var(--accent-mist);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:9px 11px;">
                     <input type="checkbox" id="np-repo-deploy"
                         style="accent-color:var(--accent);width:14px;height:14px;">
                     <span style="display:flex;align-items:center;gap:6px;">
@@ -5906,7 +5952,7 @@
                 </div>
                 <div style="display:flex;gap:7px;margin-top:8px;">
                     <button onclick="closeAgentModal();openAgentBar();"
-                        style="flex:1.6;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:11px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
+                        style="flex:1.6;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
                         ontouchstart="this.style.opacity='0.8'" ontouchend="this.style.opacity='1'">
                         <span class="material-icons-round" style="font-size:15px;pointer-events:none;">chat</span>Open
                         Chat
@@ -5944,14 +5990,14 @@
 
                 <div style="display:flex;gap:7px;margin-top:8px;">
                     <button onclick="connectAgent()"
-                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border-radius:11px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;"
+                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;"
                         ontouchstart="this.style.opacity='0.8'" ontouchend="this.style.opacity='1'">
                         <span class="material-icons-round"
                             style="font-size:16px;pointer-events:none;">add_circle</span>Connect
                     </button>
                     <button onclick="openCustomModelDialog()"
                         style="display:flex;align-items:center;justify-content:center;gap:5px;padding:10px 13px;border-radius:11px;border:1.5px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;flex-shrink:0;"
-                        ontouchstart="this.style.background='var(--accent-dim)'"
+                        ontouchstart="this.style.background='var(--accent-wash)'"
                         ontouchend="this.style.background='rgba(128,128,128,0.08)'">
                         <span class="material-icons-round" style="font-size:15px;pointer-events:none;">tune</span>
                     </button>
@@ -5969,7 +6015,7 @@
         style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);z-index:301;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;padding:18px;width:88%;max-width:360px;font-family:'Poppins',sans-serif;opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.25s cubic-bezier(0.34,1.2,0.64,1);">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
             <div
-                style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                style="width:32px;height:32px;border-radius:10px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span class="material-icons-round"
                     style="color:var(--accent);font-size:16px;pointer-events:none;">tune</span>
             </div>
@@ -6020,7 +6066,7 @@
             <button onclick="closeCustomModelDialog()"
                 style="flex:1;padding:10px;border-radius:11px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancel</button>
             <button onclick="connectCustomModel()"
-                style="flex:1.5;padding:10px;border-radius:11px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                style="flex:1.5;padding:10px;border-radius:11px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
                 <span class="material-icons-round" style="font-size:15px;pointer-events:none;">add_circle</span>Add
             </button>
         </div>
@@ -6034,8 +6080,8 @@
         style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.92);z-index:501;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:24px;width:90%;max-width:380px;font-family:'Poppins',sans-serif;opacity:0;pointer-events:none;transition:opacity 0.22s ease,transform 0.28s cubic-bezier(0.34,1.2,0.64,1);box-shadow:0 12px 40px rgba(0,0,0,0.2);overflow:hidden;">
         
         <!-- Header -->
-        <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--glass-border);background:rgba(16,185,129,0.06);">
-            <div style="width:36px;height:36px;border-radius:12px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--glass-border);background:var(--accent-mist);">
+            <div style="width:36px;height:36px;border-radius:12px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span class="material-icons-round" style="color:var(--accent);font-size:20px;">drive_file_move</span>
             </div>
             <div style="flex:1;">
@@ -6110,7 +6156,7 @@
             <button onclick="closeMoveCopyDialog()"
                 style="flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--glass-border);background:none;color:var(--text-color);font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s;">Cancel</button>
             <button id="mc-execute-btn" onclick="executeMoveCopy()"
-                style="flex:1;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:white;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s,transform 0.15s;">
+                style="flex:1;padding:12px;border-radius:12px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s,transform 0.15s;">
                 <span class="material-icons-round" style="font-size:16px;">check_circle</span>
                 <span id="mc-action-label">Copy</span> File
             </button>
@@ -6123,7 +6169,7 @@
         <!-- Header -->
         <div style="padding:16px 20px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
             <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;color:var(--accent);">
+                <div style="width:34px;height:34px;border-radius:10px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;color:var(--accent);">
                     <span class="material-icons-round" style="font-size:20px;">difference</span>
                 </div>
                 <div>
@@ -6141,7 +6187,7 @@
             <span>Line comparisons below</span>
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="color:#ef4444;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;"></span>Removed</span>
-                <span style="color:#10b981;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>Added</span>
+                <span style="color:#10b981;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent-fill);"></span>Added</span>
             </div>
         </div>
 
@@ -6153,7 +6199,7 @@
         <!-- Footer Actions -->
         <div style="padding:16px 20px;border-top:1px solid var(--glass-border);display:flex;gap:10px;justify-content:flex-end;background:rgba(0,0,0,0.08);flex-shrink:0;">
             <button onclick="closeDiffReviewModal()" style="padding:10px 20px;border-radius:12px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(128,128,128,0.06)'" onmouseleave="this.style.background='none'">Cancel</button>
-            <button id="diff-modal-apply-btn" style="padding:10px 24px;border-radius:12px;border:none;background:var(--accent);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity 0.15s;" onmouseenter="this.style.opacity=0.9" onmouseleave="this.style.opacity=1">
+            <button id="diff-modal-apply-btn" style="padding:10px 24px;border-radius:12px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity 0.15s;" onmouseenter="this.style.opacity=0.9" onmouseleave="this.style.opacity=1">
                 <span class="material-icons-round" style="font-size:16px;pointer-events:none;">check_circle</span>Apply Changes
             </button>
         </div>
@@ -6340,7 +6386,11 @@
             const c = document.createElement('canvas'); c.width = size; c.height = size;
             const ctx = c.getContext('2d');
             // Full green background (for maskable/adaptive icons)
-            ctx.fillStyle = '#10b981';
+            const accentFill = ctx.createLinearGradient(0, 0, size, size);
+            const palette = getComputedStyle(document.body);
+            accentFill.addColorStop(0, palette.getPropertyValue('--accent-fill-start').trim());
+            accentFill.addColorStop(1, palette.getPropertyValue('--accent-fill-end').trim());
+            ctx.fillStyle = accentFill;
             ctx.fillRect(0, 0, size, size);
             // Rounded rect (slightly inset for safe zone padding)
             const pad = size * 0.08;
@@ -6352,7 +6402,7 @@
             ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
             ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
             ctx.closePath();
-            ctx.fillStyle = '#059669'; ctx.fill();
+            ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fill();
             ctx.fillStyle = 'white'; ctx.font = `bold ${size * 0.36}px monospace`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText('</>', size / 2, size * 0.53);
@@ -6592,7 +6642,7 @@
                 document.head.appendChild(s);
                 _animationsDisabled = true;
                 const btn = document.getElementById('no-anim-btn');
-                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-dim)'; }
+                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-wash)'; }
             }
             // Plain text ON by default — only disable if user explicitly turned it off
             if (localStorage.getItem('codx_plain_text') === '0') {
@@ -6601,7 +6651,7 @@
                 _forcePlainText = true;
                 editor.session.setMode('ace/mode/text');
                 const btn = document.getElementById('plain-text-btn');
-                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-dim)'; }
+                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-wash)'; }
             }
         })();
 
@@ -7660,10 +7710,10 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             let toolbarHtml = '';
             if (_ghSelectedItems.size > 0) {
                 toolbarHtml = `
-                    <div style="display:flex;gap:6px;padding:8px 12px;background:var(--accent-dim);border-radius:8px;margin-bottom:8px;align-items:center;">
+                    <div style="display:flex;gap:6px;padding:8px 12px;background:var(--accent-wash);border-radius:8px;margin-bottom:8px;align-items:center;">
                         <span style="font-size:11px;font-weight:700;color:var(--accent);flex:1;">${_ghSelectedItems.size} item(s) selected</span>
-                        <button onclick="_ghMoveSelected()" style="background:rgba(16,185,129,0.2);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:var(--accent);cursor:pointer;">Move</button>
-                        <button onclick="_ghCopySelected()" style="background:rgba(16,185,129,0.2);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:var(--accent);cursor:pointer;">Copy</button>
+                        <button onclick="_ghMoveSelected()" style="background:var(--accent-wash);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:var(--accent);cursor:pointer;">Move</button>
+                        <button onclick="_ghCopySelected()" style="background:var(--accent-wash);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:var(--accent);cursor:pointer;">Copy</button>
                         <button onclick="_ghDeleteSelected()" style="background:rgba(239,68,68,0.2);border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;color:#ef4444;cursor:pointer;">Delete All</button>
                         <button onclick="_ghClearSelection()" style="background:rgba(128,128,128,0.2);border:none;border-radius:6px;padding:5px 8px;font-size:10px;cursor:pointer;">Clear</button>
                     </div>
@@ -7720,7 +7770,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 const icon = item.type === 'tree' ? 'folder' : _ghFileIcon(item.name);
                 row.innerHTML = `
                     <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
-                        <div class="gh-item-checkbox" style="width:18px;height:18px;border-radius:3px;border:1.5px solid var(--accent);background:${isSelected ? 'var(--accent)' : 'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                        <div class="gh-item-checkbox" style="width:18px;height:18px;border-radius:3px;border:1.5px solid var(--accent);background:${isSelected ? 'var(--accent-fill)' : 'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
                             ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                         </div>
                         <span class="material-icons-round gh-item-icon">${icon}</span>
@@ -7811,7 +7861,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button onclick="document.getElementById('gh-move-copy-modal').remove()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-weight:600;cursor:pointer;">Cancel</button>
-                    <button id="gh-move-confirm" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;">Move Items</button>
+                    <button id="gh-move-confirm" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-weight:700;cursor:pointer;">Move Items</button>
                 </div>
             `;
             
@@ -7842,7 +7892,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                         browser.innerHTML = '<div style="padding:8px 12px;font-size:10px;opacity:0.5;">No folders found. Files will go to root.</div>';
                     } else {
                         browser.innerHTML = folderList.map(f => `
-                            <div onclick="document.getElementById('gh-dest-folder').value='${f}'" style="padding:6px 12px;cursor:pointer;font-size:10px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--glass-border);transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-dim)'" onmouseleave="this.style.background=''">
+                            <div onclick="document.getElementById('gh-dest-folder').value='${f}'" style="padding:6px 12px;cursor:pointer;font-size:10px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--glass-border);transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-wash)'" onmouseleave="this.style.background=''">
                                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);">folder</span>
                                 <span>${f}</span>
                             </div>
@@ -7942,7 +7992,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button onclick="document.getElementById('gh-copy-modal').remove()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-weight:600;cursor:pointer;">Cancel</button>
-                    <button id="gh-copy-confirm" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;">Copy Items</button>
+                    <button id="gh-copy-confirm" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-weight:700;cursor:pointer;">Copy Items</button>
                 </div>
             `;
             
@@ -8324,7 +8374,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             <!-- Header -->
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <div style="width:32px;height:32px;border-radius:9px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <div style="width:32px;height:32px;border-radius:9px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                         <span class="material-icons-round" style="color:var(--accent);font-size:17px;">upload</span>
                     </div>
                     <div>
@@ -8337,7 +8387,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 </button>
             </div>
             <!-- File info -->
-            <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+            <div style="background:var(--accent-mist);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
                 <div style="font-size:9px;font-weight:700;color:var(--text-color);opacity:0.45;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Committing</div>
                 <div style="display:flex;align-items:center;gap:7px;">
                     <span class="material-icons-round" style="font-size:16px;color:var(--accent);">insert_drive_file</span>
@@ -8349,10 +8399,10 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             <input id="commit-msg-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false" value="Update ${fileName}" placeholder="Commit message" style="width:100%;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:12px;margin-bottom:12px;outline:none;user-select:text;-webkit-user-select:text;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--glass-border)'">
             <!-- Action row -->
             <div style="display:flex;gap:7px;">
-                <button onclick="_commitAnotherFile()" style="flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-dim)'" onmouseleave="this.style.background='rgba(128,128,128,0.08)'">
+                <button onclick="_commitAnotherFile()" style="flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(128,128,128,0.08);color:var(--text-color);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background 0.15s;" onmouseenter="this.style.background='var(--accent-wash)'" onmouseleave="this.style.background='rgba(128,128,128,0.08)'">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">swap_horiz</span>Change File
                 </button>
-                <button onclick="_doCommit()" style="flex:1.4;padding:10px 8px;border-radius:10px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button onclick="_doCommit()" style="flex:1.4;padding:10px 8px;border-radius:10px;border:none;background:var(--accent-fill);color:white;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:15px;pointer-events:none;">upload</span>Commit
                 </button>
             </div>
@@ -8404,7 +8454,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             ].join(';');
 
             el.innerHTML = `
-            <div style="width:44px;height:44px;border-radius:50%;background:rgba(16,185,129,0.15);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;">
+            <div style="width:44px;height:44px;border-radius:50%;background:var(--accent-wash);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <div style="font-size:15px;font-weight:700;color:var(--text-color);">Committed</div>
@@ -8544,11 +8594,11 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                         style="padding:10px 12px;border-bottom:1px solid var(--glass-border);cursor:${isCurrent ? 'default' : 'pointer'};
                         display:flex;align-items:center;gap:8px;transition:background 0.15s;
                         ${isCurrent ? 'opacity:0.45;' : ''}"
-                        ${isCurrent ? '' : 'onmouseenter="this.style.background=\'var(--accent-dim)\'" onmouseleave="this.style.background=\'\'"'}>
+                        ${isCurrent ? '' : 'onmouseenter="this.style.background=\'var(--accent-wash)\'" onmouseleave="this.style.background=\'\'"'}>
                         <span style="font-family:'Courier New',monospace;font-size:10px;color:var(--accent);font-weight:600;flex-shrink:0;">${sha7}</span>
                         <span style="font-size:11px;font-family:'Poppins',sans-serif;color:var(--text-color);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${msg || '(no message)'}</span>
                         <span style="font-size:10px;opacity:0.5;font-family:'Poppins',sans-serif;flex-shrink:0;text-align:right;line-height:1.3;">${date}<br>${time}</span>
-                        ${isCurrent ? '<span style="font-size:9px;background:var(--accent-dim);color:var(--accent);border-radius:4px;padding:2px 6px;flex-shrink:0;font-family:Poppins,sans-serif;font-weight:700;letter-spacing:0.5px;">Current</span>' : ''}
+                        ${isCurrent ? '<span style="font-size:9px;background:var(--accent-wash);color:var(--accent);border-radius:4px;padding:2px 6px;flex-shrink:0;font-family:Poppins,sans-serif;font-weight:700;letter-spacing:0.5px;">Current</span>' : ''}
                     </div>`;
                 }).join('');
 
@@ -8572,7 +8622,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 if (!confirmed) return;
 
                 // Highlight selected row
-                rowEl.style.background = 'var(--accent-dim)';
+                rowEl.style.background = 'var(--accent-wash)';
                 rowEl.style.pointerEvents = 'none';
                 
                 const loader = document.createElement('div');
@@ -8796,14 +8846,14 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 r.onload = ev => {
                     const sizeKB = (file.size / 1024).toFixed(1);
                     agentAttachment = { name: file.name, content: `[Binary file: ${file.name}, size: ${sizeKB}KB, type: ${file.type || 'unknown'}]` };
-                    document.getElementById('agent-attach-btn').style.background = 'var(--accent-dim)';
+                    document.getElementById('agent-attach-btn').style.background = 'var(--accent-wash)';
                     document.getElementById('agent-attach-btn').style.color = 'var(--accent)';
                 };
                 r.readAsArrayBuffer(file);
             } else {
                 r.onload = ev => {
                     agentAttachment = { name: file.name, content: ev.target.result };
-                    document.getElementById('agent-attach-btn').style.background = 'var(--accent-dim)';
+                    document.getElementById('agent-attach-btn').style.background = 'var(--accent-wash)';
                     document.getElementById('agent-attach-btn').style.color = 'var(--accent)';
                 };
                 r.readAsText(file);
@@ -9051,7 +9101,7 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
                 const isActive = i === activeAgentIdx;
                 const row = document.createElement('div');
                 row.className = 'am-agent-row' + (isActive ? ' active' : '');
-                const tagHtml = ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor || 'var(--accent)'};background:${ag.tagColor || 'var(--accent)'}22;">${ag.tag}</span>` : '';
+                const tagHtml = ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor || 'var(--accent)'};background:${ag.tagColor && ag.tagColor !== '#10b981' ? ag.tagColor + '22' : 'var(--accent-wash)'};">${ag.tag}</span>` : '';
                 row.innerHTML = `
                 <div class="am-agent-dot"></div>
                 <div class="am-agent-name">${ag.providerName}</div>
@@ -9280,8 +9330,8 @@ let ghCurrentRepo = localStorage.getItem('gh_last_repo') || "", ghCurrentFile = 
             const barDot = document.querySelector('.agent-status-dot');
             // Key already validated by connectAgent() — if we got here, it's connected
             // Just show green immediately; no need to burn tokens on a test call
-            if (dot) { dot.style.background = '#10b981'; dot.title = 'Connected · ' + (_activeAgent()?.providerName || 'AI' || ''); }
-            if (barDot) barDot.style.background = '#10b981';
+            if (dot) { dot.style.background = 'var(--accent-fill)'; dot.title = 'Connected · ' + (_activeAgent()?.providerName || 'AI' || ''); }
+            if (barDot) barDot.style.background = 'var(--accent-fill)';
         }
         function closeAgentBar() {
             if (_agentPendingEdits && _agentPendingEdits.length > 0) {
@@ -9861,12 +9911,12 @@ Rules:
 
                 // Open in tab button
                 const tabBtn = document.createElement('button');
-                tabBtn.style.cssText = 'background:var(--accent-dim);border:none;border-radius:6px;padding:5px 7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.15s;';
+                tabBtn.style.cssText = 'background:var(--accent-wash);border:none;border-radius:6px;padding:5px 7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.15s;';
                 tabBtn.innerHTML = `<span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none">tab</span>`;
                 tabBtn.title = 'Open in new tab';
                 tabBtn.onclick = () => {
                     openFileInTab(file.filename, file.content, true);
-                    tabBtn.style.background = 'var(--accent)';
+                    tabBtn.style.background = 'var(--accent-fill)';
                     tabBtn.querySelector('span').style.color = 'white';
                 };
 
@@ -9939,7 +9989,7 @@ Rules:
                         <div style="font-size:9px;color:#ef4444;font-weight:700;margin-bottom:3px;letter-spacing:0.4px;">REMOVE</div>
                         <div style="color:#ef4444;font-family:monospace;font-size:10px;opacity:0.9;word-break:break-all;">${findPreview}</div>
                     </div>
-                    <div style="flex:1;min-width:0;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:5px 7px;">
+                    <div style="flex:1;min-width:0;background:var(--accent-mist);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:5px 7px;">
                         <div style="font-size:9px;color:#10b981;font-weight:700;margin-bottom:3px;letter-spacing:0.4px;">INSERT</div>
                         <div style="color:#10b981;font-family:monospace;font-size:10px;opacity:0.9;word-break:break-all;">${replacePreview}</div>
                     </div>
@@ -10012,7 +10062,7 @@ Rules:
             if (old) old.remove();
             const toast = document.createElement('div');
             toast.id = 'agent-undo-toast';
-            toast.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;font-size:11px;font-family:Poppins,sans-serif;';
+            toast.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:var(--accent-wash);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;font-size:11px;font-family:Poppins,sans-serif;';
             toast.innerHTML = `<span style="color:var(--accent);font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg> Applied ${count} edit${count > 1 ? 's' : ''}</span>`;
             const undoBtn = document.createElement('span');
             undoBtn.textContent = 'Undo';
@@ -10662,7 +10712,7 @@ Rules:
                 openBtn.onclick = () => {
                     openFileInTab(f.filename, f.content, true);
                     openBtn.innerHTML = '&#10003;';
-                    openBtn.style.background = 'var(--accent)';
+                    openBtn.style.background = 'var(--accent-fill)';
                     openBtn.style.color = 'white';
                 };
                 row.appendChild(name); row.appendChild(openBtn);
@@ -11042,7 +11092,7 @@ No markdown, no backticks, no explanation outside the array.`;
                 const pn = document.createElement('div');
                 pn.id = 'chat-history-panel';
                 pn.innerHTML = `<div class="chp-header">
-                <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                     <span class="material-icons-round" style="color:var(--accent);font-size:16px;pointer-events:none;">history</span>
                 </div>
                 <div class="chp-title">Chat History</div>
@@ -11108,7 +11158,7 @@ No markdown, no backticks, no explanation outside the array.`;
                     row.style.animationDelay = (delay * 40) + 'ms'; delay++;
                     const userMsgs = session.messages ? session.messages.filter(m => m.role === 'user').length : 0;
                     const t = new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const fileTag = session.fileName ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--accent-dim);color:var(--accent);font-family:Poppins,sans-serif;flex-shrink:0;">' + session.fileName + '</span>' : '';
+                    const fileTag = session.fileName ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--accent-wash);color:var(--accent);font-family:Poppins,sans-serif;flex-shrink:0;">' + session.fileName + '</span>' : '';
                     row.innerHTML = '<div class="chp-session-icon"><span class="material-icons-round" style="color:var(--accent);font-size:15px;pointer-events:none;">chat</span></div>' +
                         '<div class="chp-session-info"><div class="chp-session-name">' + (session.name || 'Unnamed Chat') + '</div>' +
                         '<div class="chp-session-meta"><span>' + t + '</span><span style="opacity:0.4">·</span><span>' + userMsgs + ' msg' + (userMsgs !== 1 ? 's' : '') + '</span>' + fileTag + '</div></div>';
@@ -11188,7 +11238,7 @@ No markdown, no backticks, no explanation outside the array.`;
                 // Session ka file tag header mein dikhao
                 if (session.fileName) {
                     const fileHdr = document.createElement('div');
-                    fileHdr.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;margin:4px 0 8px;background:var(--accent-dim);border-radius:10px;font-size:10px;font-weight:700;color:var(--accent);font-family:Poppins,sans-serif;';
+                    fileHdr.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;margin:4px 0 8px;background:var(--accent-wash);border-radius:10px;font-size:10px;font-weight:700;color:var(--accent);font-family:Poppins,sans-serif;';
                     fileHdr.innerHTML = '<span class="material-icons-round" style="font-size:13px;pointer-events:none;">insert_drive_file</span>' + session.fileName;
                     box.appendChild(fileHdr);
                 }
@@ -11448,10 +11498,10 @@ No markdown, no backticks, no explanation outside the array.`;
                     const prevIsOld = prevCodePart && /old|original|before|current/.test(prevCodePart.lang.toLowerCase());
 
                     const applyBtn = (isNew && prevIsOld)
-                        ? `<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)" data-old="${btoa(unescape(encodeURIComponent(prevCodePart.content.replace(/^\d+\| ?/gm, ''))))}" data-new="${b64}" data-b64="1" style="background:var(--accent);color:white;">
+                        ? `<button class="code-canvas-btn" onclick="_canvasApplyReplace(this)" data-old="${btoa(unescape(encodeURIComponent(prevCodePart.content.replace(/^\d+\| ?/gm, ''))))}" data-new="${b64}" data-b64="1" style="background:var(--accent-fill);color:white;">
                         <span class="material-icons-round">auto_fix_high</span>Apply
                        </button>`
-                        : `<button class="code-canvas-btn" onclick="_canvasInsertOrReplace(this)" data-new="${b64}" data-b64="1" style="background:var(--accent-dim);color:var(--accent);">
+                        : `<button class="code-canvas-btn" onclick="_canvasInsertOrReplace(this)" data-new="${b64}" data-b64="1" style="background:var(--accent-wash);color:var(--accent);">
                         <span class="material-icons-round">edit</span>Insert / Replace
                        </button>`;
 
@@ -11850,7 +11900,7 @@ No markdown, no backticks, no explanation outside the array.`;
             };
 
             const sendBtn2 = document.createElement('button');
-            sendBtn2.style.cssText = 'padding:6px 14px;border-radius:9px;border:none;background:var(--accent);color:white;font-family:Poppins,sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;';
+            sendBtn2.style.cssText = 'padding:6px 14px;border-radius:9px;border:none;background:var(--accent-fill);color:white;font-family:Poppins,sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;';
             sendBtn2.innerHTML = '<span class="material-icons-round" style="font-size:14px;pointer-events:none;">send</span> Resend';
             sendBtn2.onclick = () => {
                 const newText = ta.value.trim();
@@ -12099,7 +12149,7 @@ No markdown, no backticks, no explanation outside the array.`;
             }
 
             _codxScanned = true;
-            if (btn) { btn.style.animation = ''; btn.style.background = 'var(--accent-dim)'; btn.style.color = 'var(--accent)'; btn.style.boxShadow = '0 0 0 1.5px var(--accent)'; }
+            if (btn) { btn.style.animation = ''; btn.style.background = 'var(--accent-wash)'; btn.style.color = 'var(--accent)'; btn.style.boxShadow = '0 0 0 1.5px var(--accent)'; }
             if (ind) { ind.style.display = 'flex'; }
 
             const fc = Object.keys(map.functions).length;
@@ -12211,7 +12261,7 @@ No markdown, no backticks, no explanation outside the array.`;
                 _codxScanned = true;
                 const btn = document.getElementById('codx-scan-btn');
                 const ind = document.getElementById('codx-scan-indicator');
-                if (btn) { btn.style.background = 'var(--accent-dim)'; btn.style.color = 'var(--accent)'; btn.style.boxShadow = '0 0 0 1.5px var(--accent)'; }
+                if (btn) { btn.style.background = 'var(--accent-wash)'; btn.style.color = 'var(--accent)'; btn.style.boxShadow = '0 0 0 1.5px var(--accent)'; }
                 if (ind) { ind.style.display = 'flex'; }
             }
         }, 700);
@@ -12567,11 +12617,11 @@ STRICT FORMAT RULES:
                 if (box && !document.getElementById('inline-no-agent-banner')) {
                     const banner = document.createElement('div');
                     banner.id = 'inline-no-agent-banner';
-                    banner.style.cssText = 'margin:12px;padding:14px;border-radius:14px;background:var(--accent-dim);border:1px solid rgba(16,185,129,0.3);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;';
+                    banner.style.cssText = 'margin:12px;padding:14px;border-radius:14px;background:var(--accent-wash);border:1px solid rgba(16,185,129,0.3);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;';
                     banner.innerHTML = `<span class="material-icons-round" style="font-size:28px;color:var(--accent);">smart_toy</span>
                     <div style="font-size:12px;font-weight:700;color:var(--text-color);font-family:'Poppins',sans-serif;">No Agent Connected</div>
                     <div style="font-size:11px;color:var(--text-color);opacity:0.6;font-family:'Poppins',sans-serif;line-height:1.5;">Connect a free AI agent to start chatting.<br>Groq is free &amp; super fast.</div>
-                    <button onclick="openAgentModal();document.getElementById('inline-no-agent-banner')?.remove();" style="background:var(--accent);color:white;border:none;border-radius:10px;padding:9px 20px;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <button onclick="openAgentModal();document.getElementById('inline-no-agent-banner')?.remove();" style="background:var(--accent-fill);color:white;border:none;border-radius:10px;padding:9px 20px;font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;">
                         <span class="material-icons-round" style="font-size:15px;pointer-events:none;">add_circle</span>Add Agent
                     </button>`;
                     box.appendChild(banner);
@@ -13031,7 +13081,7 @@ Rules:
             const contentJson = JSON.stringify(newContent).replace(/"/g, '&quot;');
 
             card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
+            <div style="background:var(--accent-mist);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
                 <span class="material-icons-round" style="font-size:15px;color:var(--accent);">reorder</span>
                 <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Reorganized file — ${newLines.length} lines</span>
                 <span style="font-size:9px;font-weight:600;font-family:'Poppins',sans-serif;color:var(--text-color);opacity:0.45;">
@@ -13040,7 +13090,7 @@ Rules:
             </div>
             <div style="max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.15);">${html}<div style="padding:4px 8px;font-size:9px;opacity:0.4;font-family:'Courier New',monospace;">... preview shows first 60 lines</div></div>
             <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button onclick="_applyInlineReorganize(this, ${contentJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button onclick="_applyInlineReorganize(this, ${contentJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent-fill);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply Reorganize
                 </button>
                 <button onclick="this.closest('div').parentElement.remove()" style="padding:8px 14px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;">Cancel</button>
@@ -13067,7 +13117,7 @@ Rules:
                 editor.setValue(cleaned, -1);
             }
             const undoCount = _agentUndoStack.length;
-            btn.closest('div').parentElement.innerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:8px;background:rgba(16,185,129,0.08);border-radius:12px;">
+            btn.closest('div').parentElement.innerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:8px;background:var(--accent-mist);border-radius:12px;">
             <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
             <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Reorganized successfully</span>
             <button onclick="_agentUndoLast(this)" style="background:rgba(128,128,128,0.12);border:1px solid var(--glass-border);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;color:var(--text-color);cursor:pointer;display:flex;align-items:center;gap:4px;">
@@ -13108,7 +13158,7 @@ Rules:
                     html += `<div style="padding:1px 8px;font-family:'Courier New',monospace;font-size:10px;color:#ef4444;background:rgba(239,68,68,0.1);white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;">-${escHtml(op.l)}</div>`;
                 } else {
                     hasChanges = true;
-                    html += `<div style="padding:1px 8px;font-family:'Courier New',monospace;font-size:10px;color:#10b981;background:rgba(16,185,129,0.1);white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;">+${escHtml(op.l)}</div>`;
+                    html += `<div style="padding:1px 8px;font-family:'Courier New',monospace;font-size:10px;color:#10b981;background:var(--accent-wash);white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;">+${escHtml(op.l)}</div>`;
                 }
             });
             return { html, hasChanges };
@@ -13151,7 +13201,7 @@ Rules:
                 const { html, hasChanges } = _buildDiffHTML(oldLines, newLines);
                 if (hasChanges) {
                     diffHTML += `<div style="margin-bottom: 12px; border:1px solid var(--glass-border); border-radius:12px; overflow:hidden; background:rgba(0,0,0,0.2);">
-                        <div style="font-size:10px; font-weight:700; color:var(--accent); padding:8px 12px; background:rgba(16,185,129,0.06); border-bottom:1px solid var(--glass-border); font-family:'Poppins',sans-serif; text-transform:uppercase; letter-spacing:0.5px;">Edit Block ${idx + 1}</div>
+                        <div style="font-size:10px; font-weight:700; color:var(--accent); padding:8px 12px; background:var(--accent-mist); border-bottom:1px solid var(--glass-border); font-family:'Poppins',sans-serif; text-transform:uppercase; letter-spacing:0.5px;">Edit Block ${idx + 1}</div>
                         <div style="max-height: 350px; overflow-y: auto; overflow-x: hidden;">${html}</div>
                     </div>`;
                 }
@@ -13362,7 +13412,7 @@ Rules:
             });
 
             card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
+            <div style="background:var(--accent-mist);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
                 <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
                 <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Auto-Applied ${count} change${count !== 1 ? 's' : ''} to Editor</span>
             </div>
@@ -13372,7 +13422,7 @@ Rules:
             </div>
             <div class="diff-preview-container" style="display:none;max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);border-bottom:1px solid var(--glass-border);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
             <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button class="auto-apply-accept-btn" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button class="auto-apply-accept-btn" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent-fill);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Accept
                 </button>
                 <button class="auto-apply-undo-btn" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:#ef4444;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
@@ -13468,7 +13518,7 @@ Rules:
             const tabId = targetTab ? targetTab.id : 'null';
 
             card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
+            <div style="background:var(--accent-mist);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
                 <span class="material-icons-round" style="font-size:15px;color:var(--accent);">difference</span>
                 <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">${count} edit${count !== 1 ? 's' : ''} — review changes</span>
                 <span style="font-size:9px;font-weight:600;font-family:'Poppins',sans-serif;color:var(--text-color);opacity:0.45;display:flex;align-items:center;gap:3px;">
@@ -13478,7 +13528,7 @@ Rules:
             </div>
             <div style="max-height:180px;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,0.15);">${diffHTML || '<div style="padding:10px 12px;font-size:11px;opacity:0.5;font-family:Poppins,sans-serif;">No preview available</div>'}</div>
             <div style="padding:8px 12px;display:flex;gap:7px;border-top:1px solid var(--glass-border);">
-                <button class="card-apply-btn" data-edits-json="${editsJson}" onclick="_clearEditorDiffMarkers();_applyInlineEdits(this, ${editsJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <button class="card-apply-btn" data-edits-json="${editsJson}" onclick="_clearEditorDiffMarkers();_applyInlineEdits(this, ${editsJson}, ${tabId})" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--accent-fill);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply
                 </button>
                 <button onclick="_clearEditorDiffMarkers();openDiffReviewModal(${editsJson}, fileTabs.find(t => t.id === ${tabId}))" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
@@ -13710,7 +13760,7 @@ Use only line numbers visible in the context. Be precise.`;
                 }).join('\n');
 
                 cardParent.innerHTML = `<div style="border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;">
-                <div style="padding:8px 12px;display:flex;align-items:center;gap:8px;background:rgba(16,185,129,0.08);">
+                <div style="padding:8px 12px;display:flex;align-items:center;gap:8px;background:var(--accent-mist);">
                     <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
                     <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">${applied} edit${applied !== 1 ? 's' : ''} applied <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg></span>
                     <button onclick="_agentUndoLast(this)" title="Undo" style="background:rgba(128,128,128,0.12);border:1px solid var(--glass-border);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;color:var(--text-color);cursor:pointer;display:flex;align-items:center;gap:4px;">
@@ -13722,7 +13772,7 @@ Use only line numbers visible in the context. Be precise.`;
                     <button onclick="_inlineReportNotWorking(this)" style="flex:1;padding:7px;border-radius:9px;border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#ef4444;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                         <span class="material-icons-round" style="font-size:14px;pointer-events:none;">thumb_down</span>Didn't work
                     </button>
-                    <button onclick="_inlineConfirmWorking(this)" style="flex:1;padding:7px;border-radius:9px;border:1px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.07);color:var(--accent);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                    <button onclick="_inlineConfirmWorking(this)" style="flex:1;padding:7px;border-radius:9px;border:1px solid rgba(16,185,129,0.35);background:var(--accent-mist);color:var(--accent);font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                         <span class="material-icons-round" style="font-size:14px;pointer-events:none;">thumb_up</span>Looks good
                     </button>
                 </div>
@@ -13859,7 +13909,7 @@ Use only line numbers visible in the context. Be precise.`;
 
         // ── "Looks good" — dismiss card, add positive confirmation to history ──
         function _inlineConfirmWorking(btn) {
-            btn.closest('div').parentElement.innerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.06);border-radius:12px;border:1px solid rgba(16,185,129,0.2);">
+            btn.closest('div').parentElement.innerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:var(--accent-mist);border-radius:12px;border:1px solid rgba(16,185,129,0.2);">
             <span class="material-icons-round" style="font-size:15px;color:var(--accent);">verified</span>
             <span style="font-size:11px;font-weight:600;color:var(--accent);font-family:'Poppins',sans-serif;">Fix confirmed <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg></span>
         </div>`;
@@ -13871,7 +13921,7 @@ Use only line numbers visible in the context. Be precise.`;
         function _applyInlineSplit(btn, files) {
             if (!files || !files.length) return;
             files.forEach(f => openFileInTab(f.filename, f.content, true));
-            btn.closest('div').parentElement.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.08);border-radius:12px;">
+            btn.closest('div').parentElement.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:var(--accent-mist);border-radius:12px;">
             <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
             <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;">${files.length} files created</span>
         </div>`;
@@ -13881,7 +13931,7 @@ Use only line numbers visible in the context. Be precise.`;
 
         function _applyInlineNewFile(btn, filename, content) {
             openFileInTab(filename, content, true);
-            btn.closest('div').parentElement.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.08);border-radius:12px;">
+            btn.closest('div').parentElement.innerHTML = `<div style="padding:9px 12px;display:flex;align-items:center;gap:7px;background:var(--accent-mist);border-radius:12px;">
             <span class="material-icons-round" style="font-size:15px;color:var(--accent);">check_circle</span>
             <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;">${filename} created</span>
         </div>`;
@@ -13902,13 +13952,13 @@ Use only line numbers visible in the context. Be precise.`;
             ).join('');
 
             card.innerHTML = `
-            <div style="background:rgba(16,185,129,0.08);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
+            <div style="background:var(--accent-mist);padding:9px 12px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;">
                 <span class="material-icons-round" style="font-size:15px;color:var(--accent);pointer-events:none;">${icon}</span>
                 <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">${title}</span>
             </div>
             ${linesHTML ? `<div style="padding:8px 12px 4px;">${linesHTML}</div>` : ''}
             <div style="padding:8px 12px;display:flex;gap:7px;" id="confirm-card-actions-${Date.now()}">
-                <button class="confirm-apply-btn" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:opacity 0.15s,transform 0.15s;">
+                <button class="confirm-apply-btn" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--accent-fill);color:white;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:opacity 0.15s,transform 0.15s;">
                     <span class="material-icons-round" style="font-size:14px;pointer-events:none;">check</span>Apply
                 </button>
                 <button class="confirm-decline-btn" style="padding:9px 16px;border-radius:9px;border:1px solid var(--glass-border);background:none;color:var(--text-color);font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;opacity:0.6;transition:opacity 0.15s;">
@@ -13922,7 +13972,7 @@ Use only line numbers visible in the context. Be precise.`;
 
             applyBtn.onclick = () => {
                 onApply();
-                actRow.outerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:rgba(16,185,129,0.06);">
+                actRow.outerHTML = `<div style="padding:8px 12px;display:flex;align-items:center;gap:7px;background:var(--accent-mist);">
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);">check_circle</span>
                 <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'Poppins',sans-serif;flex:1;">Applied <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;pointer-events:none;"><polyline points="20 6 9 17 4 12"/></svg></span>
                 <button onclick="_agentUndoLast(this)" style="background:rgba(128,128,128,0.12);border:1px solid var(--glass-border);border-radius:8px;padding:3px 10px;font-size:10px;font-weight:700;font-family:'Poppins',sans-serif;color:var(--text-color);cursor:pointer;display:flex;align-items:center;gap:4px;">
@@ -13993,7 +14043,7 @@ Use only line numbers visible in the context. Be precise.`;
             dd.innerHTML = '';
             if (agentList.length === 0) {
                 dd.innerHTML = `<div style="padding:12px;font-size:11px;color:var(--text-color);opacity:0.5;font-family:'Poppins',sans-serif;text-align:center;">No agents connected</div>
-            <div style="padding:0 10px 10px;"><button onclick="_inlineCloseModelDropdown();openAgentModal();" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;">Add Agent</button></div>`;
+            <div style="padding:0 10px 10px;"><button onclick="_inlineCloseModelDropdown();openAgentModal();" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--accent-fill);color:white;font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;">Add Agent</button></div>`;
                 return;
             }
             // Group agents by category
@@ -14027,14 +14077,14 @@ Use only line numbers visible in the context. Be precise.`;
                 groups[cat].forEach(({ ag, i }) => {
                     const isSelected = i === activeAgentIdx;
                     const row = document.createElement('div');
-                    row.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px 8px 24px;cursor:pointer;border-bottom:1px solid var(--glass-border);background:${isSelected ? 'var(--accent-dim)' : 'transparent'};transition:background 0.15s;`;
+                    row.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px 8px 24px;cursor:pointer;border-bottom:1px solid var(--glass-border);background:${isSelected ? 'var(--accent-wash)' : 'transparent'};transition:background 0.15s;`;
                     row.innerHTML = `
                     <span style="flex:1;font-size:12px;font-weight:600;color:${isSelected ? 'var(--accent)' : 'var(--text-color)'};font-family:'Poppins',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${ag.providerName}</span>
-                    ${ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor || 'var(--accent)'};background:${ag.tagColor || 'var(--accent)'}22;pointer-events:none;">${ag.tag}</span>` : ''}
+                    ${ag.tag ? `<span style="font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;font-family:'Poppins',sans-serif;color:${ag.tagColor || 'var(--accent)'};background:${ag.tagColor && ag.tagColor !== '#10b981' ? ag.tagColor + '22' : 'var(--accent-wash)'};pointer-events:none;">${ag.tag}</span>` : ''}
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" style="pointer-events:none;opacity:${isSelected ? '1' : '0'};flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`;
-                    row.addEventListener('touchstart', () => { row.style.background = 'var(--accent-dim)'; }, { passive: true });
-                    row.addEventListener('touchend', () => { setTimeout(() => { row.style.background = i === activeAgentIdx ? 'var(--accent-dim)' : 'transparent'; }, 150); }, { passive: true });
-                    row.addEventListener('touchcancel', () => { row.style.background = i === activeAgentIdx ? 'var(--accent-dim)' : 'transparent'; }, { passive: true });
+                    row.addEventListener('touchstart', () => { row.style.background = 'var(--accent-wash)'; }, { passive: true });
+                    row.addEventListener('touchend', () => { setTimeout(() => { row.style.background = i === activeAgentIdx ? 'var(--accent-wash)' : 'transparent'; }, 150); }, { passive: true });
+                    row.addEventListener('touchcancel', () => { row.style.background = i === activeAgentIdx ? 'var(--accent-wash)' : 'transparent'; }, { passive: true });
                     row.onclick = (e) => {
                         e.stopPropagation();
                         _inlineSwitchModel(i);
@@ -14095,7 +14145,7 @@ Use only line numbers visible in the context. Be precise.`;
                 _inlineRenderFileDropdown();
                 dd.style.display = 'block';
                 if (chevron) chevron.style.transform = 'rotate(180deg)';
-                if (trigger) { trigger.style.borderColor = 'var(--accent)'; trigger.style.background = 'var(--accent-dim)'; }
+                if (trigger) { trigger.style.borderColor = 'var(--accent)'; trigger.style.background = 'var(--accent-wash)'; }
                 // Close on outside tap
                 setTimeout(() => {
                     document.addEventListener('click', _inlineCloseFileDropdown, { once: true });
@@ -14132,14 +14182,14 @@ Use only line numbers visible in the context. Be precise.`;
             // ── "New File" option ──
             const isNewSelected = _inlineSelectedTabId === 'new';
             const newRow = document.createElement('div');
-            newRow.style.cssText = `display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'};`;
+            newRow.style.cssText = `display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isNewSelected ? 'var(--accent-wash)' : 'transparent'};`;
             newRow.innerHTML = `
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;">add_circle</span>
             <span style="flex:1;font-size:11px;font-weight:700;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:inline;vertical-align:middle;pointer-events:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> New File</span>
             <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isNewSelected ? '1' : '0'};">radio_button_checked</span>`;
-            newRow.addEventListener('touchstart', () => { newRow.style.background = 'rgba(16,185,129,0.12)'; }, { passive: true });
-            newRow.addEventListener('touchend', () => { setTimeout(() => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, 150); }, { passive: true });
-            newRow.addEventListener('touchcancel', () => { newRow.style.background = isNewSelected ? 'rgba(16,185,129,0.12)' : 'transparent'; }, { passive: true });
+            newRow.addEventListener('touchstart', () => { newRow.style.background = 'var(--accent-wash)'; }, { passive: true });
+            newRow.addEventListener('touchend', () => { setTimeout(() => { newRow.style.background = isNewSelected ? 'var(--accent-wash)' : 'transparent'; }, 150); }, { passive: true });
+            newRow.addEventListener('touchcancel', () => { newRow.style.background = isNewSelected ? 'var(--accent-wash)' : 'transparent'; }, { passive: true });
             newRow.onclick = (e) => {
                 e.stopPropagation();
                 _inlineSelectedTabId = 'new';
@@ -14155,11 +14205,11 @@ Use only line numbers visible in the context. Be precise.`;
                 const isTarget = t.id === _inlineSelectedTabId;
                 const isCtx = _inlineContextTabIds.has(t.id) && !isTarget;
                 const row = document.createElement('div');
-                row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent'};`;
+                row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--glass-border);transition:background 0.15s;background:${isTarget ? 'var(--accent-wash)' : isCtx ? 'var(--accent-mist)' : 'transparent'};`;
                 row.innerHTML = `
                 <span class="material-icons-round" style="font-size:14px;color:${isTarget ? 'var(--accent)' : 'var(--text-color)'};opacity:${isTarget ? '1' : '0.45'};pointer-events:none;">insert_drive_file</span>
                 <span style="flex:1;font-size:11px;font-weight:600;color:var(--text-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">${t.name}</span>
-                <span title="Add as context" style="display:flex;align-items:center;padding:3px 5px;border-radius:5px;cursor:pointer;pointer-events:auto;background:${isCtx ? 'var(--accent-dim)' : 'transparent'};" id="ctx-btn-${t.id}">
+                <span title="Add as context" style="display:flex;align-items:center;padding:3px 5px;border-radius:5px;cursor:pointer;pointer-events:auto;background:${isCtx ? 'var(--accent-wash)' : 'transparent'};" id="ctx-btn-${t.id}">
                     <span class="material-icons-round" style="font-size:13px;color:${isCtx ? 'var(--accent)' : 'var(--text-color)'};opacity:${isCtx ? '1' : '0.3'};pointer-events:none;">library_books</span>
                 </span>
                 <span class="material-icons-round" style="font-size:14px;color:var(--accent);pointer-events:none;opacity:${isTarget ? '1' : '0'};">radio_button_checked</span>`;
@@ -14168,7 +14218,7 @@ Use only line numbers visible in the context. Be precise.`;
                 const _rowBg = isTarget ? 'var(--accent-dim)' : isCtx ? 'rgba(16,185,129,0.05)' : 'transparent';
                 row.addEventListener('touchstart', (e) => {
                     row._ts = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
-                    if (!e.target.closest('[id="ctx-btn-' + t.id + '"]')) row.style.background = 'rgba(16,185,129,0.12)';
+                    if (!e.target.closest('[id="ctx-btn-' + t.id + '"]')) row.style.background = 'var(--accent-wash)';
                 }, { passive: true });
                 row.addEventListener('touchmove', (e) => {
                     if (row._ts) { const dy = Math.abs(e.touches[0].clientY - row._ts.y), dx = Math.abs(e.touches[0].clientX - row._ts.x); if (dy > 8 || dx > 8) { row._ts.moved = true; row.style.background = _rowBg; } }
@@ -14307,7 +14357,7 @@ Use only line numbers visible in the context. Be precise.`;
             iconWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;flex-shrink:0;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);';
 
             if (isChatMode) {
-                iconWrap.style.background = 'rgba(16,185,129,0.18)';
+                iconWrap.style.background = 'var(--accent-wash)';
                 iconWrap.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
                 t.style.borderColor = 'rgba(16,185,129,0.35)';
             } else {
@@ -15005,7 +15055,7 @@ RULES:
                     s.textContent = '*, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0ms !important; transition-duration: 0.001ms !important; transition-delay: 0ms !important; }';
                     document.head.appendChild(s);
                 }
-                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-dim)'; }
+                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-wash)'; }
                 showToast('Animations OFF', 'motion_photos_off');
                 localStorage.setItem('codx_no_anim', '1');
             } else {
@@ -15024,7 +15074,7 @@ RULES:
             const btn = document.getElementById('plain-text-btn');
             if (_forcePlainText) {
                 editor.session.setMode('ace/mode/text');
-                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-dim)'; }
+                if (btn) { btn.style.color = 'var(--accent)'; btn.style.background = 'var(--accent-wash)'; }
                 showToast('Plain Text ON', 'text_fields');
                 localStorage.removeItem('codx_plain_text'); // default state, no need to store
             } else {
