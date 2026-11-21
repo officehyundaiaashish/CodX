@@ -6904,6 +6904,9 @@
                 editor.setValue(content, -1);
                 requestAnimationFrame(_updateEditorPlaceholder);
             }
+            setTimeout(() => {
+                try { editor.session.getUndoManager().reset(); } catch {}
+            }, 0);
         }
 
 
@@ -7770,7 +7773,14 @@ function parseMagicJson(fromShortcut = false) {
             syncUndoState();
             return;
         }
+        const beforeVal = editor.getValue();
         editorUndo();
+        if (beforeVal && editor.getValue() === '') {
+            editorRedo();
+            undoButton.disabled = true;
+            note.textContent = 'Nothing to undo.';
+            return;
+        }
         const tab = fileTabs.find(item => item.id === activeTabId);
         if (tab) tab.content = editor.getValue();
         saveSession();
