@@ -6011,7 +6011,7 @@
                 <small>Copy prompt</small>
             </button>
             <button type="button" id="magic-paste" class="cdlg-btn secondary" autofocus>Paste</button>
-            <button type="button" class="cdlg-btn secondary" aria-label="Close" onclick="this.closest('dialog').close()">×</button>
+            <button type="button" class="cdlg-btn secondary" aria-label="Close" onclick="closeMagicJson()">×</button>
         </header>
         <textarea id="magic-json" aria-label="JSON to parse" placeholder="Paste JSON here" spellcheck="false"></textarea>
         <footer>
@@ -7548,6 +7548,25 @@
     editor.clearSelection();
 }
 
+function closeMagicJson(result = '') {
+    const box = document.getElementById('magic-box');
+    if (!box.open || box.dataset.closing) return;
+    box.dataset.closing = 'true';
+    const finish = () => {
+        delete box.dataset.closing;
+        box.close(result);
+    };
+    if (!box.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        finish();
+        return;
+    }
+    box.getAnimations().forEach(animation => animation.cancel());
+    box.animate([
+        { opacity: 1, transform: 'translateY(0) scale(1)' },
+        { opacity: 0, transform: 'translateY(8px) scale(.97)' }
+    ], { duration: 140, easing: 'ease-in', fill: 'forwards' }).finished.then(finish, finish);
+}
+
 function parseMagicJson(fromShortcut = false) {
     const box = document.getElementById('magic-box');
     if (box.open) return;
@@ -7606,12 +7625,12 @@ function parseMagicJson(fromShortcut = false) {
                 }
             }
             if (parsed && (parsed.old !== undefined || parsed.new !== undefined)) {
-                box.close('parsed');
+                closeMagicJson('parsed');
                 const oldVal = parsed.old || '';
                 const newVal = parsed.new || '';
                 document.getElementById('find-input').value = oldVal;
                 document.getElementById('replace-input').value = newVal;
-                setTimeout(function() {
+                box.addEventListener('close', function() {
                     findText(false);
                     let match = editor.getSelectionRange();
                     if (!match.isEmpty()) {
@@ -7619,7 +7638,7 @@ function parseMagicJson(fromShortcut = false) {
                     } else {
                         showToast('Parsed! But no matching block found in code.', 'error_outline');
                     }
-                }, 100);
+                }, { once: true });
             } else {
                 note.textContent = 'Missing "old" or "new".';
             }
@@ -7647,11 +7666,24 @@ function parseMagicJson(fromShortcut = false) {
     };
     if (findModal.classList.contains('active')) toggleFindReplace();
     box.onclose = () => {
-        if (box.open || (fromShortcut && box.returnValue !== 'parsed')) return;
+        if (box.open) return;
+        box.getAnimations().forEach(animation => animation.cancel());
+        if (fromShortcut && box.returnValue !== 'parsed') return;
         if (_inPreview) switchTab('editor');
         if (!findModal.classList.contains('active')) toggleFindReplace(false);
     };
+    box.oncancel = event => {
+        event.preventDefault();
+        closeMagicJson();
+    };
+    box.getAnimations().forEach(animation => animation.cancel());
     box.showModal();
+    if (box.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        box.animate([
+            { opacity: 0, transform: 'translateY(8px) scale(.97)' },
+            { opacity: 1, transform: 'translateY(0) scale(1)' }
+        ], { duration: 180, easing: 'ease-out' });
+    }
 }
 
         // --- KEYBOARD SHORTCUTS ---
