@@ -7732,7 +7732,8 @@ function parseMagicJson(fromShortcut = false) {
     const paste = document.getElementById('magic-paste');
     const note = document.getElementById('magic-note');
     note.textContent = '';
-    field.value = '';
+    try { field.value = sessionStorage.getItem('codx_magic_draft') || ''; } catch { field.value = ''; }
+    field.oninput = () => { try { sessionStorage.setItem('codx_magic_draft', field.value); } catch {} };
     try { size.value = localStorage.getItem('codx_magic_height') || '88'; } catch {}
     const resize = () => { field.style.height = size.value + 'px'; };
     resize();
@@ -7740,7 +7741,11 @@ function parseMagicJson(fromShortcut = false) {
     size.onchange = () => { try { localStorage.setItem('codx_magic_height', size.value); } catch {} };
     let pasteVersion = 0;
     const fileInput = document.getElementById('magic-file');
+    fileInput.oncancel = (e) => {
+        e.stopPropagation();
+    };
     document.getElementById('magic-upload').onclick = () => {
+        try { sessionStorage.setItem('codx_magic_draft', field.value); } catch {}
         fileInput.value = '';
         fileInput.click();
     };
@@ -7751,6 +7756,7 @@ function parseMagicJson(fromShortcut = false) {
             const text = await file.text();
             pasteVersion++;
             field.value = text;
+            try { sessionStorage.setItem('codx_magic_draft', text); } catch {}
             note.textContent = text.trim() ? 'Loaded "' + file.name + '".' : 'Selected file is empty.';
         } catch {
             note.textContent = 'Could not read file.';
@@ -7760,6 +7766,7 @@ function parseMagicJson(fromShortcut = false) {
         pasteVersion++;
         field.value = '';
         note.textContent = '';
+        try { sessionStorage.removeItem('codx_magic_draft'); } catch {}
     };
     paste.onclick = async function readClipboard() {
         const version = ++pasteVersion;
@@ -7911,11 +7918,15 @@ function parseMagicJson(fromShortcut = false) {
     box.onclose = () => {
         if (box.open) return;
         box.getAnimations().forEach(animation => animation.cancel());
+        if (box.returnValue === 'applied' || box.returnValue === 'parsed') {
+            try { sessionStorage.removeItem('codx_magic_draft'); } catch {}
+        }
         if (fromShortcut && box.returnValue !== 'parsed') return;
         if (_inPreview) switchTab('editor');
         if (!findModal.classList.contains('active')) toggleFindReplace(false);
     };
     box.oncancel = event => {
+        if (event.target !== box) return;
         event.preventDefault();
         closeMagicJson();
     };
