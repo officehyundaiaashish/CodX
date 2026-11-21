@@ -5080,7 +5080,7 @@
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                 </button>
-                <button type="button" id="header-magic-btn" class="icon-btn no-select" title="JSON Magic" aria-label="Open JSON Magic" onclick="parseMagicJson()" style="width:30px;height:30px;min-width:30px;background:none;color:var(--accent);font:bold 14px monospace;">{ }</button>
+                <button type="button" id="header-magic-btn" class="icon-btn no-select" title="JSON Magic" aria-label="Open JSON Magic" onclick="parseMagicJson(true)" style="width:30px;height:30px;min-width:30px;background:none;color:var(--accent);font:bold 14px monospace;">{ }</button>
                 <!-- Nav hide/show toggle -->
                 <button class="icon-btn no-select" id="nav-hide-btn"
                     style="width:30px;height:30px;background:none;min-width:30px;" onclick="toggleNavVisibility()"
@@ -7548,9 +7548,10 @@
     editor.clearSelection();
 }
 
-function parseMagicJson() {
+function parseMagicJson(fromShortcut = false) {
     const box = document.getElementById('magic-box');
     if (box.open) return;
+    box.returnValue = '';
     const field = document.getElementById('magic-json');
     const size = document.getElementById('magic-height');
     const paste = document.getElementById('magic-paste');
@@ -7605,7 +7606,7 @@ function parseMagicJson() {
                 }
             }
             if (parsed && (parsed.old !== undefined || parsed.new !== undefined)) {
-                box.close();
+                box.close('parsed');
                 const oldVal = parsed.old || '';
                 const newVal = parsed.new || '';
                 document.getElementById('find-input').value = oldVal;
@@ -7646,7 +7647,7 @@ function parseMagicJson() {
     };
     if (findModal.classList.contains('active')) toggleFindReplace();
     box.onclose = () => {
-        if (box.open) return;
+        if (box.open || (fromShortcut && box.returnValue !== 'parsed')) return;
         if (_inPreview) switchTab('editor');
         if (!findModal.classList.contains('active')) toggleFindReplace(false);
     };
