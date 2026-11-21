@@ -7398,6 +7398,28 @@ function parseMagicJson() {
             showToast('Unsuccessful: Invalid JSON format.', 'error_outline');
         }
     });
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'cdlg-btn secondary';
+    copyButton.textContent = 'Copy prompt';
+    copyButton.onclick = async () => {
+        const promptText = [
+            'Use the source file and change request I provide. If either is missing, ask for it first.',
+            'Return one valid JSON object on one line, with exactly two string keys: "old" and "new".',
+            'Copy the smallest unique, nonempty block from my file into "old" exactly, including whitespace.',
+            'Put its complete replacement in "new". For an insertion, keep the anchor in the replacement. For deletion, use an empty string.',
+            'Use valid JSON escaping for newlines, tabs, quotes and backslashes. Include no Markdown, commentary, line numbers or placeholders.',
+            'For separate changes, return the first edit only and wait for the updated file.',
+            'Example: {"old":"let count = 1;","new":"let count = 2;"}'
+        ].join('\n');
+        try {
+            await navigator.clipboard.writeText(promptText);
+            copyButton.textContent = 'Copied';
+        } catch {
+            window.prompt('Copy this model prompt', promptText);
+        }
+    };
+    document.getElementById('custom-dialog-btns').prepend(copyButton);
     setTimeout(function() {
         let dialogOverlay = document.getElementById('custom-dialog-overlay');
         if (dialogOverlay) {
