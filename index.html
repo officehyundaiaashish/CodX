@@ -3883,131 +3883,23 @@
             stroke: #f59e0b;
         }
 
-        /* ── GenA Mode Button ── */
-        #gena-mode-btn {
-            display: flex;
-            position: relative;
-            transition: background 0.25s, color 0.25s, box-shadow 0.25s;
-        }
-
-        #gena-mode-btn.gena-on {
-            background: rgba(139, 92, 246, 0.22) !important;
-            color: #a78bfa !important;
-            border: 1.5px solid rgba(139, 92, 246, 0.5) !important;
-            animation: genaPulse 2s ease-out infinite;
-        }
-
-        #gena-mode-btn.gena-running {
-            background: rgba(139, 92, 246, 0.35) !important;
-            color: #c4b5fd !important;
-            border: 1.5px solid #7c3aed !important;
-            animation: genaRunning 0.9s ease-in-out infinite alternate;
-        }
-
-        @keyframes genaPulse {
-            0%   { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.6); }
-            60%  { box-shadow: 0 0 0 7px rgba(139, 92, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
-        }
-
-        @keyframes genaRunning {
-            0%   { box-shadow: 0 0 6px rgba(139, 92, 246, 0.6); }
-            100% { box-shadow: 0 0 14px rgba(139, 92, 246, 0.9); }
-        }
-
-        /* ── GenA Step Cards ── */
-        .gena-run-card {
-            background: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, var(--glass-bg) 100%);
-            border: 1px solid rgba(139, 92, 246, 0.25);
-            border-radius: 16px;
-            overflow: visible;
-            height: auto;
-            min-height: 0;
-            margin: 4px 0;
-            max-width: 100%;
-            box-shadow: 0 4px 20px rgba(139,92,246,0.08);
-        }
-
-        .gena-card-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 14px 8px;
-            border-bottom: 1px solid rgba(139,92,246,0.15);
-        }
-
-        .gena-card-title {
-            font-size: 11px;
-            font-weight: 700;
-            color: #a78bfa;
-            font-family: 'Poppins', sans-serif;
-            flex: 1;
-        }
-
-        .gena-card-timer {
-            font-size: 9px;
-            font-family: monospace;
-            color: #a78bfa;
-            opacity: 0.6;
-        }
-
-        .gena-steps-list {
-            padding: 8px 12px 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .gena-step-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 7px;
-            font-size: 10.5px;
-            font-family: 'Poppins', sans-serif;
-            line-height: 1.45;
-            opacity: 0.5;
-            transition: opacity 0.3s;
-        }
-
-        .gena-step-row.active  { opacity: 1; }
-        .gena-step-row.done    { opacity: 0.75; }
-        .gena-step-row.error   { opacity: 1; color: #f87171; }
-
-        .gena-step-icon {
-            font-size: 13px;
-            flex-shrink: 0;
-            margin-top: 1px;
-        }
-
-        .gena-step-icon.spinning {
-            display: inline-block;
-            animation: spin 0.8s linear infinite;
-        }
-
-        .gena-step-text { flex: 1; color: var(--text-color); }
-        .gena-step-result {
-            font-size: 9px;
-            color: var(--text-color);
-            opacity: 0.45;
-            font-family: monospace;
-            margin-left: 20px;
-            margin-top: 1px;
-            white-space: pre-wrap;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .gena-memory-bar {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px 8px;
-            font-size: 9.5px;
-            color: #a78bfa;
-            opacity: 0.7;
-            font-family: 'Poppins', sans-serif;
-            border-top: 1px solid rgba(139,92,246,0.12);
-        }
+        /* ── GenA Mode Button (calm, zero-flicker) ── */
+        #gena-mode-btn { display: flex; position: relative; transition: background 0.18s, color 0.18s, border-color 0.18s; }
+        #gena-mode-btn.gena-on { background: rgba(139, 92, 246, 0.22) !important; color: #a78bfa !important; border: 1.5px solid rgba(139, 92, 246, 0.55) !important; }
+        #gena-mode-btn.gena-running { background: rgba(139, 92, 246, 0.32) !important; color: #c4b5fd !important; border: 1.5px solid #8b5cf6 !important; }
+        /* ── GenA Compact Collapsible Run Card (zero-flicker) ── */
+        .gena-run-card { background: rgba(139, 92, 246, 0.06); border: 1px solid rgba(139, 92, 246, 0.22); border-radius: 14px; margin: 4px 0; max-width: 100%; overflow: hidden; }
+        .gena-run-card > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; user-select: none; font-family: 'Poppins', sans-serif; }
+        .gena-run-card > summary::-webkit-details-marker { display: none; }
+        .gena-card-dot { width: 7px; height: 7px; border-radius: 50%; background: #a78bfa; flex-shrink: 0; }
+        .gena-run-card.done .gena-card-dot { background: #10b981; }
+        .gena-run-card.error .gena-card-dot { background: #ef4444; }
+        .gena-card-title { font-size: 11px; font-weight: 600; color: var(--text-color); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gena-card-timer { font-size: 10px; font-family: monospace; color: #a78bfa; opacity: 0.75; flex-shrink: 0; }
+        .gena-steps-list { padding: 6px 12px 9px; border-top: 1px solid rgba(139, 92, 246, 0.14); display: flex; flex-direction: column; gap: 4px; }
+        .gena-step-row { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-family: 'Poppins', sans-serif; line-height: 1.4; color: var(--text-color); opacity: 0.85; }
+        .gena-step-row.error { color: #f87171; opacity: 1; }
+        .gena-step-text { flex: 1; min-width: 0; word-break: break-word; }
 
         .gena-ask-card {
             background: linear-gradient(135deg, rgba(245,158,11,0.08) 0%, var(--glass-bg) 100%);
@@ -6711,8 +6603,8 @@
         let _genARunning = false;
         let _genAAbortCtrl = null;
         let _genAMemory = [];          // session memory (also persisted to localStorage)
-        const _genAMaxSteps = 8;       // max loop iterations per run
-        const _genAStepDelay = 2500;   // ms between API calls (free model rate limit guard)
+        const _genAMaxSteps = 12;      // max loop iterations per run
+        const _genAStepDelay = 350;    // ms between API calls
         const findModal = document.getElementById('find-modal');
         // Declared early — used in saved-settings restore blocks before their definition
         let _lastZoomSize = 10;
@@ -15573,81 +15465,124 @@ Use only line numbers visible in the context. Be precise.`;
         };
 
         // ── GenA System Prompt ──
-        const _GENA_SYSTEM_PROMPT = `You are GenA, a fully autonomous coding agent inside the CodX editor. You execute tasks step-by-step by calling exactly ONE tool per response.
+        const _GENA_SYSTEM_PROMPT = `You are GenA, an autonomous coding agent inside the CodX editor. Call ONE tool per response until the goal is complete.
 
-TOOLS AVAILABLE:
-- read_code: Read the full content of the active/target file
-- read_all_files: Get a list of all open file tabs with their content summaries
-- apply_edit: Replace a section of code (args: lineStart, lineEnd, newContent)
-- create_file: Create a new file (args: name, content)
-- append_memory: Save a note for future reference (args: note)
-- read_memory: Read all previously saved notes
-- web_search: Search the web via DuckDuckGo (args: query)
-- fetch_webpage: Read clean text content of a public URL (args: url)
-- npm_info: Get package info (version, dependencies) from npm registry (args: package)
-- run_js: Execute arbitrary sandboxed Javascript code and capture logs/return value (args: code)
-- search_code: Search for a query/pattern across all open tabs/files (args: query)
-- ask_user: Ask the user a clarifying question (args: question) — pauses the loop
-- done: Signal task complete (args: summary — brief final summary for user)
+TOOLS:
+- read_code: Read active file (optional args: startLine, endLine)
+- read_all_files: List all open file tabs with line counts
+- search_code: Search text across open tabs (args: query)
+- apply_edit: Edit active file. Preferred args: {"old": "exact unique snippet", "new": "replacement"}. Or line args: {"lineStart": 10, "lineEnd": 15, "newContent": "replacement"}
+- create_file: Create a new file tab (args: name, content)
+- run_js: Run sandboxed JavaScript and read logs/return value (args: code)
+- append_memory: Save a short note (args: note)
+- read_memory: Read saved notes
+- web_search: Search the web (args: query)
+- fetch_webpage: Read public URL text (args: url)
+- npm_info: Get npm package info (args: package)
+- ask_user: Ask a clarifying question when blocked (args: question)
+- done: Finish and report result (args: summary)
 
-OUTPUT FORMAT — always respond with ONLY valid JSON, nothing else:
-{"tool":"<tool_name>","args":{...},"reasoning":"<one sentence why>"}
+OUTPUT FORMAT — respond with ONLY one valid JSON object:
+{"tool":"<tool_name>","args":{...},"reasoning":"<short 1-line reason>"}
 
 RULES:
-1. Call exactly one tool per response
-2. Be efficient — do not repeat tool calls unnecessarily
-3. Always call "done" when the task is complete
-4. Keep reasoning short (1 sentence)
-5. For apply_edit: newContent must be the COMPLETE replacement for those lines
-6. Never output plain text — only JSON tool calls`;
+1. Always inspect relevant code with search_code or read_code before apply_edit.
+2. Prefer {"old", "new"} in apply_edit for exact, safe replacements.
+3. Keep tool calls minimal and call "done" as soon as the goal is achieved.`;
+
+        function _genAParseToolCall(raw) {
+            if (!raw || typeof raw !== 'string') return null;
+            let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+            const tryParse = (s) => {
+                try { return JSON.parse(s); } catch (_) {}
+                if (typeof jsonrepair !== 'undefined') {
+                    try { return JSON.parse(jsonrepair(s)); } catch (_) {}
+                }
+                return null;
+            };
+            let obj = tryParse(cleaned);
+            if (obj && typeof obj.tool === 'string') return obj;
+            const start = cleaned.indexOf('{');
+            const end = cleaned.lastIndexOf('}');
+            if (start !== -1 && end > start) {
+                obj = tryParse(cleaned.slice(start, end + 1));
+                if (obj && typeof obj.tool === 'string') return obj;
+            }
+            return null;
+        }
+
+        function _genAGetActiveTab() {
+            const tab = fileTabs && (fileTabs.find(t => t.id === activeTabId) || fileTabs[0]);
+            if (tab && typeof editor !== 'undefined' && tab.id === activeTabId) tab.content = editor.getValue();
+            return tab || null;
+        }
 
         // ── Tool executor ──
         async function _genAExecuteTool(toolName, args, userGoalContext) {
             switch (toolName) {
-
                 case 'read_code': {
-                    const tab = fileTabs && fileTabs.find(t => t.id === activeTabId);
+                    const tab = _genAGetActiveTab();
                     if (!tab) return '[No active file]';
-                    const lines = (tab.content || '').split('\n').map((l, i) => `${i+1}| ${l}`).join('\n');
-                    return `File: ${tab.name}\nLines: ${tab.content.split('\n').length}\n\n${lines.slice(0, 8000)}`;
+                    const allLines = (tab.content || '').replace(/\r\n?/g, '\n').split('\n');
+                    const total = allLines.length;
+                    const s = Math.max(1, parseInt(args?.startLine, 10) || 1);
+                    const e = Math.min(total, parseInt(args?.endLine, 10) || total);
+                    const numbered = allLines.slice(s - 1, e).map((l, i) => `${s + i}| ${l}`).join('\n');
+                    const clipped = numbered.length > 24000 ? numbered.slice(0, 24000) + '\n...[truncated — pass startLine/endLine]' : numbered;
+                    return `File: ${tab.name} (lines ${s}-${e} of ${total})\n\n${clipped}`;
                 }
 
                 case 'read_all_files': {
-                    if (!fileTabs || fileTabs.length === 0) return '[No open files]';
-                    return fileTabs.map(t => `• ${t.name} (${(t.content||'').split('\n').length} lines)`).join('\n');
+                    _genAGetActiveTab();
+                    if (!fileTabs || !fileTabs.length) return '[No open files]';
+                    return fileTabs.map(t => `• ${t.name}${t.id === activeTabId ? ' (active)' : ''} — ${(t.content || '').split('\n').length} lines`).join('\n');
                 }
 
                 case 'apply_edit': {
-                    const { lineStart, lineEnd, newContent } = args || {};
-                    if (!lineStart || !lineEnd || newContent === undefined) return '[apply_edit error: missing args]';
-                    const tab = fileTabs && fileTabs.find(t => t.id === activeTabId);
+                    const tab = _genAGetActiveTab();
                     if (!tab) return '[No active file to edit]';
-                    const beforeContent = tab.content || '';
-                    const lines = beforeContent.split('\n');
-                    const s = Math.max(0, parseInt(lineStart) - 1);
-                    const e = Math.min(lines.length, parseInt(lineEnd));
-                    lines.splice(s, e - s, ...newContent.split('\n'));
-                    tab.content = lines.join('\n');
+                    const beforeContent = (tab.content || '').replace(/\r\n?/g, '\n');
+                    let updated = null;
+                    let summary = '';
+                    if (typeof args?.old === 'string' && typeof args?.new === 'string' && args.old.length) {
+                        const oldText = args.old.replace(/\r\n?/g, '\n');
+                        const newText = args.new.replace(/\r\n?/g, '\n');
+                        const idx = beforeContent.indexOf(oldText);
+                        if (idx < 0) return '[apply_edit error: "old" block not found. Use search_code/read_code for exact text.]';
+                        if (beforeContent.indexOf(oldText, idx + 1) >= 0) return '[apply_edit error: "old" block matches multiple places. Include more context.]';
+                        updated = beforeContent.slice(0, idx) + newText + beforeContent.slice(idx + oldText.length);
+                        summary = `Replaced exact block in ${tab.name}`;
+                    } else if (args?.lineStart != null && args?.lineEnd != null && args?.newContent !== undefined) {
+                        const lines = beforeContent.split('\n');
+                        const s = Math.max(0, parseInt(args.lineStart, 10) - 1);
+                        const e = Math.min(lines.length, parseInt(args.lineEnd, 10));
+                        if (s >= lines.length || e < s) return `[apply_edit error: invalid line range ${args.lineStart}-${args.lineEnd}]`;
+                        lines.splice(s, e - s, ...String(args.newContent).replace(/\r\n?/g, '\n').split('\n'));
+                        updated = lines.join('\n');
+                        summary = `Replaced lines ${args.lineStart}-${args.lineEnd} in ${tab.name}`;
+                    } else {
+                        return '[apply_edit error: provide {"old","new"} or {"lineStart","lineEnd","newContent"}]';
+                    }
+                    tab.content = updated;
                     if (typeof editor !== 'undefined' && activeTabId === tab.id) {
-                        const pos = editor.getCursorPosition();
-                        editor.setValue(tab.content, -1);
-                        editor.moveCursorToPosition(pos);
+                        const session = editor.session;
+                        const Range = ace.require('ace/range').Range;
+                        const last = session.getLength() - 1;
+                        session.markUndoGroup();
+                        session.replace(new Range(0, 0, last, session.getLine(last).length), updated);
+                        session.markUndoGroup();
                     }
-                    // Push to undo stack
-                    if (typeof _agentUndoStack !== 'undefined') {
-                        _agentUndoStack.push({ tabId: tab.id, before: beforeContent });
-                    }
-                    return `[Applied edit: lines ${lineStart}–${lineEnd} in ${tab.name} replaced successfully]`;
+                    if (typeof _agentUndoStack !== 'undefined') _agentUndoStack.push({ tabId: tab.id, before: beforeContent });
+                    if (typeof saveSession === 'function') saveSession();
+                    if (_inPreview && !_pythonMode && typeof _refreshPreview === 'function') _refreshPreview();
+                    return `[Success: ${summary}]`;
                 }
 
                 case 'create_file': {
-                    const { name, content } = args || {};
+                    const name = args?.name;
                     if (!name) return '[create_file error: missing name]';
-                    if (typeof openNewTab === 'function') {
-                        openNewTab(name, content || '');
-                        return `[Created file: ${name}]`;
-                    }
-                    return '[create_file: openNewTab not available]';
+                    openFileInTab(name, args?.content || '', true);
+                    return `[Created file tab: ${name}]`;
                 }
 
                 case 'append_memory': {
@@ -15766,7 +15701,7 @@ RULES:
             }
         }
 
-        // ── Main GenA Agent Loop ──
+        // ── Main GenA Agent Loop (reliable + zero-flicker) ──
         async function runGenAAgent(userGoal) {
             _genARunning = true;
             _genAAbortCtrl = new AbortController();
@@ -15775,248 +15710,164 @@ RULES:
             const btn = document.getElementById('gena-mode-btn');
             if (btn) { btn.classList.remove('gena-on'); btn.classList.add('gena-running'); }
 
-            // Build live step card in chat
             const box = document.getElementById('inline-chat-messages');
             const empty = document.getElementById('inline-chat-empty');
             if (empty) empty.remove();
 
-            const runCard = document.createElement('div');
+            const runCard = document.createElement('details');
             runCard.className = 'gena-run-card';
-            runCard.innerHTML = `
-                <div class="gena-progress-line" id="gena-prog-line"></div>
-                <div class="gena-card-header">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span class="gena-card-title">GenA Agent Running</span>
-                    <span class="gena-card-timer" id="gena-run-timer">0s</span>
-                </div>
-                <div class="gena-steps-list" id="gena-steps-list"></div>
-                <div class="gena-memory-bar" id="gena-memory-bar" style="display:none;">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span id="gena-memory-count">0 memory notes</span>
-                </div>
-            `;
+            runCard.innerHTML = `<summary><span class="gena-card-dot"></span><span class="gena-card-title">GenA · Working...</span><span class="gena-card-timer">0s</span></summary><div class="gena-steps-list"></div>`;
             box.appendChild(runCard);
-            _inlineChatScroll();
+            _inlineChatScroll(true);
 
-            // Timer
+            const titleEl = runCard.querySelector('.gena-card-title');
+            const timerEl = runCard.querySelector('.gena-card-timer');
+            const stepsList = runCard.querySelector('.gena-steps-list');
+
             const startTs = Date.now();
             const timerInterval = setInterval(() => {
-                const el = document.getElementById('gena-run-timer');
-                if (el) el.textContent = Math.floor((Date.now() - startTs) / 1000) + 's';
+                if (timerEl) timerEl.textContent = Math.floor((Date.now() - startTs) / 1000) + 's';
             }, 1000);
 
-            const stepsList = document.getElementById('gena-steps-list');
+            const toolNameMap = {
+                read_code: 'Reading code', read_all_files: 'Listing files', apply_edit: 'Applying edit',
+                create_file: 'Creating file', append_memory: 'Saving note', read_memory: 'Reading memory',
+                web_search: 'Searching web', fetch_webpage: 'Reading page', npm_info: 'Checking npm',
+                run_js: 'Running JS', search_code: 'Searching code', ask_user: 'Waiting for input', done: 'Finishing'
+            };
 
-            function _addStep(label) {
+            function _logStep(label, isError) {
                 const row = document.createElement('div');
-                row.className = 'gena-step-row active';
-                const id = 'gena-step-' + Date.now();
-                row.id = id;
-                row.innerHTML = `<span class="gena-step-icon spinning"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span><span class="gena-step-text">${label}</span>`;
+                row.className = 'gena-step-row' + (isError ? ' error' : '');
+                row.innerHTML = `<span class="gena-step-text">${isError ? '× ' : '✓ '}${label.replace(/</g, '&lt;')}</span>`;
                 stepsList.appendChild(row);
-                _inlineChatScroll();
-                return id;
             }
 
-            function _markStep(id, status, result) {
-                const row = document.getElementById(id);
-                if (!row) return;
-                row.classList.remove('active');
-                row.classList.add(status); // 'done' or 'error'
-                const icon = row.querySelector('.gena-step-icon');
-                if (icon) {
-                    icon.classList.remove('spinning');
-                    icon.innerHTML = status === 'done'
-                        ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" style="display:block;"><polyline points="20 6 9 17 4 12"/></svg>`
-                        : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" style="display:block;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-                }
-                if (result) {
-                    const res = document.createElement('div');
-                    res.className = 'gena-step-result';
-                    res.textContent = result.slice(0, 120);
-                    row.parentNode.insertBefore(res, row.nextSibling);
-                }
-                _inlineChatScroll();
-            }
-
-            // Rate-limit safe delay
-            function _genADelay(ms) {
-                return new Promise(resolve => setTimeout(resolve, ms));
-            }
-
-            // Conversation for this run (accumulates tool results)
+            const _genADelay = (ms) => new Promise(r => setTimeout(r, ms));
             const runHistory = [];
+            const memCtx = _genAMemory.length ? '\n\nMEMORY:\n' + _genAMemory.map((m, i) => `${i + 1}. ${m.note}`).join('\n') : '';
+            const activeTab = _genAGetActiveTab();
+            const fileCtx = activeTab ? `\nActive file: ${activeTab.name} (${(activeTab.content || '').split('\n').length} lines)` : '';
+
+            let nextUserMsg = `GOAL: ${userGoal}${fileCtx}${memCtx}\n\nBegin. Call your first tool.`;
             let stepCount = 0;
             let finalSummary = '';
+            let hadError = false;
+            let invalidRetries = 0;
 
             try {
                 while (stepCount < _genAMaxSteps) {
                     if (_genAAbortCtrl.signal.aborted) break;
-
                     stepCount++;
-                    const stepLabel = stepCount === 1 ? 'Planning...' : `Step ${stepCount}`;
-                    const stepId = _addStep(stepLabel);
-
-                    // Build context for this turn
-                    const curTab = fileTabs && fileTabs.find(t => t.id === activeTabId);
-                    const memCtx = _genAMemory.length > 0
-                        ? '\n\nMEMORY:\n' + _genAMemory.map((m,i) => `${i+1}. ${m.note}`).join('\n')
-                        : '';
-                    const firstMsg = stepCount === 1
-                        ? `GOAL: ${userGoal}${memCtx}\n\nBegin. Call your first tool.`
-                        : null;
-
-                    const msgToSend = firstMsg || '[Continue. Call next tool based on previous result.]';
+                    if (titleEl) titleEl.textContent = stepCount === 1 ? 'GenA · Planning...' : `GenA · Step ${stepCount}...`;
 
                     let raw;
                     try {
-                        raw = await _callAgentAPI(
-                            _GENA_SYSTEM_PROMPT,
-                            msgToSend,
-                            runHistory,
-                            _genAAbortCtrl
-                        );
+                        raw = await _callAgentAPI(_GENA_SYSTEM_PROMPT, nextUserMsg, runHistory, _genAAbortCtrl);
                     } catch (apiErr) {
-                        // Handle 429 with backoff
+                        if (apiErr.message === '__USER_ABORTED__' || _genAAbortCtrl.signal.aborted) break;
                         if (apiErr.message && apiErr.message.includes('429')) {
-                            _markStep(stepId, 'done', 'Rate limited — waiting 10s...');
-                            await _genADelay(10000);
+                            if (titleEl) titleEl.textContent = 'GenA · Rate limited, retrying...';
+                            await _genADelay(6000);
                             stepCount--;
                             continue;
                         }
-                        _markStep(stepId, 'error', apiErr.message);
+                        hadError = true;
+                        _logStep(apiErr.message || 'API error', true);
+                        finalSummary = 'Error: ' + (apiErr.message || 'API request failed.');
                         break;
                     }
 
-                    if (_genAAbortCtrl.signal.aborted) { _markStep(stepId, 'error', 'Cancelled'); break; }
+                    if (_genAAbortCtrl.signal.aborted) break;
 
-                    // Parse JSON tool call
-                    let parsed;
-                    try {
-                        const jsonMatch = raw.match(/\{[\s\S]*\}/);
-                        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-                    } catch(e) { parsed = null; }
-
-                    if (!parsed || !parsed.tool) {
-                        _markStep(stepId, 'error', 'Invalid response format. Retrying...');
+                    const parsed = _genAParseToolCall(raw);
+                    if (!parsed) {
+                        invalidRetries++;
+                        if (invalidRetries >= 2 || (!raw.includes('{') && raw.trim().length > 20)) {
+                            finalSummary = raw.trim();
+                            break;
+                        }
+                        runHistory.push({ role: 'user', content: nextUserMsg });
                         runHistory.push({ role: 'assistant', content: raw });
-                        runHistory.push({ role: 'user', content: '[ERROR: Response was not valid JSON tool call. Respond with ONLY a JSON tool call.]' });
+                        nextUserMsg = '[Respond with ONLY one valid JSON tool call: {"tool":"...","args":{...},"reasoning":"..."}]';
                         await _genADelay(_genAStepDelay);
                         continue;
                     }
+                    invalidRetries = 0;
 
-                    // Update step label with actual tool name
-                    const stepTextEl = document.getElementById(stepId)?.querySelector('.gena-step-text');
-                    const toolNameMap = {
-                        read_code: 'Reading file code',
-                        read_all_files: 'Scanning all files',
-                        apply_edit: 'Applying code edit',
-                        create_file: 'Creating new file',
-                        append_memory: 'Saving to memory',
-                        read_memory: 'Reading memory',
-                        web_search: 'Searching the web',
-                        fetch_webpage: 'Reading webpage',
-                        npm_info: 'Checking npm package',
-                        run_js: 'Running JS calculation',
-                        search_code: 'Searching in files',
-                        ask_user: 'Asking for clarification',
-                        done: 'Finishing up'
-                    };
-                    const iconSvg = _genaToolIcons[parsed.tool] || '';
-                    const toolLabel = iconSvg + (toolNameMap[parsed.tool] || parsed.tool);
-                    if (stepTextEl) stepTextEl.innerHTML = toolLabel + (parsed.reasoning ? ` — ${parsed.reasoning}` : '');
+                    const stepDesc = (toolNameMap[parsed.tool] || parsed.tool) + (parsed.reasoning ? ` — ${parsed.reasoning}` : '');
+                    if (titleEl) titleEl.textContent = `GenA · ${toolNameMap[parsed.tool] || parsed.tool}...`;
 
-                    // Execute tool
                     const toolResult = await _genAExecuteTool(parsed.tool, parsed.args || {}, userGoal);
 
-                    // Handle special signals
                     if (toolResult.startsWith('__DONE__:')) {
-                        finalSummary = toolResult.replace('__DONE__:', '');
-                        _markStep(stepId, 'done', 'Complete');
+                        _logStep(stepDesc, false);
+                        finalSummary = toolResult.slice(9).trim() || 'Task complete.';
                         break;
                     }
 
                     if (toolResult.startsWith('__ASK_USER__:')) {
-                        const question = toolResult.replace('__ASK_USER__:', '');
-                        _markStep(stepId, 'done', 'Waiting for your answer');
-
-                        // Pause loop — show question card and wait for user response
+                        const question = toolResult.slice(13);
+                        _logStep('Asked user for clarification', false);
+                        if (titleEl) titleEl.textContent = 'GenA · Waiting for your answer';
                         const userAnswer = await new Promise(resolve => {
                             const askCard = document.createElement('div');
                             askCard.className = 'gena-ask-card';
-                            askCard.innerHTML = `
-                                <div class="gena-ask-label">⚡ GenA needs your input</div>
-                                <div class="gena-ask-q">${question.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-                                <input class="gena-ask-input" type="text" placeholder="Your answer..." id="gena-ask-inp-${stepCount}">
-                                <button class="gena-ask-submit" id="gena-ask-btn-${stepCount}">Continue →</button>
-                            `;
+                            askCard.innerHTML = `<div class="gena-ask-label">GenA needs your input</div><div class="gena-ask-q">${question.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div><input class="gena-ask-input" type="text" placeholder="Your answer..."><button class="gena-ask-submit">Continue</button>`;
                             box.appendChild(askCard);
-                            _inlineChatScroll();
-                            const answerBtn = document.getElementById('gena-ask-btn-' + stepCount);
-                            const answerInp = document.getElementById('gena-ask-inp-' + stepCount);
-                            const submit = () => {
-                                const v = (answerInp ? answerInp.value.trim() : '') || '(no answer)';
-                                askCard.remove();
-                                resolve(v);
-                            };
-                            if (answerBtn) answerBtn.onclick = submit;
-                            if (answerInp) answerInp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+                            _inlineChatScroll(true);
+                            const inp = askCard.querySelector('.gena-ask-input');
+                            const sub = askCard.querySelector('.gena-ask-submit');
+                            const finish = () => { const v = (inp?.value.trim()) || '(no answer)'; askCard.remove(); resolve(v); };
+                            if (sub) sub.onclick = finish;
+                            if (inp) { inp.addEventListener('keydown', e => { if (e.key === 'Enter') finish(); }); inp.focus(); }
                         });
-
+                        runHistory.push({ role: 'user', content: nextUserMsg });
                         runHistory.push({ role: 'assistant', content: raw });
-                        runHistory.push({ role: 'user', content: `User answered: ${userAnswer}` });
+                        nextUserMsg = `User answered: ${userAnswer}`;
                         await _genADelay(_genAStepDelay);
                         continue;
                     }
 
-                    // Normal tool result — feed back to model
-                    _markStep(stepId, 'done', toolResult.slice(0, 100));
+                    const isToolErr = toolResult.startsWith('[') && /error|failed|not found|unknown/i.test(toolResult);
+                    _logStep(stepDesc, isToolErr);
+                    runHistory.push({ role: 'user', content: nextUserMsg });
                     runHistory.push({ role: 'assistant', content: raw });
-                    runHistory.push({ role: 'user', content: `Tool result (${parsed.tool}):\n${toolResult}` });
-
-                    // Update memory count badge
-                    if (_genAMemory.length > 0) {
-                        const memBar = document.getElementById('gena-memory-bar');
-                        const memCnt = document.getElementById('gena-memory-count');
-                        if (memBar) memBar.style.display = 'flex';
-                        if (memCnt) memCnt.textContent = _genAMemory.length + ' memory note' + (_genAMemory.length !== 1 ? 's' : '');
-                    }
-
-                    // Rate limit guard — wait between calls
+                    nextUserMsg = `Tool result (${parsed.tool}):\n${toolResult}`;
                     await _genADelay(_genAStepDelay);
                 }
 
-                // Max steps hit
-                if (stepCount >= _genAMaxSteps && !finalSummary) {
-                    finalSummary = 'Reached maximum steps. Task may be partially complete.';
+                if (stepCount >= _genAMaxSteps && !finalSummary && !_genAAbortCtrl.signal.aborted) {
+                    finalSummary = 'Reached maximum steps. Please review the changes or ask me to continue.';
                 }
-
             } catch (outerErr) {
-                if (!_genAAbortCtrl.signal.aborted) {
-                    console.error('[GenA error]', outerErr);
+                if (!_genAAbortCtrl?.signal.aborted) {
+                    hadError = true;
+                    finalSummary = 'Error: ' + (outerErr.message || String(outerErr));
                 }
             }
 
-            // Stop timer + progress bar
             clearInterval(timerInterval);
-            const progLine = document.getElementById('gena-prog-line');
-            if (progLine) { progLine.style.animation = 'none'; progLine.style.opacity = '0'; }
-
-            const header = runCard.querySelector('.gena-card-title');
-            if (header) {
-                const headerText = _genAAbortCtrl?.signal.aborted ? 'GenA — Cancelled' : 'GenA — Complete';
-                header.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ${headerText}`;
+            const elapsed = Math.floor((Date.now() - startTs) / 1000);
+            const aborted = _genAAbortCtrl?.signal.aborted;
+            runCard.classList.add(aborted || hadError ? 'error' : 'done');
+            if (titleEl) {
+                titleEl.textContent = aborted
+                    ? 'GenA · Cancelled'
+                    : (hadError ? `GenA · Stopped (${stepCount} step${stepCount === 1 ? '' : 's'})` : `GenA · Done (${stepCount} step${stepCount === 1 ? '' : 's'})`);
             }
+            if (timerEl) timerEl.textContent = elapsed + 's';
 
-            // Show final summary as agent message
-            if (finalSummary && !_genAAbortCtrl?.signal.aborted) {
+            if (finalSummary && !aborted) {
                 _inlineAppendMsg('agent', finalSummary);
                 _chatHistory.push({ role: 'agent', text: finalSummary, time: _chatTime() });
                 _chSaveCurrentSession();
             }
 
-            // Restore button
-            if (btn) { btn.classList.remove('gena-running'); btn.classList.add(_genAModeOn ? 'gena-on' : ''); }
+            if (btn) {
+                btn.classList.remove('gena-running');
+                btn.classList.toggle('gena-on', _genAModeOn);
+            }
             const sendBtn = document.getElementById('inline-chat-send-btn');
             if (sendBtn) {
                 sendBtn.innerHTML = '<span class="material-icons-round">send</span>';
@@ -16028,7 +15879,7 @@ RULES:
 
             _genARunning = false;
             _genAAbortCtrl = null;
-            _inlineChatScroll();
+            _inlineChatScroll(true);
         }
 
         function _toggleChatMode() {
