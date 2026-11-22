@@ -7955,12 +7955,58 @@ let _magicFlashTimer = null;
 
 let _magicReviewState = null;
 
+function _buildInlineDiffDoc(beforeText, afterText) {
+    const a = beforeText.split('\n');
+    const b = afterText.split('\n');
+    let p = 0;
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    let ae = a.length - 1, be = b.length - 1;
+    while (ae >= p && be >= p && a[ae] === b[be]) { ae--; be--; }
+
+    const out = [], removeRows = [], addRows = [], hunkStarts = [];
+    for (let k = 0; k < p; k++) out.push(a[k]);
+
+    const bPos = new Map();
+    for (let j = p; j <= be; j++) {
+        if (!bPos.has(b[j])) bPos.set(b[j], []);
+        bPos.get(b[j]).push(j);
+    }
+
+    let i = p, j = p;
+    while (i <= ae || j <= be) {
+        if (i <= ae && j <= be && a[i] === b[j]) {
+            out.push(a[i]);
+            i++; j++;
+            continue;
+        }
+        let syncI = ae + 1, syncJ = be + 1, bestDist = Infinity;
+        for (let ti = i; ti <= ae && (ti - i) < bestDist; ti++) {
+            const list = bPos.get(a[ti]);
+            if (!list) continue;
+            for (const tj of list) {
+                if (tj < j) continue;
+                const dist = (ti - i) + (tj - j);
+                if (dist >= bestDist) break;
+                const strong = (ti + 1 <= ae && tj + 1 <= be && a[ti + 1] === b[tj + 1]) || (ti === ae && tj === be);
+                if (strong) { bestDist = dist; syncI = ti; syncJ = tj; break; }
+            }
+        }
+        hunkStarts.push(out.length);
+        for (let r = i; r < syncI; r++) { removeRows.push(out.length); out.push(a[r]); }
+        for (let r = j; r < syncJ; r++) { addRows.push(out.length); out.push(b[r]); }
+        i = syncI; j = syncJ;
+    }
+
+    for (let k = ae + 1; k < a.length; k++) out.push(a[k]);
+    return { diffText: out.join('\n'), removeRows, addRows, hunkStarts };
+}
+
 function _clearMagicAppliedHighlights() {
     const session = editor.session;
     if (_magicFlashTimer) { clearTimeout(_magicFlashTimer); _magicFlashTimer = null; }
     if (session) {
         _magicAppliedMarkers.forEach(id => session.removeMarker(id));
-        _magicAppliedGutterRows.forEach(row => session.removeGutterDecoration(row, 'ace-magic-applied-gutter'));
+        _magicAppliedGutterRows.forEach(([row, cls]) => session.removeGutterDecoration(row, cls));
     }
     _magicAppliedMarkers = [];
     _magicAppliedGutterRows = [];
@@ -7969,51 +8015,61 @@ function _clearMagicAppliedHighlights() {
 function _hideMagicReviewBar() {
     const bar = document.getElementById('magic-review-bar');
     if (bar) bar.classList.remove('visible');
+    if (typeof editor !== 'undefined') editor.setReadOnly(false);
     _magicReviewState = null;
 }
 
-function _acceptMagicReview() {
-    _clearMagicAppliedHighlights();
-    _hideMagicReviewBar();
-    showToast('Changes accepted.', 'check_circle');
+function _replaceAceDocAtomic(newVal) {
+    const session = editor.session;
+    const Range = ace.require('ace/range').Range;
+    const last = session.getLength() - 1;
+    session.markUndoGroup();
+    session.replace(new Range(0, 0, last, session.getLine(last).length), newVal);
+    session.markUndoGroup();
 }
 
-function _rejectMagicReview() {
+function _acceptMagicReview() {
     const state = _magicReviewState;
     _clearMagicAppliedHighlights();
     _hideMagicReviewBar();
     if (!state) return;
-    const current = editor.getValue().replace(/\r\n?/g, '\n');
-    if (current === state.after) {
-        editorUndo();
-        if (editor.getValue().replace(/\r\n?/g, '\n') !== state.before) {
-            const session = editor.session;
-            const Range = ace.require('ace/range').Range;
-            const last = session.getLength() - 1;
-            session.markUndoGroup();
-            session.replace(new Range(0, 0, last, session.getLine(last).length), state.before);
-            session.markUndoGroup();
-        }
-    } else {
-        const session = editor.session;
-        const Range = ace.require('ace/range').Range;
-        const last = session.getLength() - 1;
-        session.markUndoGroup();
-        session.replace(new Range(0, 0, last, session.getLine(last).length), state.before);
-        session.markUndoGroup();
-    }
+    const scrollTop = editor.renderer.getScrollTop();
+    const session = editor.session;
+    const Range = ace.require('ace/range').Range;
+    // Restore original silently then apply new code as one clean Ace undo step
+    editor.setValue(state.before, -1);
+    const last = session.getLength() - 1;
+    session.markUndoGroup();
+    session.replace(new Range(0, 0, last, session.getLine(last).length), state.after);
+    session.markUndoGroup();
+    editor.renderer.scrollToY(scrollTop);
     const tab = fileTabs.find(item => item.id === activeTabId);
     if (tab) tab.content = editor.getValue();
     saveSession();
     if (_inPreview && !_pythonMode) _refreshPreview();
-    showToast('Changes rejected — undone.', 'undo');
+    showToast('Changes accepted. Undo available.', 'check_circle');
+}
+
+function _rejectMagicReview(silent = false) {
+    const state = _magicReviewState;
+    _clearMagicAppliedHighlights();
+    _hideMagicReviewBar();
+    if (!state) return;
+    const scrollTop = editor.renderer.getScrollTop();
+    editor.setValue(state.before, -1);
+    editor.renderer.scrollToY(scrollTop);
+    const tab = fileTabs.find(item => item.id === activeTabId);
+    if (tab) tab.content = editor.getValue();
+    saveSession();
+    if (_inPreview && !_pythonMode) _refreshPreview();
+    if (!silent) showToast('Changes rejected — undone.', 'undo');
 }
 
 function _jumpMagicReviewEdit(delta) {
-    if (!_magicReviewState || !_magicReviewState.rowRanges.length) return;
-    const len = _magicReviewState.rowRanges.length;
+    if (!_magicReviewState || !_magicReviewState.hunkStarts.length) return;
+    const len = _magicReviewState.hunkStarts.length;
     _magicReviewState.idx = (_magicReviewState.idx + delta + len) % len;
-    const row = _magicReviewState.rowRanges[_magicReviewState.idx][0];
+    const row = _magicReviewState.hunkStarts[_magicReviewState.idx];
     editor.gotoLine(row + 1, 0, true);
     editor.scrollToLine(row, true, true, () => {});
     const idxEl = document.getElementById('mrb-nav-idx');
@@ -8032,49 +8088,52 @@ function _showMagicReviewBar(count, rowRanges, beforeText, afterText) {
         document.body.appendChild(bar);
         document.getElementById('mrb-prev').onclick = () => _jumpMagicReviewEdit(-1);
         document.getElementById('mrb-next').onclick = () => _jumpMagicReviewEdit(1);
-        document.getElementById('mrb-reject').onclick = _rejectMagicReview;
+        document.getElementById('mrb-reject').onclick = () => _rejectMagicReview(false);
         document.getElementById('mrb-accept').onclick = _acceptMagicReview;
     }
-    _magicReviewState = { count, rowRanges: rowRanges || [], idx: 0, before: beforeText, after: afterText };
+
+    const diff = _buildInlineDiffDoc(beforeText, afterText);
+    _clearMagicAppliedHighlights();
+    editor.setReadOnly(true);
+    editor.setValue(diff.diffText, -1);
+
+    const session = editor.session;
+    const Range = ace.require('ace/range').Range;
+    diff.removeRows.forEach(r => {
+        _magicAppliedMarkers.push(session.addMarker(new Range(r, 0, r, Infinity), 'ace-diff-remove-line', 'fullLine', false));
+        session.addGutterDecoration(r, 'ace-diff-remove');
+        _magicAppliedGutterRows.push([r, 'ace-diff-remove']);
+    });
+    diff.addRows.forEach(r => {
+        _magicAppliedMarkers.push(session.addMarker(new Range(r, 0, r, Infinity), 'ace-diff-add-line', 'fullLine', false));
+        session.addGutterDecoration(r, 'ace-diff-add');
+        _magicAppliedGutterRows.push([r, 'ace-diff-add']);
+    });
+    if (diff.hunkStarts.length) {
+        const firstRow = diff.hunkStarts[0];
+        editor.gotoLine(firstRow + 1, 0, true);
+        editor.scrollToLine(firstRow, true, true, () => {});
+    }
+
+    _magicReviewState = { count, hunkStarts: diff.hunkStarts, idx: 0, before: beforeText, after: afterText };
     const lbl = document.getElementById('mrb-label');
-    if (lbl) lbl.textContent = count + (count === 1 ? ' edit' : ' edits') + ' applied';
+    if (lbl) lbl.textContent = count + (count === 1 ? ' edit' : ' edits') + ' to review';
     const nav = document.getElementById('mrb-nav');
     const idxEl = document.getElementById('mrb-nav-idx');
-    if (nav && rowRanges && rowRanges.length > 1) {
+    if (nav && diff.hunkStarts.length > 1) {
         nav.hidden = false;
-        if (idxEl) idxEl.textContent = '1 / ' + rowRanges.length;
+        if (idxEl) idxEl.textContent = '1 / ' + diff.hunkStarts.length;
     } else if (nav) {
         nav.hidden = true;
     }
     requestAnimationFrame(() => bar.classList.add('visible'));
 }
 
-function _highlightMagicAppliedRows(rowRanges) {
-    const session = editor.session;
-    if (!session || !rowRanges || !rowRanges.length) return;
-    _clearMagicAppliedHighlights();
-    const Range = ace.require('ace/range').Range;
-    const maxRow = Math.max(0, session.getLength() - 1);
-    const seen = new Set();
-    let firstRow = maxRow;
-    rowRanges.forEach(([s, e]) => {
-        const rs = Math.max(0, Math.min(maxRow, s));
-        const re = Math.max(rs, Math.min(maxRow, e));
-        if (rs < firstRow) firstRow = rs;
-        for (let r = rs; r <= re; r++) {
-            if (seen.has(r)) continue;
-            seen.add(r);
-            _magicAppliedMarkers.push(session.addMarker(new Range(r, 0, r, Infinity), 'ace-magic-applied-line', 'fullLine', false));
-            session.addGutterDecoration(r, 'ace-magic-applied-gutter');
-            _magicAppliedGutterRows.push(r);
-        }
-    });
-    editor.gotoLine(firstRow + 1, 0, true);
-    editor.scrollToLine(firstRow, true, true, () => {});
-}
+function _highlightMagicAppliedRows() {}
 
 async function applyMagicBatch(edits, onProgress) {
     if (!Array.isArray(edits) || !edits.length) throw Error('Add at least one edit.');
+    if (_magicReviewState) _rejectMagicReview(true);
     const original = editor.getValue().replace(/\r\n?/g, '\n');
     let result = original;
     const appliedRanges = [];
@@ -8124,19 +8183,7 @@ async function applyMagicBatch(edits, onProgress) {
         return [startRow, endRow];
     });
 
-    const session = editor.session;
-    if (result !== original) {
-        const Range = ace.require('ace/range').Range;
-        const last = session.getLength() - 1;
-        session.markUndoGroup();
-        session.replace(new Range(0, 0, last, session.getLine(last).length), result);
-        session.markUndoGroup();
-        const tab = fileTabs.find(item => item.id === activeTabId);
-        if (tab) tab.content = editor.getValue();
-        saveSession();
-        if (_inPreview && !_pythonMode) _refreshPreview();
-        _highlightMagicAppliedRows(rowRanges);
-    }
+    // Preview is rendered inline as red (old) + green (new) diff in Ace until Accept/Reject
     if (onProgress) onProgress('complete', edits.length, edits.length);
     return { count: edits.length, rowRanges, before: original, after: result };
 }
