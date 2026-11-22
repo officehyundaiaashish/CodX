@@ -208,24 +208,24 @@
 
         /* Tabs pill with snake border animation */
         .tabs {
-            display: flex;
-            padding: 2px;
-            border-radius: 20px;
-            background: rgba(0, 0, 0, 0.2);
-            position: relative;
-        }
-
-        body.light-theme .tabs {
-            background: rgba(0, 0, 0, 0.05);
-        }
-
-        /* Snake = thin conic border + inner mask to hollow it out */
-        .tabs::before {
-            content: '';
-            position: absolute;
-            inset: -1px;
-            border-radius: 21px;
-            padding: 1px;
+                    display: flex;
+                    padding: 2px;
+                    border-radius: 999px;
+                    background: rgba(0, 0, 0, 0.2);
+                    position: relative;
+                }
+        
+                body.light-theme .tabs {
+                    background: rgba(0, 0, 0, 0.05);
+                }
+        
+                /* Snake = thin conic border + inner mask to hollow it out */
+                .tabs::before {
+                    content: '';
+                    position: absolute;
+                    inset: -1px;
+                    border-radius: 999px;
+                    padding: 1px;
             background: conic-gradient(from var(--pill-snake, 0deg),
                     transparent 0deg,
                     transparent 300deg,
@@ -269,16 +269,16 @@
         }
 
         .tab {
-            padding: 4px 14px;
-            border-radius: 18px;
-            font-weight: 600;
-            font-size: 12px;
-            color: var(--text-color);
-            opacity: 0.7;
-            transition: opacity 0.15s, transform 0.15s;
-            cursor: pointer;
-        }
-
+                    padding: 4px 14px;
+                    border-radius: 999px;
+                    font-weight: 600;
+                    font-size: 12px;
+                    color: var(--text-color);
+                    opacity: 0.7;
+                    transition: opacity 0.15s, transform 0.15s;
+                    cursor: pointer;
+                }
+        
         .tab.active {
             background: var(--accent-fill);
             color: white;
@@ -5148,20 +5148,20 @@
             min-width: 0 !important;
         }
         /* Global Ultra-Round Theme Override (All Buttons, Icons, Pills, Tabs, Dialogs) */
-        button:not(#nav-toggle-btn):not(.mp-choice):not(.file-tab):not(.gh-tree-item),
-        .cdlg-btn, .toolbar-btn, .icon-btn, .jumper-btn, .fm-chip, .code-canvas-btn,
-        .gh-btn, .modal-btn, .pv-btn, .welcome-start-btn, .agent-action-btn,
-        .agent-step-accept, .agent-step-reject, .agent-step-refine-btn, .agent-step-refine-send,
-        .chat-apply-btn, .chat-copy-btn, .chat-split-mini-btn, .chp-del-btn,
-        .gh-item-action-btn, .am-agent-del, .gena-ask-submit, #lang-chip,
-        .am-model-tag, .am-provider-tag, .drag-pill, #chat-session-label,
-        .tabs, .tabs::before, .tab, .np-tab-bar, .np-tab,
-        #magic-copy, #magic-undo, #magic-upload, #magic-paste, #magic-clear, #magic-parse,
-        #magic-box header button, #magic-box footer button, #magic-prompt-dialog header button {
-            border-radius: 999px !important;
-        }
-        .file-tab, .mp-choice, .mp-guide, .mp-outcome, .agent-provider-btn,
-        .np-save-opt, .np-vis-opt, .am-agent-row, .am-provider-row, .am-model-row,
+        button:not(#nav-toggle-btn):not(.mp-choice):not(.gh-tree-item),
+                .cdlg-btn, .toolbar-btn, .icon-btn, .jumper-btn, .fm-chip, .code-canvas-btn,
+                .gh-btn, .modal-btn, .pv-btn, .welcome-start-btn, .agent-action-btn,
+                .agent-step-accept, .agent-step-reject, .agent-step-refine-btn, .agent-step-refine-send,
+                .chat-apply-btn, .chat-copy-btn, .chat-split-mini-btn, .chp-del-btn,
+                .gh-item-action-btn, .am-agent-del, .gena-ask-submit, #lang-chip,
+                .am-model-tag, .am-provider-tag, .drag-pill, #chat-session-label,
+                .tabs, .tabs::before, .tab, .file-tab, .np-tab-bar, .np-tab,
+                #magic-copy, #magic-undo, #magic-upload, #magic-paste, #magic-clear, #magic-parse,
+                #magic-box header button, #magic-box footer button, #magic-prompt-dialog header button {
+                    border-radius: 999px !important;
+                }
+                .mp-choice, .mp-guide, .mp-outcome, .agent-provider-btn,
+                .np-save-opt, .np-vis-opt, .am-agent-row, .am-provider-row, .am-model-row,
         .welcome-feature, .code-canvas, .agent-step-card, .chat-fix-card, .chat-split-card,
         .gena-ask-card, .gena-run-card, .prompt-preview-card, .repo-progress-card,
         .chp-session-row, .gh-custom-trigger, .gh-custom-list, .gh-breadcrumb, #gh-file-tree,
