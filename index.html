@@ -1996,6 +1996,31 @@
         #magic-height { width: 72px; accent-color: var(--accent); }
         #magic-parse { margin-left: auto; }
         #magic-note:empty { display: none; }
+        #magic-progress { margin-top: 8px; padding: 10px 12px; border-radius: 16px; background: var(--editor-bg); border: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 7px; transition: border-color 0.25s ease, background 0.25s ease; }
+        #magic-progress[hidden] { display: none; }
+        #magic-progress.mp-error { border-color: rgba(239, 68, 68, 0.55); background: rgba(239, 68, 68, 0.08); animation: mpShake 0.35s ease; }
+        #magic-progress.mp-done { border-color: rgba(16, 185, 129, 0.55); background: var(--accent-mist); }
+        .mp-prog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 600; }
+        .mp-prog-label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-color); }
+        .mp-prog-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: mpPulse 0.9s ease-in-out infinite; }
+        #magic-progress.mp-done .mp-prog-dot { background: #10b981; animation: none; }
+        #magic-progress.mp-error .mp-prog-dot { background: #ef4444; animation: none; }
+        .mp-prog-count { font-family: monospace; font-size: 11px; color: var(--accent); }
+        #magic-progress.mp-error .mp-prog-count { color: #ef4444; }
+        .mp-prog-track { height: 6px; border-radius: 999px; background: rgba(128, 128, 128, 0.18); overflow: hidden; }
+        .mp-prog-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-fill-start), var(--accent), var(--accent-ink-end)); background-size: 200% 100%; animation: mpShimmer 1.2s linear infinite; transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease; }
+        #magic-progress.mp-error .mp-prog-fill { background: #ef4444; animation: none; }
+        .mp-prog-steps { display: flex; flex-wrap: wrap; gap: 5px; }
+        .mp-prog-step { min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 3px; background: rgba(128, 128, 128, 0.14); color: var(--text-color); opacity: 0.55; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .mp-prog-step.active { opacity: 1; background: var(--accent-wash); color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); transform: scale(1.08); }
+        .mp-prog-step.done { opacity: 1; background: var(--accent-fill); color: #ffffff; transform: scale(1); }
+        .mp-prog-step.error { opacity: 1; background: #ef4444; color: #ffffff; transform: scale(1.08); }
+        @keyframes mpPulse { 0%, 100% { transform: scale(0.85); opacity: 0.6; } 50% { transform: scale(1.25); opacity: 1; } }
+        @keyframes mpShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes mpShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); } }
+        .ace-magic-applied-line { position: absolute; background: rgba(16, 185, 129, 0.22); border-left: 3px solid #10b981; z-index: 5; animation: aceMagicFlash 2.4s ease-out forwards; }
+        .ace_gutter-cell.ace-magic-applied-gutter { background: rgba(16, 185, 129, 0.28); color: #10b981 !important; font-weight: 700; }
+        @keyframes aceMagicFlash { 0% { background: rgba(16, 185, 129, 0.42); } 35% { background: rgba(16, 185, 129, 0.22); } 100% { background: rgba(16, 185, 129, 0); border-left-color: transparent; } }
         #magic-copy, #magic-undo, #magic-upload { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: opacity 0.15s, background 0.15s, color 0.15s; }
         #magic-copy:hover, #magic-upload:hover, #magic-undo:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
         #magic-undo:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -6251,6 +6276,14 @@
             <button type="button" id="magic-clear" class="cdlg-btn danger">Clear</button>
             <button type="button" id="magic-parse" class="cdlg-btn primary">Parse</button>
         </footer>
+        <div id="magic-progress" hidden aria-live="polite">
+            <div class="mp-prog-head">
+                <span class="mp-prog-label"><span class="mp-prog-dot"></span><span id="magic-progress-text">Applying edits...</span></span>
+                <span class="mp-prog-count" id="magic-progress-count">0 / 0</span>
+            </div>
+            <div class="mp-prog-track"><div class="mp-prog-fill" id="magic-progress-fill"></div></div>
+            <div class="mp-prog-steps" id="magic-progress-steps"></div>
+        </div>
         <p id="magic-note" role="status"></p>
     </dialog>
     <dialog id="magic-prompt-dialog" aria-labelledby="mp-title" onkeydown="event.stopPropagation()">
@@ -7313,9 +7346,12 @@
                 // Chat panel open → 20px above chat panel top edge
                 const chatTop = chatPanel.getBoundingClientRect().top;
                 toast.style.bottom = (window.innerHeight - chatTop + 20) + 'px';
-            } else if (!_navHidden && !_inPreview && panel && panel.style.transform !== 'translateY(100%)') {
-                // Nav visible → 20px above nav panel
+            } else if (!_navHidden && !_inPreview && panel && window.innerWidth < 768 && panel.style.transform !== 'translateY(100%)') {
+                // Nav visible (mobile bottom bar) → 20px above nav panel
                 toast.style.bottom = (panel.offsetHeight + 20) + 'px';
+            } else if (window.innerWidth >= 768) {
+                // Desktop: bottom-panel is a left sidebar, keep toast visible near bottom
+                toast.style.bottom = '28px';
             } else {
                 // Preview mode or nav hidden → center screen
                 toast.style.top = '50%';
@@ -7935,23 +7971,98 @@ function closeMagicJson(result = '') {
     animateDialogClose(document.getElementById('magic-box'), result);
 }
 
-function applyMagicBatch(edits) {
+let _magicAppliedMarkers = [];
+let _magicAppliedGutterRows = [];
+let _magicFlashTimer = null;
+
+function _highlightMagicAppliedRows(rowRanges) {
+    const session = editor.session;
+    if (!session || !rowRanges || !rowRanges.length) return;
+    if (_magicFlashTimer) { clearTimeout(_magicFlashTimer); _magicFlashTimer = null; }
+    _magicAppliedMarkers.forEach(id => session.removeMarker(id));
+    _magicAppliedMarkers = [];
+    _magicAppliedGutterRows.forEach(row => session.removeGutterDecoration(row, 'ace-magic-applied-gutter'));
+    _magicAppliedGutterRows = [];
+    const Range = ace.require('ace/range').Range;
+    const maxRow = Math.max(0, session.getLength() - 1);
+    const seen = new Set();
+    let firstRow = maxRow;
+    rowRanges.forEach(([s, e]) => {
+        const rs = Math.max(0, Math.min(maxRow, s));
+        const re = Math.max(rs, Math.min(maxRow, e));
+        if (rs < firstRow) firstRow = rs;
+        for (let r = rs; r <= re; r++) {
+            if (seen.has(r)) continue;
+            seen.add(r);
+            _magicAppliedMarkers.push(session.addMarker(new Range(r, 0, r, Infinity), 'ace-magic-applied-line', 'fullLine', false));
+            session.addGutterDecoration(r, 'ace-magic-applied-gutter');
+            _magicAppliedGutterRows.push(r);
+        }
+    });
+    editor.gotoLine(firstRow + 1, 0, true);
+    editor.scrollToLine(firstRow, true, true, () => {});
+    _magicFlashTimer = setTimeout(() => {
+        _magicAppliedMarkers.forEach(id => session.removeMarker(id));
+        _magicAppliedMarkers = [];
+        _magicAppliedGutterRows.forEach(row => session.removeGutterDecoration(row, 'ace-magic-applied-gutter'));
+        _magicAppliedGutterRows = [];
+        _magicFlashTimer = null;
+    }, 2500);
+}
+
+async function applyMagicBatch(edits, onProgress) {
     if (!Array.isArray(edits) || !edits.length) throw Error('Add at least one edit.');
-    let result = editor.getValue().replace(/\r\n?/g, '\n');
+    const original = editor.getValue().replace(/\r\n?/g, '\n');
+    let result = original;
+    const appliedRanges = [];
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const stepDelay = reduced ? 0 : Math.min(180, Math.max(55, Math.round(900 / edits.length)));
+    const wait = (ms) => ms > 0 ? new Promise(r => setTimeout(r, ms)) : Promise.resolve();
+
     for (const [index, edit] of edits.entries()) {
+        if (onProgress) onProgress('step', index, edits.length);
+        await wait(stepDelay);
         const label = 'Edit ' + (index + 1) + ': ';
         if (!edit || typeof edit.old !== 'string' || typeof edit.new !== 'string' || !edit.old.length) {
+            if (onProgress) onProgress('error', index, edits.length);
             throw Error(label + 'Use nonempty old and a string new.');
         }
         const oldText = edit.old.replace(/\r\n?/g, '\n');
         const newText = edit.new.replace(/\r\n?/g, '\n');
         const start = result.indexOf(oldText);
-        if (start < 0) throw Error(label + 'Old block not found.');
-        if (result.indexOf(oldText, start + 1) >= 0) throw Error(label + 'Old block matches multiple places.');
-        result = result.slice(0, start) + newText + result.slice(start + oldText.length);
+        if (start < 0) {
+            if (onProgress) onProgress('error', index, edits.length);
+            throw Error(label + 'Old block not found. No changes applied.');
+        }
+        if (result.indexOf(oldText, start + 1) >= 0) {
+            if (onProgress) onProgress('error', index, edits.length);
+            throw Error(label + 'Old block matches multiple places. No changes applied.');
+        }
+        const oldEnd = start + oldText.length;
+        const delta = newText.length - oldText.length;
+        for (const r of appliedRanges) {
+            if (r.start >= oldEnd) {
+                r.start += delta;
+                r.end += delta;
+            } else if (r.end > start) {
+                r.end = Math.max(r.start, r.end + delta);
+            }
+        }
+        appliedRanges.push({ start, end: start + newText.length });
+        result = result.slice(0, start) + newText + result.slice(oldEnd);
+        if (onProgress) onProgress('done-step', index, edits.length);
     }
+
+    const rowRanges = appliedRanges.map(r => {
+        const beforeStart = result.slice(0, r.start);
+        const startRow = (beforeStart.match(/\n/g) || []).length;
+        const sliceText = result.slice(r.start, r.end);
+        const endRow = startRow + (sliceText.match(/\n/g) || []).length;
+        return [startRow, endRow];
+    });
+
     const session = editor.session;
-    if (result !== editor.getValue().replace(/\r\n?/g, '\n')) {
+    if (result !== original) {
         const Range = ace.require('ace/range').Range;
         const last = session.getLength() - 1;
         session.markUndoGroup();
@@ -7961,7 +8072,9 @@ function applyMagicBatch(edits) {
         if (tab) tab.content = editor.getValue();
         saveSession();
         if (_inPreview && !_pythonMode) _refreshPreview();
+        _highlightMagicAppliedRows(rowRanges);
     }
+    if (onProgress) onProgress('complete', edits.length, edits.length);
     return edits.length;
 }
 
@@ -7974,6 +8087,22 @@ function parseMagicJson(fromShortcut = false) {
     const paste = document.getElementById('magic-paste');
     const note = document.getElementById('magic-note');
     note.textContent = '';
+    const progWrap = document.getElementById('magic-progress');
+    const progText = document.getElementById('magic-progress-text');
+    const progCount = document.getElementById('magic-progress-count');
+    const progFill = document.getElementById('magic-progress-fill');
+    const progSteps = document.getElementById('magic-progress-steps');
+    const parseBtn = document.getElementById('magic-parse');
+    let batchApplying = false;
+    const resetProgress = () => {
+        if (!progWrap) return;
+        progWrap.hidden = true;
+        progWrap.className = '';
+        progFill.style.width = '0%';
+        progSteps.innerHTML = '';
+    };
+    resetProgress();
+    parseBtn.disabled = false;
     try { field.value = sessionStorage.getItem('codx_magic_draft') || ''; } catch { field.value = ''; }
     field.oninput = () => { try { sessionStorage.setItem('codx_magic_draft', field.value); } catch {} };
     try { size.value = localStorage.getItem('codx_magic_height') || '88'; } catch {}
@@ -8005,9 +8134,11 @@ function parseMagicJson(fromShortcut = false) {
         }
     };
     document.getElementById('magic-clear').onclick = () => {
+        if (batchApplying) return;
         pasteVersion++;
         field.value = '';
         note.textContent = '';
+        resetProgress();
         try { sessionStorage.removeItem('codx_magic_draft'); } catch {}
     };
     paste.onclick = async function readClipboard() {
@@ -8022,8 +8153,8 @@ function parseMagicJson(fromShortcut = false) {
             if (current()) note.textContent = 'Touch and hold the field to paste.';
         }
     };
-    document.getElementById('magic-parse').onclick = () => {
-        if (box.dataset.closing) return;
+    parseBtn.onclick = async () => {
+        if (box.dataset.closing || batchApplying) return;
         const pastedData = field.value;
         if (!pastedData.trim()) { note.textContent = 'Paste JSON first.'; return; }
         try {
@@ -8048,13 +8179,61 @@ function parseMagicJson(fromShortcut = false) {
                 }
             }
             if (parsed && Object.prototype.hasOwnProperty.call(parsed, 'edits')) {
+                const editsArr = parsed.edits;
+                const total = Array.isArray(editsArr) ? editsArr.length : 0;
+                batchApplying = true;
+                parseBtn.disabled = true;
+                note.textContent = '';
+                if (progWrap && total > 0) {
+                    progWrap.hidden = false;
+                    progWrap.className = '';
+                    progFill.style.width = '0%';
+                    progCount.textContent = '0 / ' + total;
+                    progSteps.innerHTML = '';
+                    if (total <= 12) {
+                        for (let i = 0; i < total; i++) {
+                            const pill = document.createElement('span');
+                            pill.className = 'mp-prog-step';
+                            pill.dataset.idx = String(i);
+                            pill.textContent = String(i + 1);
+                            progSteps.appendChild(pill);
+                        }
+                    }
+                }
                 try {
-                    const count = applyMagicBatch(parsed.edits);
+                    const count = await applyMagicBatch(editsArr, (phase, idx, len) => {
+                        if (!progWrap) return;
+                        const pill = progSteps.querySelector('[data-idx="' + idx + '"]');
+                        if (phase === 'step') {
+                            progText.textContent = 'Applying edit ' + (idx + 1) + ' of ' + len + '...';
+                            progCount.textContent = (idx + 1) + ' / ' + len;
+                            progFill.style.width = Math.round(((idx + 0.4) / len) * 100) + '%';
+                            if (pill) pill.className = 'mp-prog-step active';
+                        } else if (phase === 'done-step') {
+                            progFill.style.width = Math.round(((idx + 1) / len) * 100) + '%';
+                            if (pill) { pill.className = 'mp-prog-step done'; pill.textContent = (idx + 1) + ' ✓'; }
+                        } else if (phase === 'error') {
+                            progWrap.className = 'mp-error';
+                            progText.textContent = 'Stopped at edit ' + (idx + 1) + ' — no changes applied';
+                            if (pill) { pill.className = 'mp-prog-step error'; pill.textContent = (idx + 1) + ' ×'; }
+                        } else if (phase === 'complete') {
+                            progWrap.className = 'mp-done';
+                            progFill.style.width = '100%';
+                            progText.textContent = 'All ' + len + ' edit' + (len === 1 ? '' : 's') + ' applied!';
+                            progCount.textContent = len + ' / ' + len;
+                        }
+                    });
+                    syncUndoState();
                     note.textContent = count + ' edits applied.';
+                    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    if (!reduced) await new Promise(r => setTimeout(r, 340));
                     box.addEventListener('close', () => showToast(count + ' edits applied. Undo available.', 'check_circle'), { once: true });
                     closeMagicJson('applied');
                 } catch (error) {
                     note.textContent = error.message;
+                } finally {
+                    batchApplying = false;
+                    parseBtn.disabled = false;
                 }
                 return;
             }
