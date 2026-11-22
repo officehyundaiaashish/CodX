@@ -2018,7 +2018,22 @@
         @keyframes mpPulse { 0%, 100% { transform: scale(0.85); opacity: 0.6; } 50% { transform: scale(1.25); opacity: 1; } }
         @keyframes mpShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         @keyframes mpShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); } }
-        .ace-magic-applied-line { position: absolute; background: rgba(16, 185, 129, 0.22); border-left: 3px solid #10b981; z-index: 5; animation: aceMagicFlash 2.4s ease-out forwards; }
+        .ace-magic-applied-line { position: absolute; background: rgba(16, 185, 129, 0.22); border-left: 3px solid #10b981; z-index: 5; }
+        #magic-review-bar { position: fixed; top: 96px; left: 50%; transform: translateX(-50%) translateY(-10px); z-index: 95; background: var(--glass-bg); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 999px; padding: 7px 10px 7px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1); max-width: 94vw; font-family: 'Poppins', sans-serif; }
+        #magic-review-bar.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+        .mrb-info { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-color); white-space: nowrap; }
+        .mrb-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; flex-shrink: 0; box-shadow: 0 0 8px rgba(16, 185, 129, 0.7); }
+        .mrb-nav { display: inline-flex; align-items: center; gap: 3px; }
+        .mrb-nav[hidden] { display: none; }
+        .mrb-nav-btn { width: 26px; height: 26px; border-radius: 999px; border: 1px solid var(--glass-border); background: rgba(128, 128, 128, 0.14); color: var(--text-color); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; padding: 0; }
+        .mrb-nav-btn:hover { background: var(--accent-wash); color: var(--accent); border-color: var(--accent); }
+        .mrb-nav-idx { font-size: 11px; font-family: monospace; opacity: 0.75; min-width: 30px; text-align: center; }
+        .mrb-actions { display: inline-flex; align-items: center; gap: 6px; }
+        .mrb-btn { min-width: 78px; height: 32px; padding: 0 14px; border: none; border-radius: 999px; font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: transform 0.12s, background 0.15s; }
+        .mrb-btn:active { transform: scale(0.95); }
+        .mrb-reject { background: #ef4444 !important; color: #ffffff !important; }
+        .mrb-reject:hover { background: #dc2626 !important; }
+        .mrb-accept { background: var(--accent-fill) !important; color: #ffffff !important; }
         .ace_gutter-cell.ace-magic-applied-gutter { background: rgba(16, 185, 129, 0.28); color: #10b981 !important; font-weight: 700; }
         @keyframes aceMagicFlash { 0% { background: rgba(16, 185, 129, 0.42); } 35% { background: rgba(16, 185, 129, 0.22); } 100% { background: rgba(16, 185, 129, 0); border-left-color: transparent; } }
         #magic-copy, #magic-undo, #magic-upload { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: opacity 0.15s, background 0.15s, color 0.15s; }
@@ -8046,14 +8061,106 @@ let _magicAppliedMarkers = [];
 let _magicAppliedGutterRows = [];
 let _magicFlashTimer = null;
 
+let _magicReviewState = null;
+
+function _clearMagicAppliedHighlights() {
+    const session = editor.session;
+    if (_magicFlashTimer) { clearTimeout(_magicFlashTimer); _magicFlashTimer = null; }
+    if (session) {
+        _magicAppliedMarkers.forEach(id => session.removeMarker(id));
+        _magicAppliedGutterRows.forEach(row => session.removeGutterDecoration(row, 'ace-magic-applied-gutter'));
+    }
+    _magicAppliedMarkers = [];
+    _magicAppliedGutterRows = [];
+}
+
+function _hideMagicReviewBar() {
+    const bar = document.getElementById('magic-review-bar');
+    if (bar) bar.classList.remove('visible');
+    _magicReviewState = null;
+}
+
+function _acceptMagicReview() {
+    _clearMagicAppliedHighlights();
+    _hideMagicReviewBar();
+    showToast('Changes accepted.', 'check_circle');
+}
+
+function _rejectMagicReview() {
+    const state = _magicReviewState;
+    _clearMagicAppliedHighlights();
+    _hideMagicReviewBar();
+    if (!state) return;
+    const current = editor.getValue().replace(/\r\n?/g, '\n');
+    if (current === state.after) {
+        editorUndo();
+        if (editor.getValue().replace(/\r\n?/g, '\n') !== state.before) {
+            const session = editor.session;
+            const Range = ace.require('ace/range').Range;
+            const last = session.getLength() - 1;
+            session.markUndoGroup();
+            session.replace(new Range(0, 0, last, session.getLine(last).length), state.before);
+            session.markUndoGroup();
+        }
+    } else {
+        const session = editor.session;
+        const Range = ace.require('ace/range').Range;
+        const last = session.getLength() - 1;
+        session.markUndoGroup();
+        session.replace(new Range(0, 0, last, session.getLine(last).length), state.before);
+        session.markUndoGroup();
+    }
+    const tab = fileTabs.find(item => item.id === activeTabId);
+    if (tab) tab.content = editor.getValue();
+    saveSession();
+    if (_inPreview && !_pythonMode) _refreshPreview();
+    showToast('Changes rejected — undone.', 'undo');
+}
+
+function _jumpMagicReviewEdit(delta) {
+    if (!_magicReviewState || !_magicReviewState.rowRanges.length) return;
+    const len = _magicReviewState.rowRanges.length;
+    _magicReviewState.idx = (_magicReviewState.idx + delta + len) % len;
+    const row = _magicReviewState.rowRanges[_magicReviewState.idx][0];
+    editor.gotoLine(row + 1, 0, true);
+    editor.scrollToLine(row, true, true, () => {});
+    const idxEl = document.getElementById('mrb-nav-idx');
+    if (idxEl) idxEl.textContent = (_magicReviewState.idx + 1) + ' / ' + len;
+}
+
+function _showMagicReviewBar(count, rowRanges, beforeText, afterText) {
+    let bar = document.getElementById('magic-review-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'magic-review-bar';
+        bar.className = 'no-select';
+        bar.innerHTML = '<span class="mrb-info"><span class="mrb-dot"></span><span id="mrb-label"></span></span>' +
+            '<span class="mrb-nav" id="mrb-nav" hidden><button type="button" class="mrb-nav-btn" id="mrb-prev" title="Previous change">‹</button><span class="mrb-nav-idx" id="mrb-nav-idx">1 / 1</span><button type="button" class="mrb-nav-btn" id="mrb-next" title="Next change">›</button></span>' +
+            '<span class="mrb-actions"><button type="button" class="mrb-btn mrb-reject" id="mrb-reject">Reject</button><button type="button" class="mrb-btn mrb-accept" id="mrb-accept">Accept</button></span>';
+        document.body.appendChild(bar);
+        document.getElementById('mrb-prev').onclick = () => _jumpMagicReviewEdit(-1);
+        document.getElementById('mrb-next').onclick = () => _jumpMagicReviewEdit(1);
+        document.getElementById('mrb-reject').onclick = _rejectMagicReview;
+        document.getElementById('mrb-accept').onclick = _acceptMagicReview;
+    }
+    _magicReviewState = { count, rowRanges: rowRanges || [], idx: 0, before: beforeText, after: afterText };
+    const lbl = document.getElementById('mrb-label');
+    if (lbl) lbl.textContent = count + (count === 1 ? ' edit' : ' edits') + ' applied';
+    const nav = document.getElementById('mrb-nav');
+    const idxEl = document.getElementById('mrb-nav-idx');
+    if (nav && rowRanges && rowRanges.length > 1) {
+        nav.hidden = false;
+        if (idxEl) idxEl.textContent = '1 / ' + rowRanges.length;
+    } else if (nav) {
+        nav.hidden = true;
+    }
+    requestAnimationFrame(() => bar.classList.add('visible'));
+}
+
 function _highlightMagicAppliedRows(rowRanges) {
     const session = editor.session;
     if (!session || !rowRanges || !rowRanges.length) return;
-    if (_magicFlashTimer) { clearTimeout(_magicFlashTimer); _magicFlashTimer = null; }
-    _magicAppliedMarkers.forEach(id => session.removeMarker(id));
-    _magicAppliedMarkers = [];
-    _magicAppliedGutterRows.forEach(row => session.removeGutterDecoration(row, 'ace-magic-applied-gutter'));
-    _magicAppliedGutterRows = [];
+    _clearMagicAppliedHighlights();
     const Range = ace.require('ace/range').Range;
     const maxRow = Math.max(0, session.getLength() - 1);
     const seen = new Set();
@@ -8072,13 +8179,6 @@ function _highlightMagicAppliedRows(rowRanges) {
     });
     editor.gotoLine(firstRow + 1, 0, true);
     editor.scrollToLine(firstRow, true, true, () => {});
-    _magicFlashTimer = setTimeout(() => {
-        _magicAppliedMarkers.forEach(id => session.removeMarker(id));
-        _magicAppliedMarkers = [];
-        _magicAppliedGutterRows.forEach(row => session.removeGutterDecoration(row, 'ace-magic-applied-gutter'));
-        _magicAppliedGutterRows = [];
-        _magicFlashTimer = null;
-    }, 2500);
 }
 
 async function applyMagicBatch(edits, onProgress) {
@@ -8146,7 +8246,7 @@ async function applyMagicBatch(edits, onProgress) {
         _highlightMagicAppliedRows(rowRanges);
     }
     if (onProgress) onProgress('complete', edits.length, edits.length);
-    return edits.length;
+    return { count: edits.length, rowRanges, before: original, after: result };
 }
 
 function parseMagicJson(fromShortcut = false) {
@@ -8249,12 +8349,16 @@ function parseMagicJson(fromShortcut = false) {
                     throw jsonErr;
                 }
             }
-            if (parsed && Object.prototype.hasOwnProperty.call(parsed, 'edits')) {
-                const editsArr = parsed.edits;
+            const editsArr = (parsed && Object.prototype.hasOwnProperty.call(parsed, 'edits'))
+                ? parsed.edits
+                : (parsed && (parsed.old !== undefined || parsed.new !== undefined) ? [parsed] : null);
+            if (editsArr !== null) {
                 const total = Array.isArray(editsArr) ? editsArr.length : 0;
                 batchApplying = true;
                 parseBtn.disabled = true;
                 note.textContent = '';
+                _clearMagicAppliedHighlights();
+                _hideMagicReviewBar();
                 if (progWrap && total > 0) {
                     progWrap.hidden = false;
                     progWrap.className = '';
@@ -8272,7 +8376,7 @@ function parseMagicJson(fromShortcut = false) {
                     }
                 }
                 try {
-                    const count = await applyMagicBatch(editsArr, (phase, idx, len) => {
+                    const res = await applyMagicBatch(editsArr, (phase, idx, len) => {
                         if (!progWrap) return;
                         const pill = progSteps.querySelector('[data-idx="' + idx + '"]');
                         if (phase === 'step') {
@@ -8290,15 +8394,20 @@ function parseMagicJson(fromShortcut = false) {
                         } else if (phase === 'complete') {
                             progWrap.className = 'mp-done';
                             progFill.style.width = '100%';
-                            progText.textContent = 'All ' + len + ' edit' + (len === 1 ? '' : 's') + ' applied!';
+                            progText.textContent = (len === 1 ? 'Edit applied!' : 'All ' + len + ' edits applied!');
                             progCount.textContent = len + ' / ' + len;
                         }
                     });
                     syncUndoState();
-                    note.textContent = count + ' edits applied.';
+                    const count = res.count;
+                    note.textContent = count + (count === 1 ? ' edit applied.' : ' edits applied.');
                     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                    if (!reduced) await new Promise(r => setTimeout(r, 340));
-                    box.addEventListener('close', () => showToast(count + ' edits applied. Undo available.', 'check_circle'), { once: true });
+                    if (!reduced) await new Promise(r => setTimeout(r, 320));
+                    box.addEventListener('close', () => {
+                        if (_inPreview) switchTab('editor');
+                        _showMagicReviewBar(count, res.rowRanges, res.before, res.after);
+                        showToast(count + (count === 1 ? ' edit applied — Accept or Reject.' : ' edits applied — Accept or Reject.'), 'check_circle');
+                    }, { once: true });
                     closeMagicJson('applied');
                 } catch (error) {
                     note.textContent = error.message;
@@ -8307,22 +8416,6 @@ function parseMagicJson(fromShortcut = false) {
                     parseBtn.disabled = false;
                 }
                 return;
-            }
-            if (parsed && (parsed.old !== undefined || parsed.new !== undefined)) {
-                closeMagicJson('parsed');
-                const oldVal = parsed.old || '';
-                const newVal = parsed.new || '';
-                document.getElementById('find-input').value = oldVal;
-                document.getElementById('replace-input').value = newVal;
-                box.addEventListener('close', function() {
-                    findText(false);
-                    let match = editor.getSelectionRange();
-                    if (!match.isEmpty()) {
-                        showToast('Magic Parse Success! Match Found.', 'auto_fix_high');
-                    } else {
-                        showToast('Parsed! But no matching block found in code.', 'error_outline');
-                    }
-                }, { once: true });
             } else {
                 note.textContent = 'Missing "old" or "new".';
             }
@@ -8416,6 +8509,10 @@ function parseMagicJson(fromShortcut = false) {
         if (wasNavVisible && _navHidden) toggleNavVisibility();
         if (box.returnValue === 'applied' || box.returnValue === 'parsed') {
             try { sessionStorage.removeItem('codx_magic_draft'); } catch {}
+        }
+        if (box.returnValue === 'applied') {
+            if (_inPreview) switchTab('editor');
+            return;
         }
         if (fromShortcut && box.returnValue !== 'parsed') return;
         if (_inPreview) switchTab('editor');
