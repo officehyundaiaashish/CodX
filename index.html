@@ -4349,7 +4349,7 @@
                 width: var(--sidebar-width) !important;
                 height: 100% !important;
                 transform: none;
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
                 z-index: 40;
                 display: flex !important;
                 flex-direction: column;
@@ -4535,6 +4535,55 @@
             /* Push editor + header right to make room for sidebar */
             .app-layout {
                 padding-left: var(--sidebar-width);
+                transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            /* PC collapsed icon-only rail mode */
+            body.desktop-rail #bottom-panel {
+                width: 58px !important;
+            }
+            body.desktop-rail #sidebar-resizer {
+                display: none !important;
+            }
+            body.desktop-rail .app-layout {
+                padding-left: 58px;
+            }
+            body.desktop-rail #inline-chat-panel {
+                left: 58px !important;
+            }
+            body.desktop-rail #find-modal {
+                left: calc(58px + (100% - 58px) / 2) !important;
+                width: calc(92% - 58px) !important;
+            }
+            body.desktop-rail #bottom-panel .toolbar-rows {
+                padding: 0 6px 10px 6px !important;
+            }
+            body.desktop-rail #bottom-panel .toolbar-rows > div[style*="justify-content: center"] {
+                padding: 0 !important;
+            }
+            body.desktop-rail #bottom-panel .dt-section-label {
+                font-size: 0 !important;
+                padding: 0 !important;
+                height: 1px !important;
+                margin: 8px 6px !important;
+                background: var(--glass-border) !important;
+                opacity: 1 !important;
+            }
+            body.desktop-rail #bottom-panel .dt-section-label:first-child {
+                display: none !important;
+            }
+            body.desktop-rail #bottom-panel .toolbar-btn {
+                justify-content: center !important;
+                padding: 10px 0 !important;
+                gap: 0 !important;
+                font-size: 0 !important;
+            }
+            body.desktop-rail #bottom-panel .toolbar-btn .material-icons-round {
+                font-size: 20px !important;
+            }
+            body.desktop-rail #bottom-panel .toolbar-btn svg {
+                width: 20px !important;
+                height: 20px !important;
             }
 
             /* Inline chat panel — account for sidebar */
@@ -6653,7 +6702,7 @@
         // Declared early — used in saved-settings restore blocks before their definition
         let _lastZoomSize = 10;
         let _inPreview = false;
-        let _navHidden = false;
+        let _navHidden = window.innerWidth >= 768;
 
         function _isAnyToolOpen() {
             return (
@@ -6691,21 +6740,27 @@
                 }
             }
 
-            if (inner) {
-                inner.style.transition = t;
-                if (!_navHidden && !anyToolOpen) {
-                    inner.style.transform = '';
-                    if (toggleBtn) toggleBtn.style.display = 'flex';
-                } else {
-                    inner.style.transform = isDesktop ? 'translateX(-100%)' : 'translateY(100%)';
-                    if (toggleBtn) toggleBtn.style.display = 'none';
-                }
-            }
-
             if (isDesktop) {
+                document.body.classList.toggle('desktop-rail', _navHidden);
+                if (inner) {
+                    inner.style.transition = t;
+                    inner.style.transform = anyToolOpen ? 'translateX(-100%)' : '';
+                }
                 const layout = document.querySelector('.app-layout');
                 if (layout) {
-                    layout.style.paddingLeft = (_navHidden || anyToolOpen) ? '0' : '';
+                    layout.style.paddingLeft = anyToolOpen ? '0' : '';
+                }
+            } else {
+                document.body.classList.remove('desktop-rail');
+                if (inner) {
+                    inner.style.transition = t;
+                    if (!_navHidden && !anyToolOpen) {
+                        inner.style.transform = '';
+                        if (toggleBtn) toggleBtn.style.display = 'flex';
+                    } else {
+                        inner.style.transform = 'translateY(100%)';
+                        if (toggleBtn) toggleBtn.style.display = 'none';
+                    }
                 }
             }
         }
@@ -7484,21 +7539,37 @@
         function toggleNavVisibility() {
             _navHidden = !_navHidden;
             const icon = document.getElementById('nav-hide-icon');
+            const btn = document.getElementById('nav-hide-btn');
             if (icon) {
                 if (_navHidden) {
-                    icon.style.opacity = '0.4'; icon.style.transform = 'scale(0.85)';
+                    icon.style.opacity = '0.65'; icon.style.transform = 'scale(0.92)';
                 } else {
                     icon.style.opacity = '1'; icon.style.transform = 'scale(1)';
                 }
             }
-            const isDesktop = window.innerWidth >= 768;
-            if (isDesktop) {
-                const layout = document.querySelector('.app-layout');
-                if (layout) layout.style.paddingLeft = _navHidden ? '0' : '';
+            if (btn && window.innerWidth >= 768) {
+                btn.title = _navHidden ? 'Show full panel' : 'Show icons only';
             }
             _syncBottomLayout();
-            setTimeout(() => editor.resize(), 380);
+            setTimeout(() => editor.resize(), 300);
         }
+        (function initDesktopIconRail() {
+            document.querySelectorAll('#bottom-panel .toolbar-btn').forEach(btn => {
+                if (!btn.title) {
+                    const txt = Array.from(btn.childNodes)
+                        .filter(n => n.nodeType === 3)
+                        .map(n => n.textContent.trim())
+                        .join(' ')
+                        .trim();
+                    if (txt) btn.title = txt;
+                }
+            });
+            if (window.innerWidth >= 768) {
+                document.body.classList.toggle('desktop-rail', _navHidden);
+                const btn = document.getElementById('nav-hide-btn');
+                if (btn) btn.title = _navHidden ? 'Show full panel' : 'Show icons only';
+            }
+        })();
         // Legacy stubs — kept so existing calls dont break
         function _expandNav() { }
 
