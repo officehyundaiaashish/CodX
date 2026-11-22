@@ -5114,12 +5114,40 @@
         button[onclick*="ghLogout"] {
             padding: 4px 10px !important;
         }
-        .ft-close {
-            width: 17px !important;
-            height: 17px !important;
-            min-width: 17px !important;
-            min-height: 17px !important;
-            font-size: 12px !important;
+        .file-tabs-bar {
+            padding: 3px 6px 0 !important;
+            gap: 3px !important;
+            align-items: flex-end;
+        }
+        .file-tab {
+            padding: 4px 7px 4px 10px !important;
+            gap: 5px !important;
+            font-size: 11px !important;
+            border-radius: 10px 10px 0 0 !important;
+            position: relative;
+            cursor: grab;
+            touch-action: pan-y;
+            transition: background 0.15s, opacity 0.15s;
+        }
+        .file-tab.active {
+            background: var(--editor-bg);
+        }
+        .file-tab.tab-dragging {
+            z-index: 25 !important;
+            cursor: grabbing;
+            opacity: 0.96;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+            transition: none !important;
+        }
+        span.material-icons-round.ft-close,
+        span.material-icons-round.ft-close[onclick] {
+            width: 14px !important;
+            height: 14px !important;
+            min-width: 14px !important;
+            min-height: 14px !important;
+            font-size: 10px !important;
+            margin-left: 2px !important;
+            line-height: 1 !important;
         }
         /* Red Danger / Clear / Delete / Remove / Reject / Logout Buttons */
         .cdlg-btn.danger,
@@ -7630,9 +7658,14 @@
             fileTabs.forEach(tab => {
                 const el = document.createElement('div');
                 el.className = 'file-tab' + (tab.id === activeTabId ? ' active' : '');
+                el.dataset.tabId = String(tab.id);
                 if (didSwitch && tab.id === activeTabId) el.classList.add('tab-enter');
                 el.innerHTML = `<span style="pointer-events:none">${tab.name}</span><span class="material-icons-round ft-close" onclick="closeFileTab(${tab.id},event)">close</span>`;
-                el.onclick = (e) => { if (!e.target.classList.contains('ft-close')) switchFileTab(tab.id); };
+                el.onclick = (e) => {
+                    if (el.dataset.justDragged === '1') { delete el.dataset.justDragged; return; }
+                    if (!e.target.classList.contains('ft-close')) switchFileTab(tab.id);
+                };
+                _attachTabDrag(el, tab.id, bar);
                 bar.appendChild(el);
             });
             if (didSwitch && !_inPreview && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -7644,6 +7677,91 @@
                     });
                 }
             }
+        }
+
+        function _attachTabDrag(el, tabId, bar) {
+            el.addEventListener('pointerdown', (e) => {
+                if (e.target.classList.contains('ft-close')) return;
+                if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+                if (fileTabs.length < 2) return;
+
+                let startX = e.clientX;
+                let dragging = false;
+                let lastDx = 0;
+
+                const onMove = (ev) => {
+                    const dx = ev.clientX - startX;
+                    if (!dragging && Math.abs(dx) < 6) return;
+                    if (!dragging) {
+                        dragging = true;
+                        el.classList.add('tab-dragging');
+                        try { el.setPointerCapture(e.pointerId); } catch {}
+                    }
+                    lastDx = ev.clientX - startX;
+                    el.style.transform = `translateX(${lastDx}px)`;
+
+                    const rect = el.getBoundingClientRect();
+                    const midX = rect.left + rect.width / 2;
+
+                    const next = el.nextElementSibling;
+                    if (next && next.dataset.tabId && midX > next.getBoundingClientRect().left + next.offsetWidth / 2) {
+                        const prevLeft = next.getBoundingClientRect().left;
+                        const oldLeft = el.getBoundingClientRect().left;
+                        bar.insertBefore(next, el);
+                        const idx = fileTabs.findIndex(t => t.id === tabId);
+                        if (idx !== -1 && idx + 1 < fileTabs.length) {
+                            [fileTabs[idx], fileTabs[idx + 1]] = [fileTabs[idx + 1], fileTabs[idx]];
+                        }
+                        const newLeft = el.getBoundingClientRect().left;
+                        startX += (newLeft - oldLeft);
+                        lastDx = ev.clientX - startX;
+                        el.style.transform = `translateX(${lastDx}px)`;
+                        const shift = prevLeft - next.getBoundingClientRect().left;
+                        if (next.animate && Math.abs(shift) > 0.5) {
+                            next.animate([{ transform: `translateX(${shift}px)` }, { transform: 'translateX(0)' }], { duration: 160, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+                        }
+                    } else {
+                        const prev = el.previousElementSibling;
+                        if (prev && prev.dataset.tabId && midX < prev.getBoundingClientRect().left + prev.offsetWidth / 2) {
+                            const prevLeft = prev.getBoundingClientRect().left;
+                            const oldLeft = el.getBoundingClientRect().left;
+                            bar.insertBefore(el, prev);
+                            const idx = fileTabs.findIndex(t => t.id === tabId);
+                            if (idx > 0) {
+                                [fileTabs[idx], fileTabs[idx - 1]] = [fileTabs[idx - 1], fileTabs[idx]];
+                            }
+                            const newLeft = el.getBoundingClientRect().left;
+                            startX += (newLeft - oldLeft);
+                            lastDx = ev.clientX - startX;
+                            el.style.transform = `translateX(${lastDx}px)`;
+                            const shift = prevLeft - prev.getBoundingClientRect().left;
+                            if (prev.animate && Math.abs(shift) > 0.5) {
+                                prev.animate([{ transform: `translateX(${shift}px)` }, { transform: 'translateX(0)' }], { duration: 160, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+                            }
+                        }
+                    }
+                };
+
+                const onUp = () => {
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    window.removeEventListener('pointercancel', onUp);
+                    if (!dragging) return;
+                    el.dataset.justDragged = '1';
+                    setTimeout(() => { delete el.dataset.justDragged; }, 60);
+                    el.classList.remove('tab-dragging');
+                    const fromDx = lastDx;
+                    el.style.transform = '';
+                    if (el.animate && Math.abs(fromDx) > 0.5) {
+                        el.animate([{ transform: `translateX(${fromDx}px)` }, { transform: 'translateX(0)' }], { duration: 150, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+                    }
+                    if (typeof saveSession === 'function') saveSession();
+                };
+
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+                window.addEventListener('pointercancel', onUp);
+            });
         }
 
         function switchFileTab(id) {
